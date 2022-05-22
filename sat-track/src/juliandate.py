@@ -1,5 +1,4 @@
-from datetime import datetime, timedelta, timezone
-#from datetime import timezone as tz
+from datetime import datetime
 
 class JulianDate:
 
@@ -104,3 +103,5 @@ def now() -> JulianDate:
     '''Returns a new JulianDate object equal to the current UTC time.'''
     tm = datetime.utcnow()
     return JulianDate(tm.month, tm.day, tm.year, tm.hour, tm.minute, tm.second + (tm.microsecond / 1000000))
+
+J2000 = JulianDate(1, 1, 2000, 12, 0, 0)
