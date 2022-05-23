@@ -69,5 +69,5 @@ class Body:
 
 
 _earth_elements = OrbitalElements(149.598e9, 0.0167, 0.0, 348.73936, 102.94719, 100.46435, J2000)
-EARTH = Body("Earth", _earth_elements, EARTH_MU, EARTH_EQUITORIAL_RADIUS, 86164.090531, 280.46061837, J2000,
+EARTH_BODY = Body("Earth", _earth_elements, EARTH_MU, EARTH_EQUITORIAL_RADIUS, 86164.090531, 280.46061837, J2000,
              rp=EARTH_POLAR_RADIUS, parent=None)  # set parent to sun when created
