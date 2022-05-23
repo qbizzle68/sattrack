@@ -5,6 +5,12 @@ from math import sqrt, radians, degrees
 
 
 class OrbitalElements:
+    """This object contains a celestial object's classical orbital elements, namely:
+        semi-major axis, eccentricity, inclination, right-ascension of ascending node, argument of pariapsis,
+        true anomaly and the epoch of the true anomaly.
+    Notice the true anomaly is used to represent the angular position of the orbit as opposed to the mean anomaly.
+    The epoch is not required in instantiate an object, but the class supports methods to move the object in time,
+    and behavior of the methods is undefined if the epoch is not set to the matching true anomaly."""
 
     def __init__(self, sma: float, ecc: float, inc: float, raan: float, aop: float, trueAnomaly: float,
                  epoch: JulianDate = 0):
@@ -50,43 +56,63 @@ class OrbitalElements:
         return radians(da) / sqrt(EARTH_MU / (self._sma ** 3))
 
     def setSma(self, sma: float):
+        """Sets the semi-major axis of the orbit.
+        Parameters:
+        sma:    Semi-major axis measured in meters."""
         self._sma = sma
 
     def getSma(self) -> float:
+        """Returns the semi-major axis of the orbit in meters."""
         return self._sma
 
     def setEcc(self, ecc: float):
+        """Sets the eccentricity of the orbit."""
         self._ecc = ecc
 
     def getEcc(self):
+        """Returns the eccentricity of the orbit."""
         return self._ecc
 
     def setInc(self, inc: float):
+        """"Sets the inclination of the orbit in degrees."""
         self._inc = inc
 
     def getInc(self):
+        """Returns the inclination of the orbit in degrees."""
         return self._inc
 
     def setRaan(self, raan: float):
+        """Sets the right-ascension of the ascending node in degrees.
+            Synonymous with longitude of ascending node."""
         self._raan = raan
 
     def getRaan(self):
+        """Returns the right-ascension of the ascending node in degrees.
+            Synonymous with longitude of ascending node."""
         return self._raan
 
     def setAop(self, aop: float):
+        """Sets the argument of periapsis measured in degrees."""
         self._aop = aop
 
     def getAop(self):
+        """Returns the argument of periapsis measured in degrees."""
         return self._aop
 
     def setTrueAnomaly(self, trueAnom: float):
+        """Sets the true anomaly of the orbit in degrees. For the positional methods to work properly
+        the epoch should be changed whenever this value is changed."""
         self._trueAnomaly = trueAnom
 
     def getTrueAnomaly(self):
+        """Returns the true anomaly of the orbit in degrees."""
         return self._trueAnomaly
 
     def setEpoch(self, epoch: JulianDate):
+        """Sets the epoch associated with the true anomaly. For the positional methods to work properly,
+        the true anomaly should be changed whenever this value is changed. Argument should be a JulianDate object."""
         self._epoch = epoch
 
     def getEpoch(self):
+        """Returns the epoch associated with the objects true anomaly."""
         return self._epoch
