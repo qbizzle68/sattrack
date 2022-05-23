@@ -1,6 +1,5 @@
 ﻿from math import atan2 as at2, sqrt, pi, sin, cos, radians, degrees
-
-EARTH_MU = 3.986004418e14
+from constants import EARTH_MU
 
 
 def atan2(y: float, x: float) -> float:
@@ -38,7 +37,8 @@ def meanToTrue(meanAnomaly: float, eccentricity: float) -> float:
 
 
 def meanToEccentric(meanAnomaly: float, eccentricity: float) -> float:
-    return m2ENewtonRaphson(meanAnomaly, meanAnomaly, eccentricity)
+    e = m2ENewtonRaphson(meanAnomaly, meanAnomaly, eccentricity) % 360.0
+    return e if e >= 0 else e + 360.0
 
 
 def eccentricToTrue(eccAnom: float, ecc: float) -> float:
@@ -58,7 +58,8 @@ def trueToEccentric(trueAnom: float, ecc: float) -> float:
 
 
 def eccentricToMean(eccAnom: float, ecc: float) -> float:
-    return eccAnom - ecc * sin(radians(eccAnom))
+    m = (degrees(radians(eccAnom) - ecc * sin(radians(eccAnom)))) % 360.0
+    return m if m >= 0 else m + 360.0
 
 
 def m2ENewtonRaphson(M: float, Ej: float, ecc: float) -> float:
