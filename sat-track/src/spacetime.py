@@ -108,3 +108,20 @@ def now() -> JulianDate:
 
 
 J2000 = JulianDate(1, 1, 2000, 12, 0, 0)
+
+
+def siderealTime(jd: JulianDate) -> float:
+    dt = jd.difference(J2000)
+    tmp = (18.697_374_558 + 24.065_709_824_419_08 * dt) % 24.0
+    return tmp + 24.0 if tmp < 0 else tmp
+
+
+def localSiderealTime(jd: JulianDate, lng: float) -> float:
+    if lng < 0: lng += 360.0
+    lng2RA = lng / 360.0 * 24.0
+    lst = siderealTime(jd) + lng2RA
+    return lst % 24.0
+
+
+def earthOffsetAngle(jd: JulianDate) -> float:
+    return siderealTime(jd) / 24.0 * 360.0
