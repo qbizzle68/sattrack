@@ -5,7 +5,7 @@ from spacetime import JulianDate
 from tle import TwoLineElement
 from math import radians, cos, sqrt, sin
 from constants import CK2, CK4, E6A, Q0MS2T, S, TOTHRD, XJ3, XKE, XKMPER, XMNPDA, \
-    AE, DE2RA, PIO2, TWOPI, X3PIO2
+    AE, TWOPI
 
 
 class _Mean_Elements:
@@ -25,6 +25,9 @@ class _SGP4_Independent:
 
     def __init__(self, tle: TwoLineElement):
         self._me = _Mean_Elements(tle)
+        self.initialize(tle)
+
+    def initialize(self, tle: TwoLineElement) -> None:
 
         # Recover original mean motion (xn0dp) and semi-major axis (a0dp) from input elements
         a1 = pow(XKE / self._me.xn0, TOTHRD)
@@ -52,7 +55,6 @@ class _SGP4_Independent:
             else:
                 self._s4 = perige - 78
             self._q0ms24 = pow((120 - self._s4) * AE / XKMPER, 4)
-            #s4 = s4 / XKMPER + AE
             self._s4 /= (XKMPER + AE)
         pinvsq = 1.0 / (self._a0dp * self._a0dp * beta02 * beta02)
         self._tsi = 1 / (self._a0dp - self._s4)
@@ -114,13 +116,12 @@ class _SGP4_Propagator(_SGP4_Independent):
 
     def __init__(self, tle: TwoLineElement):
         super().__init__(tle)
-        self._name = tle.getName()
         self._tle = tle
         self._tleEpoch = tle.epoch()
 
-    def getState(self, jd: JulianDate) -> tuple[EVector]:
-        #dt = self._tleEpoch.difference(jd) * XMNPDA
+    def getState(self, jd: JulianDate) -> tuple[EVector, EVector]:
         dt = jd.difference(self._tleEpoch) * XMNPDA
+
         #   update for secular gravity and atmospheric drag
         xmdf = self._me.xm0 + self._xmdot * dt
         omgadf = self._me.omega0 + self._omgdot * dt
@@ -135,7 +136,7 @@ class _SGP4_Propagator(_SGP4_Independent):
         if not self._isImp:
             delomg = self._omgcof * dt
             delm = self._xmcof * (pow( 1 + self._eta * cos(xmdf), 3) - self._delm0)
-            temp = delomg + delm;
+            temp = delomg + delm
             xmp = xmdf + temp
             omega = omgadf - temp
             tcube = tsq * dt
@@ -147,7 +148,7 @@ class _SGP4_Propagator(_SGP4_Independent):
         e = self._me.e0 - tempe
         xl = xmp + omega + xnode + self._xn0dp * templ
         beta = sqrt(1 - e * e)
-        xn = XKE / pow(a, 1.5);
+        xn = XKE / pow(a, 1.5)
 
         # long period periodics
         axn = e * cos(omega)
