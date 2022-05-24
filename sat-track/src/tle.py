@@ -178,7 +178,7 @@ class TwoLineElement:
 CELESTRAK_URL = "https://celestrak.com/NORAD/elements/gp.php?{}={}&FORMAT=TLE"
 
 
-def getTLE(query: str, value: str):
+def getTLE(query: str, value: str) -> TwoLineElement | None:
     """Retrieves a TLE from the Celestrak online repository of continually updating TLEs via HTTP.
     Parameters:
     query:  The querying type, possible values are:
@@ -201,9 +201,12 @@ def getTLE(query: str, value: str):
         print("Multiple TLEs found.")
         for l, i in zip(lineGroups, range(1, len(lineGroups)+1)):
             print(f'{i}:  {l[0]}')
+        print(f'{len(lineGroups)+1}:  None')
         x = 0
-        while x not in range(1, len(lineGroups)+1):
+        while x not in range(1, len(lineGroups)+2):
             x = int(input("Which TLE do you wish to import?: "))
+        if x == len(lineGroups) + 1:
+            return None
         i, j, k = lineGroups[x-1]
         tle = i + '\n' + j + '\n' + k
         return TwoLineElement(tle)
