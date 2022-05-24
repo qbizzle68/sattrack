@@ -41,6 +41,10 @@ class Satellite(_SGP4_Propagator):
         self._recent_time = None
         self._recent_state = (None, None)
 
+    def __str__(self):
+        return f'Name: {self._name}\nTLE:\n{self._tle.getLine1()}\n{self._tle.getLine2()}\nRecent Time: ' \
+               f'{self._recent_time}\nRecent State:\nPosition: {self._recent_state[0]}\nVelocity: {self._recent_state[1]}'
+
     def getState(self, jd: JulianDate):
         """Computes the state vectors for a satellite at a given time. The Satellite object should
         be loaded with an up-to-date TLE as the accuracy becomes less the farther from the TLE
