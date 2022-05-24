@@ -25,6 +25,7 @@ class _SGP4_Independent:
 
     def __init__(self, tle: TwoLineElement):
         self._me = _Mean_Elements(tle)
+        self._isImp = False
         self.initialize(tle)
 
     def initialize(self, tle: TwoLineElement) -> None:
