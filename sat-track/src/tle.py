@@ -1,4 +1,4 @@
-from juliandate import JulianDate
+from spacetime import JulianDate
 import requests
 
 

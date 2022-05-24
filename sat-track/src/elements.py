@@ -1,4 +1,4 @@
-from juliandate import JulianDate
+from spacetime import JulianDate
 from constants import EARTH_MU
 from anomalies import trueToMean, meanToTrue
 from math import sqrt, radians, degrees

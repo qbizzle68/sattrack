@@ -1,6 +1,6 @@
 from elements import OrbitalElements
 from body import Body, EARTH_BODY
-from juliandate import JulianDate
+from spacetime import JulianDate
 
 
 class SimpleSatellite(OrbitalElements):

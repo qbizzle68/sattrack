@@ -60,7 +60,6 @@ class JulianDate:
         timezone: The timezone offset to create the Gregorian date."""
         Z = int(self._date + 0.5 + (timezone / 24.0))
         F = (self._date + 0.5 + (timezone / 24.0)) - Z
-        A = 0
         if Z < 2299161:
             A = Z
         else:
@@ -69,9 +68,9 @@ class JulianDate:
         C = A + 1524
         D = int((C - 122.1) / 365.25)
         G = int(365.25 * D)
-        I = int((C - G) / 30.6001)
-        d = C - G - int(30.6001 * I) + F
-        m = I - 1 if I < 14 else I - 13
+        _I = int((C - G) / 30.6001)
+        d = C - G - int(30.6001 * _I) + F
+        m = _I - 1 if _I < 14 else _I - 13
         y = D - 4716 if m > 2 else D - 4715
 
         dayFrac = d - int(d)

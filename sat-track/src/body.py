@@ -1,5 +1,5 @@
 from elements import OrbitalElements
-from juliandate import JulianDate, J2000
+from spacetime import JulianDate, J2000
 from constants import EARTH_MU, EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS
 
 
