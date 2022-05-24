@@ -22,6 +22,17 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="sat_track.py" />
+    <Compile Include="src\anomalies.py" />
+    <Compile Include="src\juliandate.py" />
+    <Compile Include="src\order.py" />
+    <Compile Include="src\rotation.py" />
+    <Compile Include="test\test_rotation.py">
+      <SubType>Code</SubType>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="src\" />
+    <Folder Include="test\" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in
