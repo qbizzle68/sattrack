@@ -29,14 +29,16 @@ class SimpleSatellite(OrbitalElements):
         self._body = body
 
 
-class Satellite(_SGP4_Propagator):
+class Satellite:
     """This object describes a satellite that can be modeled with an SGP type propagation model,
     namely the SGP4 or SDP4, described by the NORAD two-line element set.
     The class also contains an internal buffer holding the most recent state and time associated
     with it."""
 
     def __init__(self, tle: TwoLineElement):
-        super().__init__(tle)
+        self._propagator = _SGP4_Propagator(tle)
+        self._tle = tle
+        self._tleEpoch = tle.epoch()
         self._name = tle.getName()
         self._recent_time = None
         self._recent_state = (None, None)
@@ -52,10 +54,13 @@ class Satellite(_SGP4_Propagator):
         Parameters:
         jd: The time to find the state vectors of the satellite.
         Returns a tuple with the position and velocity vectors as the first and second elements."""
-        self._recent_time = jd
+        '''self._recent_time = jd
         state = super().getState(jd)
         self._recent_state = state
-        return state
+        return state'''
+        self._recent_time = jd
+        self._recent_state = self._propagator.getState(self._tle, jd)
+        return self._recent_state
 
     def name(self) -> str:
         """Returns the name of the satellite, which is determined by the name in the TLE."""
@@ -70,12 +75,13 @@ class Satellite(_SGP4_Propagator):
         """The epoch found in the most recently loaded TLE."""
         return self._tleEpoch
 
-    def updateTle(self, tle: TwoLineElement) -> None:
+    def updateTLE(self, tle: TwoLineElement) -> None:
         """Updates the TLE to a more up-to-date TLE than the one loaded when instantiating."""
         self._name = tle.getName()
         self._tle = tle
         self._tleEpoch = tle.epoch()
-        self.initialize(tle)
+        self._propagator = _SGP4_Propagator(tle)
+        #self.initialize(tle)
 
     def recentTime(self) -> JulianDate:
         """The time the most recent state was calculated."""
