@@ -4,12 +4,14 @@ from datetime import datetime
 class JulianDate:
 
     def __init__(self, month: int, day: int, year: int, hour: int, minute: int, second: float, timeZone: int = 0):
-        self._date = 0
+        #self._date = 0
+        self._day_number = 0
+        self._day_fraction = 0
         self.setTime(month, day, year, hour, minute, second, timeZone)
 
     def __str__(self) -> str:
         """Returns the value and Gregorian date of the JulianDate."""
-        return str(round(self._date, 6)) + ' --- ' + self.date()
+        return str(round(self.value(), 6)) + ' --- ' + self.date()
 
     def setTime(self, m: int, d: int, y: int, hr: int, mi: int, sec: float, timeZone: int = 0):
         """Sets the value of a JulianDate object based on a Gregorian calendar date.
@@ -24,20 +26,30 @@ class JulianDate:
         t0 = int((1461 * (y + 4800 + int((m - 14) / 12))) / 4)
         t1 = int((367 * (m - 2 - (12 * int((m - 14) / 12)))) / 12)
         t2 = int((3 * int((y + 4900 + int((m - 14) / 12)) / 100)) / 4)
-        self._date = t0 + t1 - t2 + d - 32075 + (
-                    ((hr - 12) / 24.0) + (mi / 1440.0) + (sec / 86400.0) - (timeZone / 24.0))
+        self._day_number = t0 + t1 - t2 + d - 32075
+        self._day_fraction = ((hr - 12) / 24.0) + (mi / 1440.0) + (sec / 86400.0) - (timeZone / 24.0)
+        if self._day_fraction >= 1.0:
+            self._day_number += 1
+            self._day_fraction -= 1.0
+        elif self._day_fraction < 0:
+            self._day_number -= 1
+            self._day_fraction += 1.0
+        #self._date = t0 + t1 - t2 + d - 32075 + (
+                    #((hr - 12) / 24.0) + (mi / 1440.0) + (sec / 86400.0) - (timeZone / 24.0))
 
     def value(self):
         """Returns the value of the JulianDate."""
-        return self._date
+        return self._day_number + self._day_fraction
 
     def number(self):
         """Returns the Julian day number of this JulianDate."""
-        return int(self._date)
+        #return int(self._date)
+        return self._day_number
 
     def fraction(self):
         """Returns the fractional part of this JulianDate."""
-        return self._date - (int(self._date))
+        #return self._date - (int(self._date))
+        return self._day_fraction
 
     def future(self, days: float):
         """Computes a future JulianDate from this date.
@@ -45,21 +57,30 @@ class JulianDate:
         days:   Number of solar days in the future of this date. A negative value
                 indicates a computing a past date."""
         rtn = JulianDate(0, 0, 0, 0, 0, 0)
-        rtn._date = self._date + days
+        #rtn._date = self._date + days
+        int_day = int(days)
+        rtn._day_number = self._day_number + int_day
+        rtn._day_fraction = self._day_fraction + (days - int_day)
+        if rtn._day_fraction >= 1.0:
+            rtn._day_number += 1
+            rtn._day_fraction -= 1.0
         return rtn
 
     def difference(self, jd) -> float:
         """Returns the difference between two JulianDates, measured in solar days.
         Parameters:
         jd: A JulianDate object to find the difference from this object."""
-        return self._date - jd._date
+        #return self._date - jd._date
+        return self.value() - jd.value()
+
 
     def date(self, timezone: float = 0.0) -> str:
         """Generates a string with the Gregorian date equivalent of this JulianDate.
         Parameters:
         timezone: The timezone offset to create the Gregorian date."""
-        Z = int(self._date + 0.5 + (timezone / 24.0))
-        F = (self._date + 0.5 + (timezone / 24.0)) - Z
+        val = self.value()
+        Z = int(val + 0.5 + (timezone / 24.0))
+        F = (val + 0.5 + (timezone / 24.0)) - Z
         if Z < 2299161:
             A = Z
         else:
