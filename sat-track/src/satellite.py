@@ -3,6 +3,7 @@ from elements import OrbitalElements
 from body import Body, EARTH_BODY
 from spacetime import JulianDate
 from tle import TwoLineElement
+from pyevspace import EVector
 
 
 class SimpleSatellite(OrbitalElements):
@@ -59,7 +60,10 @@ class Satellite:
         self._recent_state = state
         return state'''
         self._recent_time = jd
-        self._recent_state = self._propagator.getState(self._tle, jd)
+        state = self._propagator.getState(self._tle, jd)
+        pos = EVector(state[0][0], state[0][1], state[0][2])
+        vel = EVector(state[1][0], state[1][1], state[1][2])
+        self._recent_state = (pos, vel)
         return self._recent_state
 
     def name(self) -> str:
