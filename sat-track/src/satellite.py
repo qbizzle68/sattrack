@@ -36,13 +36,14 @@ class Satellite:
     The class also contains an internal buffer holding the most recent state and time associated
     with it."""
 
-    def __init__(self, tle: TwoLineElement):
+    def __init__(self, tle: TwoLineElement, body: Body = EARTH_BODY):
         self._propagator = _SGP4_Propagator(tle)
         self._tle = tle
         self._tleEpoch = tle.epoch()
         self._name = tle.getName()
         self._recent_time = None
         self._recent_state = (None, None)
+        self._body = body
 
     def __str__(self):
         return f'Name: {self._name}\nTLE:\n{self._tle.getLine1()}\n{self._tle.getLine2()}\nRecent Time: ' \
@@ -94,3 +95,9 @@ class Satellite:
     def recentState(self):
         """The most recent state calculated."""
         return self._recent_state
+
+    def getBody(self) -> Body:
+        return self._body
+
+    def setBody(self, body: Body):
+        self._body = body
