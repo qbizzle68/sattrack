@@ -56,14 +56,10 @@ class Satellite:
         Parameters:
         jd: The time to find the state vectors of the satellite.
         Returns a tuple with the position and velocity vectors as the first and second elements."""
-        '''self._recent_time = jd
-        state = super().getState(jd)
-        self._recent_state = state
-        return state'''
         self._recent_time = jd
         state = self._propagator.getState(self._tle, jd)
-        pos = EVector(state[0][0], state[0][1], state[0][2])
-        vel = EVector(state[1][0], state[1][1], state[1][2])
+        pos = EVector(state[0][0] * 1000.0, state[0][1] * 1000.0, state[0][2] * 1000.0)
+        vel = EVector(state[1][0] * 1000.0, state[1][1] * 1000.0, state[1][2] * 1000.0)
         self._recent_state = (pos, vel)
         return self._recent_state
 
