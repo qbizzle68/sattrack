@@ -55,6 +55,8 @@ class GeoPosition(Coordinates):
         elif val < -180.0:
             tmp = val - int(val / 360.0) * 360.0
             return tmp + 360.0 if tmp < -180.0 else tmp
+        else:
+            return val
 
 
 def geocentricToGeodetic(lat: float) -> float:
