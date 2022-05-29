@@ -42,7 +42,7 @@ class Body:
         return self._orbit
 
     def mu(self) -> float:
-        return self._mu
+        return self._MU
 
     def equitorialRadius(self) -> float:
         return self._radius_eq
