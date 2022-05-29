@@ -181,7 +181,7 @@ class Rotation:
 
     def setAngles(self, angles: EulerAngles):
         self._angles = angles
-        self._matrix = getEulerMatrix(order, angles)
+        self._matrix = getEulerMatrix(self._order, angles)
 
     def getAngles(self) -> EulerAngles:
         return deepcopy(self._angles)
@@ -205,4 +205,10 @@ class Rotation:
 
     def RotateFromFrame(self, rotation, vector: EVector) -> EVector:
         return transpose(self._matrix) @ rotation._matrix @ vector
+
+
+def rotateToThenOffset(rotation: EMatrix, offset: EVector, original: EVector) -> EVector:
+    rotatedOriginal = transpose(rotation) @ original
+    rotatedOffset = transpose(rotation) @ offset
+    return rotatedOriginal - rotatedOffset
     
