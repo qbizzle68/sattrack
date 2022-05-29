@@ -1,4 +1,4 @@
-from math import asin, degrees, sqrt
+from math import asin, degrees
 
 from _sgp4 import _SGP4_Propagator
 
@@ -55,7 +55,8 @@ class Satellite:
 
     def __str__(self):
         return f'Name: {self._name}\nTLE:\n{self._tle.getLine1()}\n{self._tle.getLine2()}\nRecent Time: ' \
-               f'{self._recent_time}\nRecent State:\nPosition: {self._recent_state[0]}\nVelocity: {self._recent_state[1]}'
+               f'{self._recent_time}\nRecent State:\nPosition: {self._recent_state[0]}\nVelocity: ' \
+               f'{self._recent_state[1]}'
 
     def getState(self, jd: JulianDate):
         """Computes the state vectors for a satellite at a given time. The Satellite object should
@@ -113,7 +114,6 @@ class Satellite:
         self._tle = tle
         self._tleEpoch = tle.epoch()
         self._propagator = _SGP4_Propagator(tle)
-        #self.initialize(tle)
 
     def recentTime(self) -> JulianDate:
         """The time the most recent state was calculated."""
