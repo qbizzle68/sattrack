@@ -4,7 +4,7 @@ from constants import EARTH_FLATTENING, EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RAD
 from pyevspace import EVector
 from rotation import rotateOrderFrom, EulerAngles
 from order import Order
-from spacetime import JulianDate, localSiderealTime
+from spacetime import JulianDate, localSiderealTime, earthOffsetAngle
 
 
 class Coordinates(ABC):
@@ -96,7 +96,8 @@ def geoPositionVector(geo: GeoPosition, jd: JulianDate = None) -> EVector:
     else:
         radiusAtLat = radiusAtLatitude(geo.getLatitude())
         geocentricLat = radians(geodeticToGeocentric(geo.getLatitude()))
-        lst = radians(localSiderealTime(jd, geo.getLongitude()))
+        #lst = radians(localSiderealTime(jd, geo.getLongitude()))
+        lst = radians(geo.getLongitude() + earthOffsetAngle(jd))
         return EVector(
             radiusAtLat * cos(geocentricLat) * cos(lst),
             radiusAtLat * cos(geocentricLat) * sin(lst),
