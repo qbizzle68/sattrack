@@ -1,9 +1,16 @@
+from math import asin, degrees, sqrt
+
 from _sgp4 import _SGP4_Propagator
+
+from anomalies import atan2
+from coordinates import GeoPosition
 from elements import OrbitalElements
 from body import Body, EARTH_BODY
 from spacetime import JulianDate
 from tle import TwoLineElement
 from pyevspace import EVector
+
+from topos import ijkToSEZ
 
 
 class SimpleSatellite(OrbitalElements):
@@ -44,6 +51,7 @@ class Satellite:
         self._recent_time = None
         self._recent_state = (None, None)
         self._body = body
+        self.getState(tle.epoch())
 
     def __str__(self):
         return f'Name: {self._name}\nTLE:\n{self._tle.getLine1()}\n{self._tle.getLine2()}\nRecent Time: ' \
@@ -62,6 +70,29 @@ class Satellite:
         vel = EVector(state[1][0] * 1000.0, state[1][1] * 1000.0, state[1][2] * 1000.0)
         self._recent_state = (pos, vel)
         return self._recent_state
+
+    def getToposPosition(self, jd: JulianDate, geo: GeoPosition) -> EVector:
+        if self._recent_time == jd:
+            return ijkToSEZ(self._recent_state[0], jd, geo)
+        else:
+            self.getState(jd)
+            return ijkToSEZ(self._recent_state[0], jd, geo)
+
+    def getAltitude(self, jd: JulianDate, geo: GeoPosition) -> float:
+        if self._recent_time == jd:
+            sez = ijkToSEZ(self._recent_state[0], jd, geo)
+        else:
+            self.getState(jd)
+            sez = ijkToSEZ(self._recent_state[0], jd, geo)
+        return degrees(asin(sez[2] / sez.mag()))
+
+    def getAzimuth(self, jd: JulianDate, geo: GeoPosition) -> float:
+        if self._recent_time == jd:
+            sez = ijkToSEZ(self._recent_state[0], jd, geo)
+        else:
+            self.getState(jd)
+            sez = ijkToSEZ(self._recent_state[0], jd, geo)
+        return degrees(atan2(sez[1], -sez[0]))
 
     def name(self) -> str:
         """Returns the name of the satellite, which is determined by the name in the TLE."""
