@@ -2,7 +2,7 @@ from pyevspace import EVector, dot, cross, norm, vang
 
 from rotation.order import Order
 from rotation.rotation import getEulerMatrix, EulerAngles, rotateMatrixFrom
-from spacetime.spacetime import JulianDate
+from spacetime.juliandate import JulianDate
 from util.constants import EARTH_MU, CJ2
 from util.conversions import atan2
 from math import sqrt, radians, degrees, pi, sin, cos, acos, atan
