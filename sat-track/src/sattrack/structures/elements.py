@@ -13,10 +13,7 @@ from sattrack.structures.tle import TwoLineElement
 class OrbitalElements:
     """This object contains a celestial object's classical orbital elements, namely:
         semi-major axis, eccentricity, inclination, right-ascension of ascending node, argument of periapsis,
-        true anomaly and the epoch of the true anomaly.
-    Notice the true anomaly is used to represent the angular position of the orbit as opposed to the mean anomaly.
-    The epoch is not required in instantiate an object, but the class supports methods to move the object in time,
-    and behavior of the methods is undefined if the epoch is not set to the matching true anomaly."""
+        true anomaly and the epoch of the true anomaly."""
 
     def __init__(self, *, sma: float, ecc: float, inc: float, raan: float, aop: float, meanAnomaly: float,
                  epoch: JulianDate = 0):
@@ -72,9 +69,10 @@ class OrbitalElements:
         position:   Position state of the object at epoch.
         velocity:   Velocity state of the object at epoch.
         jd:         Julian Date of the time to compute orbital elements of."""
+
         angMom = cross(position, velocity)
         lineOfNodes = norm(cross(EVector(0, 0, 1), angMom))
-        eccVec = cls.computeEccentricVector(position, velocity)
+        eccVec = computeEccentricVector(position, velocity)
 
         ecc = eccVec.mag()
         inc = degrees(acos(angMom[2] / angMom.mag()))
@@ -89,16 +87,6 @@ class OrbitalElements:
             tAnom = 360 - tAnom
         sma = (angMom.mag() ** 2) / ((1 - (ecc * ecc)) * EARTH_MU)
         return cls(sma=sma, ecc=ecc, inc=inc, raan=ra, aop=aop, meanAnomaly=trueToMean(tAnom, ecc), epoch=jd)
-
-    @classmethod
-    def computeEccentricVector(cls, position: EVector, velocity: EVector):
-        """Compute the eccentric vector of an orbit.
-        Parameters:
-        position:   Position state of the object.
-        velocity:   Velocity state of the object."""
-        rtn = velocity * dot(position, velocity)
-        rtn = position * ((velocity.mag() ** 2) - (EARTH_MU / position.mag())) - rtn
-        return rtn / EARTH_MU
 
     def __str__(self) -> str:
         return (f'Semi-major axis: {self._sma}, Eccentricity: {self._ecc}, Inclination: {self._inc}\n'
@@ -358,7 +346,7 @@ def velocityAtTrueAnomaly(sma: float, ecc: float, trueAnom: float) -> float:
 
 # todo: why does this return NaN for 0 and 180
 def trueAnomalyFromState(position: EVector, velocity: EVector) -> float:
-    eccVec = OrbitalElements.computeEccentricVector(position, velocity)
+    eccVec = computeEccentricVector(position, velocity)
     ang = vang(position, eccVec)
     return 360 - ang if norm(cross(position, eccVec)) == norm(cross(position, velocity)) else ang
 

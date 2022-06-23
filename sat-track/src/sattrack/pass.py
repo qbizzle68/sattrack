@@ -3,8 +3,8 @@ from math import cos, radians
 from pyevspace import EVector, cross, dot, norm, vang
 
 from structures.coordinates import GeoPosition, zenithVector, geoPositionVector
-from structures.elements import OrbitalElements
-from spacetime import JulianDate
+from structures.elements import OrbitalElements, computeEccentricVector
+from spacetime.juliandate import JulianDate
 
 
 def orbitAltitude(geo: GeoPosition, jd: JulianDate, state: tuple[EVector], ecc: float, sma: float) -> float:
@@ -38,7 +38,7 @@ def orbitAltitude(geo: GeoPosition, jd: JulianDate, state: tuple[EVector], ecc: 
     p = v * t + r
 
     # find the true anomaly of this vector if it were a position vector
-    trueAnom = vang(OrbitalElements.computeEccentricVector(state[0], state[0]), p)
+    trueAnom = vang(computeEccentricVector(state[0], state[0]), p)
     pSat = norm(p) * ((sma * (1 - ecc * ecc)) / (1 + ecc * cos(radians(trueAnom))))
 
     ang = vang(p - gamma, pSat - gamma)
