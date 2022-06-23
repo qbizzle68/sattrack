@@ -1,11 +1,13 @@
 from enum import Enum
 
+
 # enum for general axis directions, empty_axis has been useful before (2 rotations)
 class Axis(Enum):
     X_AXIS = 0
     Y_AXIS = 1
     Z_AXIS = 2
     EMPTY_AXIS = 3
+
 
 class EulerOrder:
 
@@ -16,7 +18,7 @@ class EulerOrder:
         self._third_rotation = axis3
 
     def __getitem__(self, i: int) -> Axis:
-        if (i < 0 or i > 2):
+        if i < 0 or i > 2:
             raise ValueError("Index value out of range.")
         return self._rotation_order[i]
 
@@ -35,8 +37,8 @@ class EulerOrder:
         else:
             raise StopIteration
 
-class Order:
 
+class Order:
     XYZ = EulerOrder(Axis.X_AXIS, Axis.Y_AXIS, Axis.Z_AXIS)
     XZY = EulerOrder(Axis.X_AXIS, Axis.Z_AXIS, Axis.Y_AXIS)
     YXZ = EulerOrder(Axis.Y_AXIS, Axis.X_AXIS, Axis.Z_AXIS)
@@ -49,9 +51,6 @@ class Order:
     YZY = EulerOrder(Axis.Y_AXIS, Axis.Z_AXIS, Axis.Y_AXIS)
     ZXZ = EulerOrder(Axis.Z_AXIS, Axis.X_AXIS, Axis.Z_AXIS)
     ZYZ = EulerOrder(Axis.Z_AXIS, Axis.Y_AXIS, Axis.Z_AXIS)
-    X   = EulerOrder(Axis.X_AXIS, Axis.EMPTY_AXIS, Axis.EMPTY_AXIS)
-    Y   = EulerOrder(Axis.Y_AXIS, Axis.EMPTY_AXIS, Axis.EMPTY_AXIS)
-    Z   = EulerOrder(Axis.Z_AXIS, Axis.EMPTY_AXIS, Axis.EMPTY_AXIS)
-
-
-    
+    X = EulerOrder(Axis.X_AXIS, Axis.EMPTY_AXIS, Axis.EMPTY_AXIS)
+    Y = EulerOrder(Axis.Y_AXIS, Axis.EMPTY_AXIS, Axis.EMPTY_AXIS)
+    Z = EulerOrder(Axis.Z_AXIS, Axis.EMPTY_AXIS, Axis.EMPTY_AXIS)
