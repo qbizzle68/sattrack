@@ -4,9 +4,11 @@ from math import pi
 NEWTON_G = 6.67408e-11
 EARTH_MU = 3.986004418e14  # earth gravitational parameter
 
+#   Earth constants
 EARTH_EQUITORIAL_RADIUS = 6378135
 EARTH_FLATTENING = 1.0 / 298.26
 EARTH_POLAR_RADIUS = EARTH_EQUITORIAL_RADIUS * (1 - EARTH_FLATTENING)
+CJ2 = -2.064734896e14
 
 #   SGP CONSTANTS
 CK2     = 5.413080e-4
@@ -24,3 +26,4 @@ DE2RA   = 0.174532925e-1
 PIO2    = pi / 2.0
 TWOPI   = 2.0 * pi
 X3PIO2  = 3.0 * PIO2
+
