@@ -1,6 +1,6 @@
 from math import atan2 as at2, pi, sqrt
 
-from util.constants import EARTH_MU
+from sattrack.util.constants import EARTH_MU
 
 
 def atan2(y: float, x: float) -> float:

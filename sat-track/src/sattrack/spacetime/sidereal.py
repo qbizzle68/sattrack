@@ -1,4 +1,4 @@
-from spacetime.juliandate import JulianDate, J2000
+from sattrack.spacetime.juliandate import JulianDate, J2000
 
 
 def siderealTime(jd: JulianDate) -> float:

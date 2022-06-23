@@ -1,13 +1,13 @@
 from pyevspace import EVector, dot, cross, norm, vang
 
-from rotation.order import Order
-from rotation.rotation import getEulerMatrix, EulerAngles, rotateMatrixFrom
-from spacetime.juliandate import JulianDate
-from util.constants import EARTH_MU, CJ2
-from util.conversions import atan2
+from sattrack.rotation.order import Order
+from sattrack.rotation.rotation import getEulerMatrix, EulerAngles, rotateMatrixFrom
+from sattrack.spacetime.juliandate import JulianDate
+from sattrack.util.constants import EARTH_MU, CJ2
+from sattrack.util.conversions import atan2
 from math import sqrt, radians, degrees, pi, sin, cos, acos, atan
 
-from structures.tle import TwoLineElement
+from sattrack.structures.tle import TwoLineElement
 
 
 class OrbitalElements:

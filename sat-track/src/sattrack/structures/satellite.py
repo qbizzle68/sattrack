@@ -3,15 +3,15 @@ from math import atan2 as matan2
 
 from _sgp4 import _SGP4_Propagator
 
-from util.conversions import atan2
+from sattrack.util.conversions import atan2
 from coordinates import GeoPosition, geocentricToGeodetic
 from elements import OrbitalElements, trueToMean, trueAnomalyFromState
 from body import Body, EARTH_BODY
-from spacetime import JulianDate, earthOffsetAngle
+from sattrack.spacetime import JulianDate, earthOffsetAngle
 from tle import TwoLineElement
 from pyevspace import EVector
 
-from topos import ijkToSEZ
+from sattrack.topos import ijkToSEZ
 
 
 class SimpleSatellite(OrbitalElements):

@@ -1,5 +1,5 @@
 ﻿from math import sqrt, sin, cos, radians, degrees
-from util.conversions import atan2
+from sattrack.util.conversions import atan2
 
 
 def meanToTrue(meanAnomaly: float, ecc: float) -> float:

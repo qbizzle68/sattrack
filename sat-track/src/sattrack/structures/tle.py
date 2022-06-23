@@ -1,4 +1,4 @@
-from spacetime import JulianDate
+from sattrack.spacetime import JulianDate
 import requests
 
 

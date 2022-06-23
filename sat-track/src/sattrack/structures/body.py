@@ -1,6 +1,6 @@
 from elements import OrbitalElements
-from spacetime import JulianDate, J2000
-from util.constants import EARTH_MU, EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS
+from sattrack.spacetime import JulianDate, J2000
+from sattrack.util.constants import EARTH_MU, EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS
 
 
 class Body:

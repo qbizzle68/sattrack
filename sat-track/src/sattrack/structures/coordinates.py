@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from math import sin, cos, tan, atan, radians, degrees, sqrt
-from util.constants import EARTH_FLATTENING, EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS
+from sattrack.util.constants import EARTH_FLATTENING, EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS
 from pyevspace import EVector
-from rotation import rotateOrderFrom, EulerAngles
-from rotation.order import Order
-from spacetime import JulianDate, earthOffsetAngle
+from sattrack.rotation import rotateOrderFrom, EulerAngles
+from sattrack.rotation.order import Order
+from sattrack.spacetime import JulianDate, earthOffsetAngle
 
 
 class Coordinates(ABC):
