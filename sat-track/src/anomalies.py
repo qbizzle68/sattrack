@@ -1,7 +1,7 @@
 ﻿from math import atan2 as at2, sqrt, pi, sin, cos, radians, degrees
-from constants import EARTH_MU
+from util.constants import EARTH_MU
 
-
+''' MOVE THIS TO A MORE APPROPRIATE MODULE'''
 def atan2(y: float, x: float) -> float:
     """Computes atan2(y, x) but with the output shifted to (0, 2π).
     Parameters:
@@ -11,6 +11,7 @@ def atan2(y: float, x: float) -> float:
     return (theta + (2 * pi)) if theta < 0 else theta
 
 
+''' MOVE THIS TO A MORE APPROPRIATE MODULE'''
 def meanMotionToSma(meanMotion: float) -> float:
     """Converts mean motion from a two-line element to semi-major axis using
     Kepler's 2nd law.
@@ -21,6 +22,7 @@ def meanMotionToSma(meanMotion: float) -> float:
     return (EARTH_MU ** (1.0 / 3.0)) / (mMotionRad ** (2.0 / 3.0))
 
 
+''' MOVE THIS TO A MORE APPROPRIATE MODULE'''
 def smaToMeanMotion(sma: float) -> float:
     """Converts semi-major axis to mean motion.
     Parameters:
@@ -29,15 +31,15 @@ def smaToMeanMotion(sma: float) -> float:
     return sqrt(EARTH_MU / (sma ** 3))
 
 
-def meanToTrue(meanAnomaly: float, eccentricity: float) -> float:
-    return eccentricToTrue(
-        meanToEccentric(meanAnomaly, eccentricity),
-        eccentricity
-    )
+def meanToTrue(meanAnomaly: float, ecc: float) -> float:
+    eTemp = __m2ENewtonRaphson(meanAnomaly, meanAnomaly, ecc) % 360.0
+    eAnom = eTemp if eTemp >= 0 else eTemp + 360.0
+    y = sqrt(1 - (ecc * ecc)) * sin(radians(eAnom))
+    return degrees(atan2(y, cos(radians(eAnom)) - ecc))
 
 
 def meanToEccentric(meanAnomaly: float, eccentricity: float) -> float:
-    e = m2ENewtonRaphson(meanAnomaly, meanAnomaly, eccentricity) % 360.0
+    e = __m2ENewtonRaphson(meanAnomaly, meanAnomaly, eccentricity) % 360.0
     return e if e >= 0 else e + 360.0
 
 
@@ -47,9 +49,10 @@ def eccentricToTrue(eccAnom: float, ecc: float) -> float:
 
 
 def trueToMean(trueAnom: float, ecc: float) -> float:
-    return eccentricToMean(
-        trueToEccentric(trueAnom, ecc), ecc
-    )
+    y = sqrt(1 - (ecc * ecc)) * sin(radians(trueAnom))
+    eAnom = degrees(atan2(y, cos(radians(trueAnom)) + ecc))
+    m = degrees(radians(eAnom) - ecc * sin(radians(eAnom))) % 360.0
+    return m if m >= 0 else m + 360.0
 
 
 def trueToEccentric(trueAnom: float, ecc: float) -> float:
@@ -62,6 +65,15 @@ def eccentricToMean(eccAnom: float, ecc: float) -> float:
     return m if m >= 0 else m + 360.0
 
 
-def m2ENewtonRaphson(M: float, Ej: float, ecc: float) -> float:
-    Ej1 = Ej - ((Ej - ecc * sin(radians(Ej)) - M) / 1 - ecc * cos(radians(Ej)))
-    return Ej1 if abs(Ej1 - Ej) <= 1e-7 else m2ENewtonRaphson(M, Ej1, ecc)
+def __m2ENewtonRaphson(M: float, Ej: float, ecc: float) -> float:
+    M = radians(M)
+    Ej = radians(Ej)
+    while True:
+        num = Ej - (ecc * sin(Ej)) - M
+        den = 1 - ecc * cos(Ej)
+        Ej1 = Ej - (num / den)
+        if abs(Ej1 - Ej) <= 1e-7:
+            return degrees(Ej1)
+        else:
+            Ej = Ej1
+
