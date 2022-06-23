@@ -1,10 +1,10 @@
 from abc import ABC, abstractmethod
 from math import sin, cos, tan, atan, radians, degrees, sqrt
-from constants import EARTH_FLATTENING, EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS
+from util.constants import EARTH_FLATTENING, EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS
 from pyevspace import EVector
 from rotation import rotateOrderFrom, EulerAngles
-from order import Order
-from spacetime import JulianDate, localSiderealTime, earthOffsetAngle
+from rotation.order import Order
+from spacetime import JulianDate, earthOffsetAngle
 
 
 class Coordinates(ABC):
@@ -96,12 +96,36 @@ def geoPositionVector(geo: GeoPosition, jd: JulianDate = None) -> EVector:
     else:
         radiusAtLat = radiusAtLatitude(geo.getLatitude())
         geocentricLat = radians(geodeticToGeocentric(geo.getLatitude()))
-        #lst = radians(localSiderealTime(jd, geo.getLongitude()))
         lst = radians(geo.getLongitude() + earthOffsetAngle(jd))
         return EVector(
             radiusAtLat * cos(geocentricLat) * cos(lst),
             radiusAtLat * cos(geocentricLat) * sin(lst),
             radiusAtLat * sin(geocentricLat)
+        )
+
+# todo: create separate method with the bulk of this and call it with either geoCENTRIC or geoDETIC
+def zenithVector(geo: GeoPosition, jd: JulianDate = None) -> EVector:
+    if not jd:
+        return rotateOrderFrom(
+            Order.ZYX,
+            EulerAngles(
+                geo.getLatitude(),
+                geo.getLatitude(),
+                0.0),
+            EVector(
+                radiusAtLatitude(geo.getLatitude()),
+                0.0,
+                0.0)
+        )
+    else:
+        radiusAtLat = radiusAtLatitude(geo.getLatitude())
+        lat = radians(geo.getLatitude())
+        #lst = radians(localSiderealTime(jd, geo.getLongitude()))
+        lst = radians(geo.getLongitude() + earthOffsetAngle(jd))
+        return EVector(
+            radiusAtLat * cos(lat) * cos(lst),
+            radiusAtLat * cos(lat) * sin(lst),
+            radiusAtLat * sin(lat)
         )
 
 

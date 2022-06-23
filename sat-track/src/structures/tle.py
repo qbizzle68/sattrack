@@ -178,7 +178,7 @@ class TwoLineElement:
 CELESTRAK_URL = "https://celestrak.com/NORAD/elements/gp.php?{}={}&FORMAT=TLE"
 
 
-def getTLE(query: str, value: str) -> TwoLineElement | None:
+def getTLE(value: str, query: str = 'name') -> TwoLineElement | None:
     """Retrieves a TLE from the Celestrak online repository of continually updating TLEs via HTTP.
     Parameters:
     query:  The querying type, possible values are:
@@ -186,7 +186,7 @@ def getTLE(query: str, value: str) -> TwoLineElement | None:
         INTDES: International Designator (yyyy-nnn). Allows return of data for all objects
                 associated with a particular launch.
         GROUP:  Groups of satellites provided on the CelesTrak CurrentDate page.
-        NAME:   Satellite Name. Allows searching for satellites by parts of their name.
+        NAME:   Satellite Name (Default). Allows searching for satellites by parts of their name.
         SPECIAL:Special data sets for the GEO Protected Zone (GPZ) or GPZ Plus:
     value:  The value to search for, which depends on the querying type."""
     response = requests.get(CELESTRAK_URL.format(query.upper(), value.replace(' ', '%20')))

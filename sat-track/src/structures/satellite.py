@@ -1,12 +1,13 @@
-from math import asin, degrees
+from math import asin, degrees, sqrt, pi, radians
+from math import atan2 as matan2
 
 from _sgp4 import _SGP4_Propagator
 
-from anomalies import atan2
-from coordinates import GeoPosition
-from elements import OrbitalElements
+from util.conversions import atan2
+from coordinates import GeoPosition, geocentricToGeodetic
+from elements import OrbitalElements, trueToMean, trueAnomalyFromState
 from body import Body, EARTH_BODY
-from spacetime import JulianDate
+from spacetime import JulianDate, earthOffsetAngle
 from tle import TwoLineElement
 from pyevspace import EVector
 
@@ -18,6 +19,7 @@ class SimpleSatellite(OrbitalElements):
     orbital elements. The orbit, therefore, of this type of satellite is modeled by a conic section, and is usually
     over idealized, but can be used to more simply compute orbital characteristics/positions."""
 
+    #todo: implement this with a tle
     def __init__(self, name: str, sma: float, ecc: float, inc: float, raan: float, aop: float, trueAnomaly: float,
                  *, epoch: JulianDate = 0, body: Body = EARTH_BODY):
         self._name = name
@@ -128,3 +130,23 @@ class Satellite:
 
     def setBody(self, body: Body):
         self._body = body
+
+
+def getSubPoint(satellite: Satellite, time: JulianDate) -> GeoPosition:
+    pos = satellite.getState(time)[0]
+    xyMag = sqrt(pos[0]*pos[0] + pos[1]*pos[1])
+    dec = degrees(matan2(pos[2], xyMag))
+    lng = (degrees(atan2(pos[1], pos[0])) - earthOffsetAngle(time)) % 360.0
+    if lng > 180.0:
+        lng = lng - 360.0
+    return GeoPosition(geocentricToGeodetic(dec), lng)
+
+def timeToAnomaly(satellite: Satellite, jd0: JulianDate, trueAnom1: float) -> float:
+    state0 = satellite.getState(jd0)
+    ecc = satellite.tle().eccentricity()
+    meanAnom0 = trueToMean(trueAnomalyFromState(state0[0], state0[1]), ecc)
+    meanAnom1 = trueToMean(trueAnom1, ecc)
+    if meanAnom1 < meanAnom0:
+        meanAnom1 += 360
+    n0 = satellite.tle().meanMotion() * 2 * pi
+    return radians(meanAnom1 - meanAnom0) / n0

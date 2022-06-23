@@ -1,6 +1,6 @@
 from elements import OrbitalElements
 from spacetime import JulianDate, J2000
-from constants import EARTH_MU, EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS
+from util.constants import EARTH_MU, EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS
 
 
 class Body:
@@ -68,6 +68,7 @@ class Body:
     # other methods here
 
 
-_earth_elements = OrbitalElements(149.598e9, 0.0167, 0.0, 348.73936, 102.94719, 100.46435, J2000)
+_earth_elements = OrbitalElements(sma=149.598e9,ecc=0.0167,inc=0.0,raan=348.73936,aop=102.94719,meanAnomaly=100.46435,epoch=J2000)
+#_earth_elements = OrbitalElements(149.598e9, 0.0167, 0.0, 348.73936, 102.94719, 100.46435, J2000)
 EARTH_BODY = Body("Earth", _earth_elements, EARTH_MU, EARTH_EQUITORIAL_RADIUS, 86164.090531, 280.46061837, J2000,
              rp=EARTH_POLAR_RADIUS, parent=None)  # set parent to sun when created
