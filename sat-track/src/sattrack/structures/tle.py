@@ -1,4 +1,4 @@
-from sattrack.spacetime import JulianDate
+from sattrack.spacetime.juliandate import JulianDate
 import requests
 
 
@@ -48,18 +48,23 @@ class TwoLineElement:
 
         line2Tokens = [i for i in line2.split(' ') if i != '']
         if not len(line2Tokens) in [8, 9]:
-            raise Exception(f"Bad number of tokens in line 2. {len(line2Tokens)}y")  # make custom version for this
+            raise Exception(
+                f"Bad number of tokens in line 2. {len(line2Tokens)}y")  # todo: make custom version for this
         line2lens = [(1, 2), (5, 6), (6, 9), (6, 9), (7, 8), (6, 9), (6, 9)]
         for tok, vals in zip(line2Tokens, line2lens):
             if not len(tok) in range(vals[0], vals[1]):
-                raise Exception(f"Token of bad length {tok}, {vals}")  # make a custom version and describe which token
+                raise Exception(
+                    f"Token of bad length {tok}, {vals}")  # todo: make a custom version and describe which token
         if len(line2Tokens) == 8:
             if not len(line2Tokens[-1]) in range(16, 18):
-                raise Exception(f"bad token {line2Tokens[-1]}, {(16, 17)}")  # make a custom version and describe # which token
+                raise Exception(
+                    f"bad token {line2Tokens[-1]}, {(16, 17)}")  # todo: make a custom version and describe
+                # which token
         else:
             for tok, vals in zip(line2Tokens[-2:], [(10, 12), (2, 6)]):
                 if not len(tok) in range(vals[0], vals[1]):
-                    raise Exception(f"Token of bad length {tok}, {vals}")  # make a custom version and describe which token
+                    raise Exception(
+                        f"Token of bad length {tok}, {vals}")  # todo: make a custom version and describe which token
         return line1Tokens, line2Tokens
 
     def _parseLines(self, line1Tokens: list[str], line2Tokens: list[str]) -> None:
@@ -197,16 +202,16 @@ def getTLE(value: str, query: str = 'name') -> TwoLineElement | None:
     elif len(lines) == 3:
         return TwoLineElement(response.text)
     else:
-        lineGroups = [(lines[i], lines[i+1], lines[i+2]) for i in range(0, len(lines), 3)]
+        lineGroups = [(lines[i], lines[i + 1], lines[i + 2]) for i in range(0, len(lines), 3)]
         print("Multiple TLEs found.")
-        for l, i in zip(lineGroups, range(1, len(lineGroups)+1)):
+        for l, i in zip(lineGroups, range(1, len(lineGroups) + 1)):
             print(f'{i}:  {l[0]}')
-        print(f'{len(lineGroups)+1}:  None')
+        print(f'{len(lineGroups) + 1}:  None')
         x = 0
-        while x not in range(1, len(lineGroups)+2):
+        while x not in range(1, len(lineGroups) + 2):
             x = int(input("Which TLE do you wish to import?: "))
         if x == len(lineGroups) + 1:
             return None
-        i, j, k = lineGroups[x-1]
+        i, j, k = lineGroups[x - 1]
         tle = i + '\n' + j + '\n' + k
         return TwoLineElement(tle)

@@ -1,13 +1,15 @@
 from math import asin, degrees, sqrt, pi, radians
 from math import atan2 as matan2
 
-from _sgp4 import _SGP4_Propagator
+import _sgp4
 
+from sattrack.spacetime.juliandate import JulianDate
+from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.util.conversions import atan2
 from coordinates import GeoPosition, geocentricToGeodetic
 from elements import OrbitalElements, trueToMean, trueAnomalyFromState
 from body import Body, EARTH_BODY
-from sattrack.spacetime import JulianDate, earthOffsetAngle
+
 from tle import TwoLineElement
 from pyevspace import EVector
 
@@ -19,11 +21,11 @@ class SimpleSatellite(OrbitalElements):
     orbital elements. The orbit, therefore, of this type of satellite is modeled by a conic section, and is usually
     over idealized, but can be used to more simply compute orbital characteristics/positions."""
 
-    #todo: implement this with a tle
-    def __init__(self, name: str, sma: float, ecc: float, inc: float, raan: float, aop: float, trueAnomaly: float,
+    # todo: implement this with a tle
+    def __init__(self, name: str, sma: float, ecc: float, inc: float, raan: float, aop: float, meanAnomaly: float,
                  *, epoch: JulianDate = 0, body: Body = EARTH_BODY):
         self._name = name
-        super().__init__(sma, ecc, inc, raan, aop, trueAnomaly, epoch)
+        super().__init__(sma=sma, ecc=ecc, inc=inc, raan=raan, aop=aop, meanAnomaly=meanAnomaly, epoch=epoch)
         self._body = body
 
     def __str__(self) -> str:
@@ -46,7 +48,7 @@ class Satellite:
     with it."""
 
     def __init__(self, tle: TwoLineElement, body: Body = EARTH_BODY):
-        self._propagator = _SGP4_Propagator(tle)
+        self._propagator = _sgp4._SGP4_Propagator(tle)
         self._tle = tle
         self._tleEpoch = tle.epoch()
         self._name = tle.getName()
@@ -115,7 +117,7 @@ class Satellite:
         self._name = tle.getName()
         self._tle = tle
         self._tleEpoch = tle.epoch()
-        self._propagator = _SGP4_Propagator(tle)
+        self._propagator = _sgp4._SGP4_Propagator(tle)
 
     def recentTime(self) -> JulianDate:
         """The time the most recent state was calculated."""
@@ -140,6 +142,7 @@ def getSubPoint(satellite: Satellite, time: JulianDate) -> GeoPosition:
     if lng > 180.0:
         lng = lng - 360.0
     return GeoPosition(geocentricToGeodetic(dec), lng)
+
 
 def timeToAnomaly(satellite: Satellite, jd0: JulianDate, trueAnom1: float) -> float:
     state0 = satellite.getState(jd0)

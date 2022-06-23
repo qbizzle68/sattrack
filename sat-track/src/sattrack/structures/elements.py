@@ -303,11 +303,11 @@ def __m2ENewtonRaphson(M: float, Ej: float, ecc: float) -> float:
             return degrees(Ej1)
         else:
             Ej = Ej1
-    '''Ej1 = Ej - ((Ej - ecc * sin(radians(Ej)) - M) / (1 - ecc * cos(radians(Ej))))
-    return Ej1 if abs(Ej1 - Ej) <= 1e-7 else __m2ENewtonRaphson(M, Ej1, ecc)'''
+
 
 def __m2E(M, Ej, ecc):
     return Ej - ((Ej - ecc * sin(radians(Ej)) - M) / (1 - ecc * cos(radians(Ej))))
+
 
 def __m2ENewtonRaphson2(M: float, ecc: float) -> float:
     Ei1 = M
@@ -346,18 +346,22 @@ def velocityAtTrueAnomaly(sma: float, ecc: float, trueAnom: float) -> float:
     r = radiusAtTrueAnomaly(sma, ecc, trueAnom)
     return sqrt(EARTH_MU * ((2 / r) - (1 / sma)))
 
+
 '''how can we compute this without a velocity vector'''
 '''idea: use another vector in the orbital plane (second position or line of nodes?) to generate angular momentum,
-    use this vector to create a quaternion or a rotation matrix based on the angle-axis rotation, and rotate the position
-    vector by (90 - flight angle) ... need true anomaly for flight angle'''
+    use this vector to create a quaternion or a rotation matrix based on the angle-axis rotation, and rotate the 
+    position vector by (90 - flight angle) ... need true anomaly for flight angle'''
 '''new idea: generate an angular momentum direction with some other vector, generate line of nodes with this vector,
     find the angle from this vector, then account for aop to find true anomaly. need to figure out how to differentiate
     from angles between 0-180 and 180-360.'''
-#todo: why does this return NaN for 0 and 180
+
+
+# todo: why does this return NaN for 0 and 180
 def trueAnomalyFromState(position: EVector, velocity: EVector) -> float:
     eccVec = OrbitalElements.computeEccentricVector(position, velocity)
     ang = vang(position, eccVec)
     return 360 - ang if norm(cross(position, eccVec)) == norm(cross(position, velocity)) else ang
+
 
 def trueAnomalyFromMomentum(position: EVector, momentum: EVector, aop: float) -> float:
     lineOfNodes = cross(EVector(0, 0, 1), momentum)
