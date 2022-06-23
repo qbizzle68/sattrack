@@ -90,4 +90,3 @@ def __m2ENewtonRaphson(M: float, ecc: float) -> float:
             return degrees(Ej1)
         else:
             Ej = Ej1
-
