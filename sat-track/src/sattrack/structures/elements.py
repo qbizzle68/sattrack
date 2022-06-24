@@ -1,7 +1,7 @@
 from pyevspace import EVector, dot, cross, norm
 from math import sqrt, radians, degrees, pi, sin, cos, acos
 
-from sattrack.position import computeRadius
+from sattrack.position import computeRadius, meanAnomalyAt
 from sattrack.rotation.order import Order
 from sattrack.rotation.rotation import getEulerMatrix, EulerAngles, rotateMatrixFrom
 from sattrack.spacetime.juliandate import JulianDate
@@ -100,31 +100,6 @@ class OrbitalElements:
                 + f'RAAN: {self._raan}, Argument of Perigee: {self._aop}, Mean Anomaly: {self._meanAnomaly}\n'
                 + f'Epoch: {str(self._epoch)}')
 
-    def timeToMeanAnomaly(self, meanAnomaly: float) -> float:
-        """Computes the time taken for the object to reach a given mean anomaly. To incorporate multiple orbits,
-        increase the argument by the orbit count multiple of 360 degrees.
-        Parameters:
-        meanAnomaly:    The mean anomaly to compute the time until, measured in degrees."""
-
-        n = smaToMeanMotion(self._sma)
-        dM = meanAnomaly - self._meanAnomaly
-        if dM < 0:
-            dM %= 360
-        return radians(dM) / n
-
-    def meanAnomalyAt(self, jd: JulianDate) -> float:
-        """Computes the mean anomaly at a given time.
-        Parameters:
-        jd: The time to compute the mean anomaly.
-        Returns the mean anomaly in degrees."""
-
-        if self._epoch == 0:
-            raise ValueError("Epoch was not set for this instance.")
-        n = smaToMeanMotion(self._sma)
-        dt = jd.difference(self._epoch)
-        mRad = n * dt + radians(self._meanAnomaly)
-        return degrees(mRad) % 360
-
     def getState(self, jd: JulianDate = None) -> tuple[EVector]:
         """Computes state vectors based on the orbital elements at a given time.
         Parameters:
@@ -133,7 +108,7 @@ class OrbitalElements:
 
         if not jd:
             jd = self._epoch
-        tAnom = meanToTrue(self.meanAnomalyAt(jd), self._ecc)
+        tAnom = meanToTrue(meanAnomalyAt(jd), self._ecc)
         eAnom = trueToEccentric(tAnom, self._ecc)
         r = computeRadius(self)
         pOrbit = EVector(cos(radians(tAnom)), sin(radians(tAnom)), 0) * r
