@@ -1,6 +1,7 @@
-from pyevspace import EVector, dot, cross, norm, vang
-from math import sqrt, radians, degrees, pi, sin, cos, acos, atan
+from pyevspace import EVector, dot, cross, norm
+from math import sqrt, radians, degrees, pi, sin, cos, acos
 
+from sattrack.position import computeRadius
 from sattrack.rotation.order import Order
 from sattrack.rotation.rotation import getEulerMatrix, EulerAngles, rotateMatrixFrom
 from sattrack.spacetime.juliandate import JulianDate
@@ -35,12 +36,14 @@ class OrbitalElements:
         self._epoch = epoch
 
     @classmethod
-    def fromTLE(cls, tle: TwoLineElement, jd: JulianDate):
+    def fromTLE(cls, tle: TwoLineElement, jd: JulianDate = 0):
         """Class method used to instantiate an object from a two-line element object at a given time.
         Parameters:
         tle:    Two-Line element of the object to obtain orbital elements of.
         jd:     Julian Date of the time to compute orbital elements of."""
 
+        if jd == 0:
+            jd = tle.epoch()
         dt = jd.difference(tle.epoch())
         inc = tle.inclination()
         nConvert = tle.meanMotion() * 2 * pi / 86400
@@ -55,7 +58,7 @@ class OrbitalElements:
         aDot = -2 * a0 * n0dot / (3 * n0)
         sma = (a0 + aDot * dt) * 1000
         eDot = -2 * (1 - tleEcc) * n0dot / (3 * n0)
-        ecc = tleEcc + eDot * dt # todo: do we use this for the next line?
+        ecc = tleEcc + eDot * dt  # todo: do we use this for the next line?
         temp = (a0 ** -3.5) / ((1 - (tleEcc * tleEcc)) ** 2)
         # todo: include the moon and sun perturbations to this
         lanJ2Dot = -2.06474e14 * temp * cos(radians(inc))
@@ -80,8 +83,8 @@ class OrbitalElements:
         inc = degrees(acos(angMom[2] / angMom.mag()))
         ra = degrees(acos(lineOfNodes[0] / lineOfNodes.mag()))
         if lineOfNodes[1] < 0:
-            ra = 360 - ra   # todo: AOP is significantly off, why?
-        aop = degrees(acos(dot(lineOfNodes, eccVec) / lineOfNodes.mag() * eccVec.mag()))
+            ra = 360 - ra
+        aop = degrees(acos(dot(lineOfNodes, eccVec) / (lineOfNodes.mag() * eccVec.mag())))
         if eccVec[2] < 0:
             aop = 360 - aop
         tAnom = degrees(acos(dot(eccVec, position) / (eccVec.mag() * position.mag())))
@@ -123,14 +126,19 @@ class OrbitalElements:
         return degrees(mRad) % 360
 
     def getState(self, jd: JulianDate = None) -> tuple[EVector]:
+        """Computes state vectors based on the orbital elements at a given time.
+        Parameters:
+        jd:     Time to compute the state vectors.
+        returns: A tuple containing the position and velocity vectors in m and m/s respectively."""
+
         if not jd:
             jd = self._epoch
         tAnom = meanToTrue(self.meanAnomalyAt(jd), self._ecc)
         eAnom = trueToEccentric(tAnom, self._ecc)
-        r = radiusAtTrueAnomaly(self._sma, self._ecc, tAnom)
+        r = computeRadius(self)
         pOrbit = EVector(cos(radians(tAnom)), sin(radians(tAnom)), 0) * r
         vOrbit = EVector(-sin(radians(eAnom)), sqrt(1 - self._ecc * self._ecc) * cos(radians(eAnom)), 0) * (
-                    sqrt(EARTH_MU * self._sma) / r)
+                sqrt(EARTH_MU * self._sma) / r)
         rot = getEulerMatrix(Order.ZXZ, EulerAngles(self._raan, self._inc, self._aop))
         return rotateMatrixFrom(rot, pOrbit), rotateMatrixFrom(rot, vOrbit)
 
@@ -196,6 +204,7 @@ class OrbitalElements:
         """Returns the epoch associated with the objects true anomaly."""
         return self._epoch
 
+
 def raanProcession(tle: TwoLineElement) -> float:
     """Computes the procession of the right-ascension of the ascending node due to third-body perturbations
      and the non-spherical earth. Values are negative for a prograde (direct) orbit, positive for retrograde.
@@ -204,7 +213,8 @@ def raanProcession(tle: TwoLineElement) -> float:
     returns: The rate of procession of the RAAN in degrees per day."""
 
     a = meanMotionToSma(tle.meanMotion()) / 1000.0
-    dRaanSphere = -2.06474e14 * (a ** -3.5) * cos(radians(tle.inclination())) / ((1 - tle.eccentricity() * tle.eccentricity()) ** 2)
+    dRaanSphere = -2.06474e14 * (a ** -3.5) * cos(radians(tle.inclination())) / (
+                (1 - tle.eccentricity() * tle.eccentricity()) ** 2)
     dRaanMoon = -0.00338 * cos(radians(tle.inclination())) / tle.meanMotion()
     dRaanSun = -0.00154 * cos(radians(tle.inclination())) / tle.meanMotion()
     return dRaanSphere + dRaanMoon + dRaanSun
@@ -218,7 +228,8 @@ def aopProcession(tle: TwoLineElement) -> float:
     returns: The rate of procession of the AOP in degrees per day."""
 
     a = meanMotionToSma(tle.meanMotion()) / 1000.0
-    dAopSphere = 1.03237e14 * (a ** -3.5) * (4 - 5 * (sin(radians(tle.inclination())) ** 2)) / ((1 - tle.eccentricity() * tle.eccentricity()) ** 2)
+    dAopSphere = 1.03237e14 * (a ** -3.5) * (4 - 5 * (sin(radians(tle.inclination())) ** 2)) / \
+        ((1 - tle.eccentricity() * tle.eccentricity()) ** 2)
     dAopMoon = 0.00169 * (4 - 5 * (sin(radians(tle.inclination())) ** 2)) / tle.meanMotion()
     dAopSun = 0.00077 * (4 - 5 * (sin(radians(tle.inclination())) ** 2)) / tle.meanMotion()
     return dAopSphere + dAopMoon + dAopSun
@@ -229,57 +240,7 @@ def computeEccentricVector(position: EVector, velocity: EVector) -> EVector:
     Parameters:
     position:   Position state of the object.
     velocity:   Velocity state of the object."""
+
     rtn = velocity * dot(position, velocity)
     rtn = position * ((velocity.mag() ** 2) - (EARTH_MU / position.mag())) - rtn
     return rtn / EARTH_MU
-
-
-def radiusFromElements(elements: OrbitalElements) -> float:
-    return radiusAtTrueAnomaly(elements.getSma(), elements.getEcc(),
-                               meanToTrue(elements.getMeanAnomaly(), elements.getEcc()))
-
-
-def radiusAtTrueAnomaly(sma: float, ecc: float, trueAnomaly: float) -> float:
-    return sma * (1 - ecc * ecc) / (1 + ecc * cos(radians(trueAnomaly)))
-
-
-def flightAngleFromElements(elements: OrbitalElements) -> float:
-    return flightAngleAtTrueAnomaly(elements.getEcc(), meanToTrue(elements.getMeanAnomaly(), elements.getEcc()))
-
-
-def flightAngleAtTrueAnomaly(ecc: float, trueAnom: float) -> float:
-    taRad = radians(trueAnom)
-    return atan((ecc * sin(taRad)) / (1 + ecc * cos(taRad)))
-
-
-def velocityFromElements(elements: OrbitalElements) -> float:
-    return velocityAtTrueAnomaly(elements.getSma(), elements.getEcc(),
-                                 meanToTrue(elements.getMeanAnomaly(), elements.getEcc()))
-
-
-def velocityAtTrueAnomaly(sma: float, ecc: float, trueAnom: float) -> float:
-    r = radiusAtTrueAnomaly(sma, ecc, trueAnom)
-    return sqrt(EARTH_MU * ((2 / r) - (1 / sma)))
-
-
-'''how can we compute this without a velocity vector'''
-'''idea: use another vector in the orbital plane (second position or line of nodes?) to generate angular momentum,
-    use this vector to create a quaternion or a rotation matrix based on the angle-axis rotation, and rotate the 
-    position vector by (90 - flight angle) ... need true anomaly for flight angle'''
-'''new idea: generate an angular momentum direction with some other vector, generate line of nodes with this vector,
-    find the angle from this vector, then account for aop to find true anomaly. need to figure out how to differentiate
-    from angles between 0-180 and 180-360.'''
-
-
-# todo: why does this return NaN for 0 and 180
-def trueAnomalyFromState(position: EVector, velocity: EVector) -> float:
-    eccVec = computeEccentricVector(position, velocity)
-    ang = vang(position, eccVec)
-    return 360 - ang if norm(cross(position, eccVec)) == norm(cross(position, velocity)) else ang
-
-
-def trueAnomalyFromMomentum(position: EVector, momentum: EVector, aop: float) -> float:
-    lineOfNodes = cross(EVector(0, 0, 1), momentum)
-    ang = vang(position, lineOfNodes)
-    angAdjust = 360 - ang if norm(cross(position, lineOfNodes)) == norm(momentum) else ang
-    return (angAdjust - aop) % 360
