@@ -3,8 +3,9 @@ from pyevspace import EVector, dot, cross, norm, vang
 from sattrack.rotation.order import Order
 from sattrack.rotation.rotation import getEulerMatrix, EulerAngles, rotateMatrixFrom
 from sattrack.spacetime.juliandate import JulianDate
+from sattrack.util.anomalies import meanToTrue, trueToMean, trueToEccentric
 from sattrack.util.constants import EARTH_MU, CJ2
-from sattrack.util.conversions import atan2
+from sattrack.util.conversions import atan2, smaToMeanMotion
 from math import sqrt, radians, degrees, pi, sin, cos, acos, atan
 
 from sattrack.structures.tle import TwoLineElement
@@ -40,6 +41,7 @@ class OrbitalElements:
         Parameters:
         tle:    Two-Line element of the object to obtain orbital elements of.
         jd:     Julian Date of the time to compute orbital elements of."""
+
         dt = jd.difference(tle.epoch())
         inc = tle.inclination()
         nConvert = tle.meanMotion() * 2 * pi / 86400
@@ -89,6 +91,8 @@ class OrbitalElements:
         return cls(sma=sma, ecc=ecc, inc=inc, raan=ra, aop=aop, meanAnomaly=trueToMean(tAnom, ecc), epoch=jd)
 
     def __str__(self) -> str:
+        """Returns a string representation of the orbital elements."""
+
         return (f'Semi-major axis: {self._sma}, Eccentricity: {self._ecc}, Inclination: {self._inc}\n'
                 + f'RAAN: {self._raan}, Argument of Perigee: {self._aop}, Mean Anomaly: {self._meanAnomaly}\n'
                 + f'Epoch: {str(self._epoch)}')
@@ -98,6 +102,7 @@ class OrbitalElements:
         increase the argument by the orbit count multiple of 360 degrees.
         Parameters:
         meanAnomaly:    The mean anomaly to compute the time until, measured in degrees."""
+
         n = smaToMeanMotion(self._sma)
         dM = meanAnomaly - self._meanAnomaly
         if dM < 0:
@@ -109,6 +114,7 @@ class OrbitalElements:
         Parameters:
         jd: The time to compute the mean anomaly.
         Returns the mean anomaly in degrees."""
+
         if self._epoch == 0:
             raise ValueError("Epoch was not set for this instance.")
         n = smaToMeanMotion(self._sma)
@@ -127,34 +133,6 @@ class OrbitalElements:
                     sqrt(EARTH_MU * self._sma) / r)
         rot = getEulerMatrix(Order.ZXZ, EulerAngles(self._raan, self._inc, self._aop))
         return rotateMatrixFrom(rot, pOrbit), rotateMatrixFrom(rot, vOrbit)
-
-    '''def moveTo(self, jd: JulianDate):
-        """Moves a satellites angular position to a specified time using the mean motion of the object. Time is
-        determined by a future or past Julian Date.s
-        Parameters:
-        jd: The Julian Date you wish to move the object to."""
-        self.moveBy(jd.difference(self._epoch))
-
-    def moveBy(self, dt: float):
-        """Moves a satellites angular position by a number of solar days, using the mean motion of the object.
-        A negative value indicates a past position.
-        Parameters:
-        dt: The number of solar days to move the object to."""
-        dtp = 86400 * dt
-        M1rad = radians(trueToMean(self._trueAnomaly, self._ecc)) + dtp * sqrt(EARTH_MU / (self._sma ** 3))
-        self._trueAnomaly = meanToTrue(degrees(M1rad), self._ecc)
-        self._epoch = self._epoch.future(dt)
-
-    def timeUntil(self, trueAnomaly: float) -> float:
-        """Returns the time until the object achieves a specified true anomaly.
-            If the trueAnomaly parameter is equal to the current true anomaly, the returned value will be 0,
-            NOT the orbital period. I.e. the angle needed to travel will be 0, not 360 degrees.
-        Parameters:
-        trueAnomaly:    The time computed will be the time it takes to travel to this true anomaly."""
-        M0 = trueToMean(self._trueAnomaly, self._ecc)
-        M1 = trueToMean(trueAnomaly, self._ecc)
-        da = M1 - M0 if M1 >= M0 else M1 + 360.0 - M0
-        return radians(da) / sqrt(EARTH_MU / (self._sma ** 3))'''
 
     def setSma(self, sma: float):
         """Sets the semi-major axis of the orbit.
@@ -227,84 +205,6 @@ def computeEccentricVector(position: EVector, velocity: EVector) -> EVector:
     rtn = velocity * dot(position, velocity)
     rtn = position * ((velocity.mag() ** 2) - (EARTH_MU / position.mag())) - rtn
     return rtn / EARTH_MU
-
-
-def meanMotionToSma(meanMotion: float) -> float:
-    """Converts mean motion from a two-line element to semi-major axis using
-    Kepler's 2nd law.
-    Parameters:
-    meanMotion: Mean motion measured in revolutions per day.
-    Returns the semi-major axis in meters."""
-    mMotionRad = meanMotion * 2 * pi / 86400.0
-    return (EARTH_MU ** (1.0 / 3.0)) / (mMotionRad ** (2.0 / 3.0))
-
-
-def smaToMeanMotion(sma: float) -> float:
-    """Converts semi-major axis to mean motion.
-    Parameters:
-    sma: Semi-major axis measured in meters.
-    Returns the mean motion in radians per second."""
-    return sqrt(EARTH_MU / (sma ** 3))
-
-
-def meanToTrue(meanAnomaly: float, eccentricity: float) -> float:
-    return eccentricToTrue(
-        meanToEccentric(meanAnomaly, eccentricity),
-        eccentricity
-    )
-
-
-def meanToEccentric(meanAnomaly: float, eccentricity: float) -> float:
-    e = __m2ENewtonRaphson(meanAnomaly, meanAnomaly, eccentricity) % 360.0
-    return e if e >= 0 else e + 360.0
-
-
-def eccentricToTrue(eccAnom: float, ecc: float) -> float:
-    y = sqrt(1 - (ecc * ecc)) * sin(radians(eccAnom))
-    return degrees(atan2(y, cos(radians(eccAnom)) - ecc))
-
-
-def trueToMean(trueAnom: float, ecc: float) -> float:
-    return eccentricToMean(
-        trueToEccentric(trueAnom, ecc), ecc
-    )
-
-
-def trueToEccentric(trueAnom: float, ecc: float) -> float:
-    y = sqrt(1 - (ecc * ecc)) * sin(radians(trueAnom))
-    return degrees(atan2(y, cos(radians(trueAnom)) + ecc))
-
-
-def eccentricToMean(eccAnom: float, ecc: float) -> float:
-    m = (degrees(radians(eccAnom) - ecc * sin(radians(eccAnom)))) % 360.0
-    return m if m >= 0 else m + 360.0
-
-
-def __m2ENewtonRaphson(M: float, Ej: float, ecc: float) -> float:
-    M = radians(M)
-    Ej = radians(Ej)
-    while True:
-        num = Ej - (ecc * sin(Ej)) - M
-        den = 1 - ecc * cos(Ej)
-        Ej1 = Ej - (num / den)
-        if abs(Ej1 - Ej) <= 1e-7:
-            return degrees(Ej1)
-        else:
-            Ej = Ej1
-
-
-def __m2E(M, Ej, ecc):
-    return Ej - ((Ej - ecc * sin(radians(Ej)) - M) / (1 - ecc * cos(radians(Ej))))
-
-
-def __m2ENewtonRaphson2(M: float, ecc: float) -> float:
-    Ei1 = M
-    for i in range(0):
-        Ei = Ei1
-        Eo = __m2E(M, Ei, ecc)
-        Eoo = __m2E(M, Eo, ecc)
-        Ei1 = 0.5 * (Eo + Eoo)
-    return __m2ENewtonRaphson(M, Ei1, ecc)
 
 
 def radiusFromElements(elements: OrbitalElements) -> float:
