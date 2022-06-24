@@ -114,7 +114,7 @@ class Satellite:
         self._name = tle.getName()
         self._tle = tle
         self._tleEpoch = tle.epoch()
-        self._propagator = _sgp4._SGP4_Propagator(tle)
+        self._propagator = _SGP4_Propagator(tle)
 
     def recentTime(self) -> JulianDate:
         """The time the most recent state was calculated."""
