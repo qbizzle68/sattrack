@@ -1,13 +1,12 @@
 from pyevspace import EVector, dot, cross, norm, vang
+from math import sqrt, radians, degrees, pi, sin, cos, acos, atan
 
 from sattrack.rotation.order import Order
 from sattrack.rotation.rotation import getEulerMatrix, EulerAngles, rotateMatrixFrom
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.util.anomalies import meanToTrue, trueToMean, trueToEccentric
-from sattrack.util.constants import EARTH_MU, CJ2
-from sattrack.util.conversions import atan2, smaToMeanMotion
-from math import sqrt, radians, degrees, pi, sin, cos, acos, atan
-
+from sattrack.util.constants import EARTH_MU
+from sattrack.util.conversions import smaToMeanMotion, meanMotionToSma
 from sattrack.structures.tle import TwoLineElement
 
 
@@ -56,11 +55,12 @@ class OrbitalElements:
         aDot = -2 * a0 * n0dot / (3 * n0)
         sma = (a0 + aDot * dt) * 1000
         eDot = -2 * (1 - tleEcc) * n0dot / (3 * n0)
-        ecc = tleEcc + eDot * dt
-        temp = (a0 ** -3.5) * ((1 - (tleEcc * tleEcc)) ** -2)
-        lanJ2Dot = CJ2 * temp * cos(radians(inc))
+        ecc = tleEcc + eDot * dt # todo: do we use this for the next line?
+        temp = (a0 ** -3.5) / ((1 - (tleEcc * tleEcc)) ** 2)
+        # todo: include the moon and sun perturbations to this
+        lanJ2Dot = -2.06474e14 * temp * cos(radians(inc))
         ra = tle.raan() + lanJ2Dot * dt
-        aopJ2Dot = (CJ2 / 2) * temp * (4 - 5 * ((sin(radians(inc))) ** 2))
+        aopJ2Dot = 1.03237e14 * temp * (4 - 5 * ((sin(radians(inc))) ** 2))
         aop = tle.argumentOfPeriapsis() + aopJ2Dot * dt
         return cls(sma=sma, ecc=ecc, inc=inc, raan=ra, aop=aop, meanAnomaly=M1, epoch=jd)
 
@@ -80,7 +80,7 @@ class OrbitalElements:
         inc = degrees(acos(angMom[2] / angMom.mag()))
         ra = degrees(acos(lineOfNodes[0] / lineOfNodes.mag()))
         if lineOfNodes[1] < 0:
-            ra = 360 - ra
+            ra = 360 - ra   # todo: AOP is significantly off, why?
         aop = degrees(acos(dot(lineOfNodes, eccVec) / lineOfNodes.mag() * eccVec.mag()))
         if eccVec[2] < 0:
             aop = 360 - aop
@@ -195,6 +195,33 @@ class OrbitalElements:
     def getEpoch(self):
         """Returns the epoch associated with the objects true anomaly."""
         return self._epoch
+
+def raanProcession(tle: TwoLineElement) -> float:
+    """Computes the procession of the right-ascension of the ascending node due to third-body perturbations
+     and the non-spherical earth. Values are negative for a prograde (direct) orbit, positive for retrograde.
+    Parameters:
+    tle:    Two-line element set for an object.
+    returns: The rate of procession of the RAAN in degrees per day."""
+
+    a = meanMotionToSma(tle.meanMotion()) / 1000.0
+    dRaanSphere = -2.06474e14 * (a ** -3.5) * cos(radians(tle.inclination())) / ((1 - tle.eccentricity() * tle.eccentricity()) ** 2)
+    dRaanMoon = -0.00338 * cos(radians(tle.inclination())) / tle.meanMotion()
+    dRaanSun = -0.00154 * cos(radians(tle.inclination())) / tle.meanMotion()
+    return dRaanSphere + dRaanMoon + dRaanSun
+
+
+def aopProcession(tle: TwoLineElement) -> float:
+    """Computes the procession of the argument of periapsis due to third-body perturbations and the
+    non-spherical Earth. Values are positive for a prograde (direct) orbit, negative for retrograde.
+    Parameters:
+    tle:    Two-line element set for an object.
+    returns: The rate of procession of the AOP in degrees per day."""
+
+    a = meanMotionToSma(tle.meanMotion()) / 1000.0
+    dAopSphere = 1.03237e14 * (a ** -3.5) * (4 - 5 * (sin(radians(tle.inclination())) ** 2)) / ((1 - tle.eccentricity() * tle.eccentricity()) ** 2)
+    dAopMoon = 0.00169 * (4 - 5 * (sin(radians(tle.inclination())) ** 2)) / tle.meanMotion()
+    dAopSun = 0.00077 * (4 - 5 * (sin(radians(tle.inclination())) ** 2)) / tle.meanMotion()
+    return dAopSphere + dAopMoon + dAopSun
 
 
 def computeEccentricVector(position: EVector, velocity: EVector) -> EVector:
