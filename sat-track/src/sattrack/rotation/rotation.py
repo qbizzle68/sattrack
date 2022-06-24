@@ -3,7 +3,7 @@ from math import cos, sin, radians
 
 from pyevspace import EVector, EMatrix, transpose
 
-from order import Axis, EulerOrder
+from sattrack.rotation.order import Axis, EulerOrder
 
 
 # todo: change this when we can create matrices from lists

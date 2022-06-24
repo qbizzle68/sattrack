@@ -1,4 +1,4 @@
-from elements import OrbitalElements
+from sattrack.structures.elements import OrbitalElements
 from sattrack.spacetime.juliandate import JulianDate, J2000
 from sattrack.util.constants import EARTH_MU, EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS
 

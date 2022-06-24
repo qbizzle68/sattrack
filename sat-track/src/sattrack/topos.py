@@ -1,9 +1,10 @@
 from pyevspace import EVector, cross, dot, norm
 
-from structures.coordinates import GeoPosition, geoPositionVector, zenithVector
-from rotation.order import Order
-from rotation import getEulerMatrix, EulerAngles, rotateToThenOffset
-from spacetime import JulianDate, earthOffsetAngle
+from sattrack.structures.coordinates import GeoPosition, geoPositionVector, zenithVector
+from sattrack.rotation.order import Order
+from sattrack.rotation.rotation import getEulerMatrix, EulerAngles, rotateToThenOffset
+from sattrack.spacetime.juliandate import JulianDate
+from sattrack.spacetime.sidereal import  earthOffsetAngle
 
 
 def ijkToSEZ(vec: EVector, jd: JulianDate, geo: GeoPosition) -> EVector:

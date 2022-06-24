@@ -1,18 +1,15 @@
 from math import asin, degrees, sqrt, pi, radians
 from math import atan2 as matan2
 
-import _sgp4
-
+from pyevspace import EVector
+from sattrack.structures._sgp4 import _SGP4_Propagator
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.util.conversions import atan2
-from coordinates import GeoPosition, geocentricToGeodetic
-from elements import OrbitalElements, trueToMean, trueAnomalyFromState
-from body import Body, EARTH_BODY
-
-from tle import TwoLineElement
-from pyevspace import EVector
-
+from sattrack.structures.coordinates import GeoPosition, geocentricToGeodetic
+from sattrack.structures.elements import OrbitalElements, trueToMean, trueAnomalyFromState
+from sattrack.structures.body import Body, EARTH_BODY
+from sattrack.structures.tle import TwoLineElement
 from sattrack.topos import ijkToSEZ
 
 
@@ -48,7 +45,7 @@ class Satellite:
     with it."""
 
     def __init__(self, tle: TwoLineElement, body: Body = EARTH_BODY):
-        self._propagator = _sgp4._SGP4_Propagator(tle)
+        self._propagator = _SGP4_Propagator(tle)
         self._tle = tle
         self._tleEpoch = tle.epoch()
         self._name = tle.getName()
