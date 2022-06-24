@@ -42,4 +42,4 @@ def orbitAltitude(geo: GeoPosition, jd: JulianDate, state: tuple[EVector], ecc: 
     pSat = norm(p) * ((sma * (1 - ecc * ecc)) / (1 + ecc * cos(radians(trueAnom))))
 
     ang = vang(p - gamma, pSat - gamma)
-    return ang if pSat.mag2() . p.mag2() else -ang
+    return ang if pSat.mag2() < p.mag2() else -ang
