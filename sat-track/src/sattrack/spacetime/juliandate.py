@@ -4,7 +4,6 @@ from datetime import datetime
 class JulianDate:
 
     def __init__(self, month: int, day: int, year: int, hour: int, minute: int, second: float, timeZone: int = 0):
-        #self._date = 0
         self._day_number = 0
         self._day_fraction = 0
         self.setTime(month, day, year, hour, minute, second, timeZone)
@@ -23,6 +22,7 @@ class JulianDate:
         mi:       Gregorian date minute.
         sec:      Gregorian date second, includes fractional portions.
         timeZone: Timezone of the Gregorian date time, defaults to 0."""
+
         t0 = int((1461 * (y + 4800 + int((m - 14) / 12))) / 4)
         t1 = int((367 * (m - 2 - (12 * int((m - 14) / 12)))) / 12)
         t2 = int((3 * int((y + 4900 + int((m - 14) / 12)) / 100)) / 4)
@@ -34,8 +34,6 @@ class JulianDate:
         elif self._day_fraction < 0:
             self._day_number -= 1
             self._day_fraction += 1.0
-        #self._date = t0 + t1 - t2 + d - 32075 + (
-                    #((hr - 12) / 24.0) + (mi / 1440.0) + (sec / 86400.0) - (timeZone / 24.0))
 
     def value(self):
         """Returns the value of the JulianDate."""
@@ -43,12 +41,10 @@ class JulianDate:
 
     def number(self):
         """Returns the Julian day number of this JulianDate."""
-        #return int(self._date)
         return self._day_number
 
     def fraction(self):
         """Returns the fractional part of this JulianDate."""
-        #return self._date - (int(self._date))
         return self._day_fraction
 
     def future(self, days: float):
@@ -56,8 +52,8 @@ class JulianDate:
         Parameters:
         days:   Number of solar days in the future of this date. A negative value
                 indicates a computing a past date."""
+
         rtn = JulianDate(0, 0, 0, 0, 0, 0)
-        #rtn._date = self._date + days
         int_day = int(days)
         rtn._day_number = self._day_number + int_day
         rtn._day_fraction = self._day_fraction + (days - int_day)
@@ -70,14 +66,13 @@ class JulianDate:
         """Returns the difference between two JulianDates, measured in solar days.
         Parameters:
         jd: A JulianDate object to find the difference from this object."""
-        #return self._date - jd._date
         return self.value() - jd.value()
-
 
     def date(self, timezone: float = 0.0) -> str:
         """Generates a string with the Gregorian date equivalent of this JulianDate.
         Parameters:
         timezone: The timezone offset to create the Gregorian date."""
+
         val = self.value()
         Z = int(val + 0.5 + (timezone / 24.0))
         F = (val + 0.5 + (timezone / 24.0)) - Z

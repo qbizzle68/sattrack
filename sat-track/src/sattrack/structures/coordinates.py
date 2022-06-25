@@ -104,7 +104,8 @@ def geoPositionVector(geo: GeoPosition, jd: JulianDate = None) -> EVector:
             radiusAtLat * sin(geocentricLat)
         )
 
-# todo: create separate method with the bulk of this and call it with either geoCENTRIC or geoDETIC
+
+# todo: create separate method with the bulk of this and call it with either geocentric or geodetic
 def zenithVector(geo: GeoPosition, jd: JulianDate = None) -> EVector:
     if not jd:
         return rotateOrderFrom(
@@ -121,7 +122,6 @@ def zenithVector(geo: GeoPosition, jd: JulianDate = None) -> EVector:
     else:
         radiusAtLat = radiusAtLatitude(geo.getLatitude())
         lat = radians(geo.getLatitude())
-        #lst = radians(localSiderealTime(jd, geo.getLongitude()))
         lst = radians(geo.getLongitude() + earthOffsetAngle(jd))
         return EVector(
             radiusAtLat * cos(lat) * cos(lst),

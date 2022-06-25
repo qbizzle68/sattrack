@@ -2,9 +2,9 @@ from math import cos, radians
 
 from pyevspace import EVector, cross, dot, norm, vang
 
-from structures.coordinates import GeoPosition, zenithVector, geoPositionVector
-from structures.elements import OrbitalElements, computeEccentricVector
 from spacetime.juliandate import JulianDate
+from structures.coordinates import GeoPosition, zenithVector, geoPositionVector
+from structures.elements import computeEccentricVector
 
 
 def orbitAltitude(geo: GeoPosition, jd: JulianDate, state: tuple[EVector], ecc: float, sma: float) -> float:

@@ -7,7 +7,7 @@ class Body:
 
     def __init__(self, name: str, orbit: OrbitalElements, mu: float, re: float, rev_period: float, offset: float = 0,
                  epoch: JulianDate = None, *, rp: float = 0, parent=None):
-        """Initial values needed do describe an orbitable body.
+        """Initial values needed to describe an orbitable body.
         Parameters:
         name:   Name of the body.
         orbit:  Classical orbital parameters estimating the bodies orbit.
@@ -68,7 +68,7 @@ class Body:
     # other methods here
 
 
-_earth_elements = OrbitalElements(sma=149.598e9,ecc=0.0167,inc=0.0,raan=348.73936,aop=102.94719,meanAnomaly=100.46435,epoch=J2000)
-#_earth_elements = OrbitalElements(149.598e9, 0.0167, 0.0, 348.73936, 102.94719, 100.46435, J2000)
+_earth_elements = OrbitalElements(sma=149.598e9, ecc=0.0167, inc=0.0, raan=348.73936, aop=102.94719,
+                                  meanAnomaly=100.46435, epoch=J2000)
 EARTH_BODY = Body("Earth", _earth_elements, EARTH_MU, EARTH_EQUITORIAL_RADIUS, 86164.090531, 280.46061837, J2000,
-             rp=EARTH_POLAR_RADIUS, parent=None)  # set parent to sun when created
+                  rp=EARTH_POLAR_RADIUS, parent=None)  # set parent to sun when created

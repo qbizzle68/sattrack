@@ -51,7 +51,7 @@ def computeVelocity(elements: OrbitalElements) -> float:
     return sqrt(EARTH_MU * ((2 / radius) - (1 / elements.getSma())))
 
 
-def getSubPoint(position: EVector, velocity: EVector, jd: JulianDate) -> GeoPosition:
+def getSubPoint(position: EVector, jd: JulianDate) -> GeoPosition:
     xyMag = sqrt(position[0]*position[0] + position[1]*position[1])
     dec = degrees(matan2(position[2], xyMag))
     lng = (degrees(catan2(position[1], position[0])) - earthOffsetAngle(jd)) % 360.0

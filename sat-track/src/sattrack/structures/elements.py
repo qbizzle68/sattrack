@@ -1,14 +1,15 @@
-from pyevspace import EVector, dot, cross, norm
 from math import sqrt, radians, degrees, pi, sin, cos, acos
+
+from pyevspace import EVector, dot, cross, norm
 
 from sattrack.position import computeRadius, meanAnomalyAt
 from sattrack.rotation.order import Order
 from sattrack.rotation.rotation import getEulerMatrix, EulerAngles, rotateMatrixFrom
 from sattrack.spacetime.juliandate import JulianDate
+from sattrack.structures.tle import TwoLineElement
 from sattrack.util.anomalies import meanToTrue, trueToMean, trueToEccentric
 from sattrack.util.constants import EARTH_MU
-from sattrack.util.conversions import smaToMeanMotion, meanMotionToSma
-from sattrack.structures.tle import TwoLineElement
+from sattrack.util.conversions import meanMotionToSma
 
 
 class OrbitalElements:
@@ -106,8 +107,9 @@ class OrbitalElements:
         jd:     Time to compute the state vectors.
         returns: A tuple containing the position and velocity vectors in m and m/s respectively."""
 
-        if not jd:
+        if jd is None:
             jd = self._epoch
+        # noinspection PyArgumentList
         tAnom = meanToTrue(meanAnomalyAt(jd), self._ecc)
         eAnom = trueToEccentric(tAnom, self._ecc)
         r = computeRadius(self)

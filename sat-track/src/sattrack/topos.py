@@ -7,7 +7,7 @@ from sattrack.structures.coordinates import GeoPosition, geoPositionVector, zeni
 from sattrack.rotation.order import Order
 from sattrack.rotation.rotation import getEulerMatrix, EulerAngles, rotateToThenOffset
 from sattrack.spacetime.juliandate import JulianDate
-from sattrack.spacetime.sidereal import  earthOffsetAngle
+from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.structures.satellite import Satellite
 from sattrack.util.conversions import atan2
 
@@ -28,7 +28,6 @@ def ijkToSEZ(vec: EVector, jd: JulianDate, geo: GeoPosition) -> EVector:
 def getPVector(geo: GeoPosition, state: tuple[EVector], jd: JulianDate) -> EVector:
     zeta = zenithVector(geo, jd)
     gamma = geoPositionVector(geo, jd)
-    #state = sat.getState(jd)
     lamb = norm(cross(state[0], state[1]))
     x = dot(zeta, gamma) * (zeta[0] - (zeta[1] * lamb[0] / lamb[1]))
     y = -lamb[0] * x / lamb[1]
