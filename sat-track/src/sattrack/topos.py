@@ -12,7 +12,7 @@ from sattrack.structures.satellite import Satellite
 from sattrack.util.conversions import atan2
 
 
-def ijkToSEZ(vec: EVector, jd: JulianDate, geo: GeoPosition) -> EVector:
+def toTopocentric(vec: EVector, jd: JulianDate, geo: GeoPosition) -> EVector:
     geoVector = geoPositionVector(geo, jd)
     mat = getEulerMatrix(
         Order.ZYX,
@@ -25,6 +25,7 @@ def ijkToSEZ(vec: EVector, jd: JulianDate, geo: GeoPosition) -> EVector:
     return rotateToThenOffset(mat, geoVector, vec)
 
 
+# todo: think of a better name for this
 def getPVector(geo: GeoPosition, state: tuple[EVector], jd: JulianDate) -> EVector:
     zeta = zenithVector(geo, jd)
     gamma = geoPositionVector(geo, jd)
@@ -40,16 +41,16 @@ def getPVector(geo: GeoPosition, state: tuple[EVector], jd: JulianDate) -> EVect
 #   todo: moved these, not sure if i want to keep them like this
 def getToposPosition(satellite: Satellite, jd: JulianDate, geo: GeoPosition) -> EVector:
     state = satellite.getState(jd)
-    return ijkToSEZ(state[0], jd, geo)
+    return toTopocentric(state[0], jd, geo)
 
 
 def getAltitude(satellite: Satellite, jd: JulianDate, geo: GeoPosition) -> float:
     state = satellite.getState(jd)
-    sez = ijkToSEZ(state[0], jd, geo)
+    sez = toTopocentric(state[0], jd, geo)
     return degrees(asin(sez[2] / sez.mag()))
 
 
 def getAzimuth(satellite: Satellite, jd: JulianDate, geo: GeoPosition) -> float:
     state = satellite.getState(jd)
-    sez = ijkToSEZ(state[0], jd, geo)
+    sez = toTopocentric(state[0], jd, geo)
     return degrees(atan2(sez[1], -sez[0]))
