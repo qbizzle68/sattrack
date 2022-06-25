@@ -1,5 +1,9 @@
+from math import pi
+
 from sattrack.spacetime.juliandate import JulianDate
 import requests
+
+from sattrack.util.constants import EARTH_MU
 
 
 class TwoLineElement:
@@ -178,6 +182,11 @@ class TwoLineElement:
     def revolutionNumber(self) -> int:
         """Returns the revolution number of the satellite."""
         return self._revNum
+
+    def sma(self) -> float:
+        """Computes the semi-major axis (m) from the mean motion (rev/day)."""
+        mMotionRad = self._meanMotion * 2 * pi / 86400.0
+        return (EARTH_MU ** (1.0 / 3.0)) / (mMotionRad ** (2.0 / 3.0))
 
 
 CELESTRAK_URL = "https://celestrak.com/NORAD/elements/gp.php?{}={}&FORMAT=TLE"
