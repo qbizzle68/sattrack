@@ -109,7 +109,6 @@ class OrbitalElements:
 
         if jd is None:
             jd = self._epoch
-        # noinspection PyArgumentList
         tAnom = meanToTrue(meanAnomalyAt(jd), self._ecc)
         eAnom = trueToEccentric(tAnom, self._ecc)
         r = computeRadius(self)
