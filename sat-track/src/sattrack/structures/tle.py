@@ -82,8 +82,16 @@ class TwoLineElement:
         epochDay = float(line1Tokens[3][2:])
         self._epoch = JulianDate(12, 31, epochYear - 1, 0, 0, 0).future(epochDay)
         self._nDot = float(line1Tokens[4])
-        self._nDDot = float('0.' + line1Tokens[5][:-2] + 'e' + line1Tokens[5][-2:])
-        self._bStar = float('0.' + line1Tokens[6][:-2] + 'e' + line1Tokens[6][-2:])
+        dDotSign = 1
+        if line1Tokens[5][0] == '-':
+            dDotSign = -1
+            line1Tokens[5] = line1Tokens[5][1:]
+        self._nDDot = dDotSign * float('0.' + line1Tokens[5][:-2] + 'e' + line1Tokens[5][-2:])
+        bStarSign = 1
+        if line1Tokens[6][0] == '-':
+            bStarSign = -1
+            line1Tokens[6] = line1Tokens[6][1:]
+        self._bStar = bStarSign * float('0.' + line1Tokens[6][:-2] + 'e' + line1Tokens[6][-2:])
         self._ephemeris = int(line1Tokens[7])
         self._setNumber = int(line1Tokens[8][:-1])
         #   line 2
