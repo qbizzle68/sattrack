@@ -27,7 +27,8 @@ class Satellite:
 
     def getState(self, jd: JulianDate) -> tuple[EVector]:
         if self._tle:
-            return self._propagator.getState(self._tle, jd)
+            rawState = self._propagator.getState(self._tle, jd)
+            return EVector(rawState[0][0], rawState[0][1], rawState[0][2]), EVector(rawState[1][0], rawState[1][1], rawState[1][2])
         else:
             return self._elements.getState(jd)
 
