@@ -27,14 +27,15 @@ def toTopocentric(vec: EVector, jd: JulianDate, geo: GeoPosition) -> EVector:
 
 # todo: think of a better name for this
 def getPVector(geo: GeoPosition, state: tuple[EVector], jd: JulianDate) -> EVector:
-    zeta = zenithVector(geo, jd)
+    zeta = norm(zenithVector(geo, jd))
     gamma = geoPositionVector(geo, jd)
     lamb = norm(cross(state[0], state[1]))
-    x = dot(zeta, gamma) * (zeta[0] - (zeta[1] * lamb[0] / lamb[1]))
+    x = dot(zeta, gamma) / (zeta[0] - (zeta[1] * lamb[0] / lamb[1]))
     y = -lamb[0] * x / lamb[1]
     r = EVector(x, y, 0)
     v = cross(zeta, lamb)
-    t = dot(r, (gamma - r)) / dot(r, r)
+    # t = dot(r, (gamma - r)) / dot(r, r)
+    t = (dot(v, gamma) - dot(v, r)) / v.mag2()
     return r + v * t
 
 
