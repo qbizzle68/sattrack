@@ -1,15 +1,14 @@
-from math import sqrt, radians, degrees, pi, sin, cos, acos
+from math import sqrt, radians, degrees, pi, sin, cos, acos, atan
 
 from pyevspace import EVector, dot, cross, norm
 
-from sattrack.position import computeRadius, meanAnomalyAt
 from sattrack.rotation.order import Order
 from sattrack.rotation.rotation import getEulerMatrix, EulerAngles, rotateMatrixFrom
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.structures.tle import TwoLineElement
 from sattrack.util.anomalies import meanToTrue, trueToMean, trueToEccentric
 from sattrack.util.constants import EARTH_MU
-from sattrack.util.conversions import meanMotionToSma
+from sattrack.util.conversions import meanMotionToSma, smaToMeanMotion
 
 
 class OrbitalElements:
@@ -66,7 +65,7 @@ class OrbitalElements:
         ra = tle.raan() + lanJ2Dot * dt
         aopJ2Dot = 1.03237e14 * temp * (4 - 5 * ((sin(radians(inc))) ** 2))
         aop = tle.argumentOfPeriapsis() + aopJ2Dot * dt
-        return cls(sma=sma, ecc=ecc, inc=inc, raan=ra, aop=aop, meanAnomaly=M1, epoch=jd)
+        return cls(sma=sma, ecc=ecc, inc=inc, raan=ra, aop=aop, meanAnomaly=degrees(M1), epoch=jd)
 
     @classmethod
     def fromState(cls, position: EVector, velocity: EVector, jd: JulianDate = 0):
@@ -220,3 +219,34 @@ def computeEccentricVector(position: EVector, velocity: EVector) -> EVector:
     rtn = velocity * dot(position, velocity)
     rtn = position * ((velocity.mag() ** 2) - (EARTH_MU / position.mag())) - rtn
     return rtn / EARTH_MU
+
+
+def computeVelocity(elements: OrbitalElements) -> float:
+    radius = computeRadius(elements)
+    return sqrt(EARTH_MU * ((2 / radius) - (1 / elements.getSma())))
+
+
+def computeRadius(elements: OrbitalElements) -> float:
+    tAnom = meanToTrue(elements.getMeanAnomaly(), elements.getEcc())
+    ecc = elements.getEcc()
+    return elements.getSma() * (1 - ecc * ecc) / (1 + ecc * cos(radians(tAnom)))
+
+
+def computeFlightAngle(elements: OrbitalElements) -> float:
+    tAnomRad = radians(meanToTrue(elements.getMeanAnomaly(), elements.getEcc()))
+    return atan((elements.getEcc() * sin(tAnomRad)) / (1 + elements.getEcc() * cos(tAnomRad)))
+
+
+def meanAnomalyAt(elements: OrbitalElements, jd: JulianDate) -> float:
+    if elements.getEpoch() == 0:
+        raise ValueError('Epoch was not set for this instance.')
+    n = smaToMeanMotion(elements.getSma())
+    dt = jd.difference(elements.getEpoch()) * 86400.0
+    mAnomRad = n * dt + radians(elements.getMeanAnomaly())
+    return degrees(mAnomRad) % 360.0
+
+
+def timeToMeanAnomaly(elements: OrbitalElements, meanAnom: float) -> float:
+    n = smaToMeanMotion(elements.getSma())
+    dM = (meanAnom - elements.getMeanAnomaly()) % 360.0
+    return radians(dM) / n / 86400.0
