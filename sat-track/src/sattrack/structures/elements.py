@@ -187,7 +187,7 @@ def raanProcession(tle: TwoLineElement) -> float:
     tle:    Two-line element set for an object.
     returns: The rate of procession of the RAAN in degrees per day."""
 
-    a = meanMotionToSma(tle.meanMotion()) / 1000.0
+    a = meanMotionToSma(tle.meanMotion())
     dRaanSphere = -2.06474e14 * (a ** -3.5) * cos(radians(tle.inclination())) / (
                 (1 - tle.eccentricity() * tle.eccentricity()) ** 2)
     dRaanMoon = -0.00338 * cos(radians(tle.inclination())) / tle.meanMotion()
@@ -202,7 +202,7 @@ def aopProcession(tle: TwoLineElement) -> float:
     tle:    Two-line element set for an object.
     returns: The rate of procession of the AOP in degrees per day."""
 
-    a = meanMotionToSma(tle.meanMotion()) / 1000.0
+    a = meanMotionToSma(tle.meanMotion())
     dAopSphere = 1.03237e14 * (a ** -3.5) * (4 - 5 * (sin(radians(tle.inclination())) ** 2)) / \
         ((1 - tle.eccentricity() * tle.eccentricity()) ** 2)
     dAopMoon = 0.00169 * (4 - 5 * (sin(radians(tle.inclination())) ** 2)) / tle.meanMotion()
