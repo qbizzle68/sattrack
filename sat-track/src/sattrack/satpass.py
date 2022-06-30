@@ -76,7 +76,8 @@ class Pass:
 
 
 def nextPass(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianDate:
-    if orbitAltitude(geo, time, sat.getState(time), sat.tle().eccentricity(), sat.tle().sma()) < 0:
+    #if orbitAltitude(geo, time, sat.getState(time), sat.tle().eccentricity(), sat.tle().sma()) < 0:
+    if orbitAltitude(sat, geo, time):
         t0 = timeToPlane(sat, geo, time)
         '''assume the sat needs to travel a full orbit still to become visible even if it recently passed the "PVector"'''
     else:
@@ -96,12 +97,7 @@ def nextPass(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianDate:
         dma0 = radians(ma1 - ma0 + 360)
     else:
         dma0 = radians(ma1 - ma0)
-    print('ma0', ma0)
-    print('ma1', ma1)
     dt0 = dma0 / (sat.tle().meanMotion() * 2 * pi)
-    print('dma0', dma0)
-    print('denominator', sat.tle().meanMotion() * 2 * pi)
-    print('dt0', dt0)
     # get better estimate by adjusting pVec to more accurate value
     t1 = t0.future(dt0)
     state = sat.getState(t1)
@@ -128,7 +124,10 @@ def timeToPlane(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianDat
     state = sat.getState(jd)
     ecc = sat.tle().eccentricity()
     sma = meanMotionToSma(sat.tle().meanMotion())
-    alt = orbitAltitude(geo, jd, state, ecc, sma)
+    #alt = orbitAltitude(geo, jd, state, ecc, sma)
+    alt = orbitAltitude(sat, geo, jd)
+    if alt > 0:
+        return jd
     dRaan = raanProcession(sat.tle())
     while abs(alt) > 2.7e-4: # one arc-second on either side
         # todo: improve this guess of dt
@@ -136,11 +135,13 @@ def timeToPlane(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianDat
         jd = jd.future(dt)
         mat = getMatrix(Axis.Z_AXIS, dRaan * dt)
         state = (mat @ state[0], mat @ state[1])
-        alt = orbitAltitude(geo, jd, state, ecc, sma)
+        #alt = orbitAltitude(geo, jd, state, ecc, sma)
+        alt = orbitAltitude(sat, geo, jd)
     return jd
 
 
-def orbitAltitude(geo: GeoPosition, jd: JulianDate, state: tuple[EVector], ecc: float, sma: float) -> float:
+#def orbitAltitude(geo: GeoPosition, jd: JulianDate, state: tuple[EVector], ecc: float, sma: float) -> float:
+def orbitAltitude(sat: Satellite, geo: GeoPosition, jd: JulianDate) -> float:
     """Computes the angle above or below the horizon, of the nearest point along the orbit to
     a GeoPosition at a given time. This in essence tells you if the path of the orbit can be seen
     above a given horizon. A negative value indicates the nearest point on the orbital path
@@ -153,8 +154,12 @@ def orbitAltitude(geo: GeoPosition, jd: JulianDate, state: tuple[EVector], ecc: 
     ecc:    Eccentricity of the orbit.
     sma:    Semi-major axis of the orbit in meters."""
 
+    state = sat.getState(jd)
+    ecc = sat.tle().eccentricity()
+    sma = sat.tle().sma()
+
     # zenith vector for the GeoPosition
-    zeta = zenithVector(geo, jd)
+    zeta = norm(zenithVector(geo, jd))
     # GeoPosition vector in geocentric reference frame
     gamma = geoPositionVector(geo, jd)
     # normalized angular momentum, vector equation for orbital plane
@@ -167,11 +172,12 @@ def orbitAltitude(geo: GeoPosition, jd: JulianDate, state: tuple[EVector], ecc: 
     v = cross(zeta, lamb)
 
     # compute exact solution for parametrized vector which yields the nearest point to intersection
-    t = dot(v, gamma - r) / dot(v, v)
+    # t = dot(v, gamma - r) / dot(v, v)
+    t = (dot(v, gamma) - dot(v, r)) / v.mag2()
     p = v * t + r
 
     # find the true anomaly of this vector if it were a position vector
-    trueAnom = vang(computeEccentricVector(state[0], state[0]), p)
+    trueAnom = vang(computeEccentricVector(state[0], state[1]), p)
     pSat = norm(p) * ((sma * (1 - ecc * ecc)) / (1 + ecc * cos(radians(trueAnom))))
 
     ang = vang(p - gamma, pSat - gamma)
