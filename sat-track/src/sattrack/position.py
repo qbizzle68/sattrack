@@ -10,9 +10,13 @@ from sattrack.structures.elements import computeEccentricVector
 from sattrack.util.conversions import atan2 as catan2
 
 
-# todo: why does this return NaN for 0 and 180
 def computeTrueAnomaly(position: EVector, velocity: EVector) -> float:
     eccVec = computeEccentricVector(position, velocity)
+    # todo: fix this in pyevspace module
+    if norm(position) == eccVec:
+        return 0
+    elif norm(-position) == eccVec:
+        return 180
     ang = vang(position, eccVec)
     return 360 - ang if norm(cross(position, eccVec)) == norm(cross(position, velocity)) else ang
 
