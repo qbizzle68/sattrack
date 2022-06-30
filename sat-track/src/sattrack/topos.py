@@ -1,5 +1,4 @@
-from cmath import asin
-from math import degrees
+from math import degrees, asin
 
 from pyevspace import EVector, cross, dot, norm
 
