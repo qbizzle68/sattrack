@@ -76,47 +76,54 @@ class Pass:
 
 
 def nextPass(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianDate:
-    #if orbitAltitude(geo, time, sat.getState(time), sat.tle().eccentricity(), sat.tle().sma()) < 0:
-    if orbitAltitude(sat, geo, time):
+    if orbitAltitude(sat, geo, time) < 0:
         t0 = timeToPlane(sat, geo, time)
-        '''assume the sat needs to travel a full orbit still to become visible even if it recently passed the "PVector"'''
     else:
         t0 = time
-    """find pVec, find time to pVec (time between anomalies), recompute pVec, find shortest time positive or negative to equivalent anomaly"""
+
     # rough estimate to next maximum height moving forward
     state = sat.getState(t0)
     pVec = getPVector(geo, state, t0)
-    ta0 = computeTrueAnomaly(state[0], state[1])
-    ma0 = trueToMean(ta0, sat.tle().eccentricity())
+    ma0 = trueToMean(computeTrueAnomaly(state[0], state[1]), sat.tle().eccentricity())
     eccVec = computeEccentricVector(state[0], state[1])
     ta1 = vang(eccVec, pVec)
     if norm(cross(eccVec, pVec)) != norm(cross(state[0], state[1])):
         ta1 = 360 - ta1
     ma1 = trueToMean(ta1, sat.tle().eccentricity())
     if ma1 < ma0:
-        dma0 = radians(ma1 - ma0 + 360)
+        dma0 = radians(ma1 + 360 - ma0)
     else:
         dma0 = radians(ma1 - ma0)
-    dt0 = dma0 / (sat.tle().meanMotion() * 2 * pi)
-    # get better estimate by adjusting pVec to more accurate value
-    t1 = t0.future(dt0)
-    state = sat.getState(t1)
-    pVec = getPVector(geo, state, t1)
-    ta0 = computeTrueAnomaly(state[0], state[1])
-    ma0 = trueToMean(ta0, sat.tle().eccentricity())
-    eccVec = computeEccentricVector(state[0], state[1])
-    ta1 = vang(eccVec, pVec)
-    if norm(cross(eccVec, pVec)) != norm(cross(state[0], state[1])):
-        ta1 = 360 - ta1
-    ma1 = trueToMean(ta1, sat.tle().eccentricity())
-    if ma1 < ma0:
-        dma1 = radians(ma1 - ma0 + 360)
-    else:
-        dma1 = radians(ma1 - ma0)
-    if dma1 >= 180:
-        dma1 -= 360
-    dt1 = dma1 / (sat.tle().meanMotion() * 2 * pi)
-    return t1.future(dt1)
+    tn = t0.future(dma0 / (sat.tle().meanMotion() * 2 * pi))
+
+    # iterate towards answer moving forward or backward
+    state = sat.getState(tn)
+    pVec = getPVector(geo, state, tn)
+    while vang(state[0], pVec) > 2.78e-4:
+        pVec = getPVector(geo, state, tn)
+        eccVec = computeEccentricVector(state[0], state[1])
+        tan = computeTrueAnomaly(state[0], state[1])
+        man = trueToMean(tan, sat.tle().eccentricity())
+        tan1 = vang(eccVec, pVec)
+        if norm(cross(eccVec, pVec)) != norm(cross(state[0], state[1])):
+            tan1 = 360 - tan1
+        man1 = trueToMean(tan1, sat.tle().eccentricity())
+        if tan1 <= tan:
+            if (tan - tan1) < 180:
+                dma = radians(man1 - man)
+            else:
+                dma = radians(man1 + 360 - man)
+        else:
+            if (tan1 - tan) > 180:
+                dma = radians(man1 - 360 - man)
+            else:
+                dma = radians(man1 - man)
+        tn = tn.future(dma / (sat.tle().meanMotion() * 2 * pi))
+        state = sat.getState(tn)
+        pVec = getPVector(geo, state, tn)
+    if orbitAltitude(sat, geo, tn) < 0:
+        return nextPass(sat, geo, tn.future(0.001))
+    return tn
 
 
 def timeToPlane(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianDate:
