@@ -1,6 +1,8 @@
 layout.txt
 fig/
 test/
+*csv/
+*.xlsx
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
