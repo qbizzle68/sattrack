@@ -226,6 +226,11 @@ class Rotation:
 
 
 def rotateToThenOffset(rotation: EMatrix, offset: EVector, original: EVector) -> EVector:
+    """Rotates a vector to a rotated and offset reference frame.
+    Parameters:
+    rotation:   Rotation matrix to reference frame.
+    offset:     Offset vector between reference frame origins.
+    original:   Original vector to be rotated."""
     rotatedOriginal = transpose(rotation) @ original
     rotatedOffset = transpose(rotation) @ offset
     return rotatedOriginal - rotatedOffset
