@@ -1,4 +1,4 @@
-from math import sqrt, degrees, atan2 as matan2
+from math import sqrt, degrees, atan2 as matan2, radians, pi
 
 from pyevspace import EVector, vang, norm, cross
 
@@ -6,6 +6,8 @@ from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.structures.coordinates import GeoPosition, geocentricToGeodetic
 from sattrack.structures.elements import computeEccentricVector
+from sattrack.structures.satellite import Satellite
+from sattrack.util.anomalies import trueToMean
 
 from sattrack.util.conversions import atan2 as catan2
 
@@ -19,6 +21,24 @@ def computeTrueAnomaly(position: EVector, velocity: EVector) -> float:
         return 180
     ang = vang(position, eccVec)
     return 360 - ang if norm(cross(position, eccVec)) == norm(cross(position, velocity)) else ang
+
+
+def nearestTrueAnomaly(sat: Satellite, time: JulianDate, trueAnom: float) -> JulianDate:
+    state = sat.getState(time)
+    meanAnom0 = trueToMean(computeTrueAnomaly(state[0], state[1]), sat.tle().eccentricity())
+    meanAnom1 = trueToMean(trueAnom, sat.tle().eccentricity())
+    if meanAnom1 < meanAnom0:
+        if meanAnom0 - meanAnom1 < 180:
+            dma = radians(meanAnom1 - meanAnom0)
+        else:
+            dma = radians(meanAnom1 + 360 - meanAnom0)
+    else:
+        if meanAnom1 - meanAnom0 > 180:
+            dma = radians(meanAnom1 - 360 - meanAnom0)
+        else:
+            dma = radians(meanAnom1 - meanAnom0)
+    n = sat.tle().meanMotion() * 2 * pi
+    return time.future(dma / n)
 
 
 def getSubPoint(position: EVector, jd: JulianDate) -> GeoPosition:
