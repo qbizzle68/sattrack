@@ -8,7 +8,7 @@ from sattrack.rotation.rotation import getMatrix
 from sattrack.structures.satellite import Satellite
 from sattrack.topos import getPVector, getToposPosition
 from sattrack.util.anomalies import trueToMean
-from sattrack.util.conversions import meanMotionToSma, atan2
+from sattrack.util.conversions import atan2
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.structures.coordinates import GeoPosition, zenithVector, geoPositionVector
 from sattrack.structures.elements import computeEccentricVector, raanProcession
@@ -52,15 +52,16 @@ class PositionInfo:
 
 
 class Pass:
-
     """set first if rise isn't visible, this determines pass visibility."""
-    def __init__(self, rise: PositionInfo, set: PositionInfo, max: PositionInfo, first: PositionInfo = None, last: PositionInfo = None):
-        self._riseInfo = rise
-        self._setInfo = set
-        self._maxInfo = max
-        self._firstVisible = first
-        self._lastVisible = last
-        if first is not None or rise.visibility():
+
+    def __init__(self, riseInfo: PositionInfo, setInfo: PositionInfo, maxInfo: PositionInfo,
+                 firstInfo: PositionInfo = None, lastInfo: PositionInfo = None):
+        self._riseInfo = riseInfo
+        self._setInfo = setInfo
+        self._maxInfo = maxInfo
+        self._firstVisible = firstInfo
+        self._lastVisible = lastInfo
+        if firstInfo is not None or riseInfo.visibility():
             self._visible = True
         else:
             self._visible = False
@@ -92,15 +93,19 @@ class Pass:
 def nextPass(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Pass:
     nextPassTime = nextPassMax(sat, geo, time)
     riseTime, setTime = riseSetTimes(sat, geo, nextPassTime)
-    makeInfo = lambda pos, tm: PositionInfo(degrees(asin(pos[2] / pos.mag())),
-                                           degrees(atan2(pos[1], -pos[0])),
-                                           tm)
-    risePos = getToposPosition(sat, riseTime, geo)# = sat.getState(riseTime)
-    riseInfo = makeInfo(risePos, riseTime) # todo: check visibility
+
+    risePos = getToposPosition(sat, riseTime, geo)
+    riseInfo = PositionInfo(degrees(asin(risePos[2] / risePos.mag())),
+                            degrees(atan2(risePos[1], -risePos[0])),
+                            riseTime)  # todo: check visibility
     setPos = getToposPosition(sat, setTime, geo)
-    setInfo = makeInfo(setPos, setTime) # todo: check visibility
+    setInfo = PositionInfo(degrees(asin(setPos[2] / setPos.mag())),
+                           degrees(atan2(setPos[1], -setPos[0])),
+                           setTime)  # todo: check visibility
     maxPos = getToposPosition(sat, nextPassTime, geo)
-    maxInfo = makeInfo(maxPos, nextPassTime) # todo: check visibility
+    maxInfo = PositionInfo(degrees(asin(maxPos[2] / maxPos.mag())),
+                           degrees(atan2(maxPos[1], -maxPos[0])),
+                           nextPassTime)  # todo: check visibility
     return Pass(riseInfo, setInfo, maxInfo)
 
 
@@ -164,7 +169,7 @@ def riseSetTimes(sat: Satellite, geo: GeoPosition, time: JulianDate) -> tuple[Ju
     # time needs to be a during the pass
     a = sat.tle().sma()
     c = a * sat.tle().eccentricity()
-    b = sqrt(a*a - c*c)
+    b = sqrt(a * a - c * c)
 
     state = sat.getState(time)
     hNorm = norm(cross(state[0], state[1]))
@@ -177,7 +182,7 @@ def riseSetTimes(sat: Satellite, geo: GeoPosition, time: JulianDate) -> tuple[Ju
 
     R = sqrt((dot(zeta, u) ** 2) + (dot(zeta, v) ** 2))
     try:
-        beta = acos(dot(zeta, gamma-ce) / R)
+        beta = acos(dot(zeta, gamma - ce) / R)
     except ValueError:
         # create our own exception type here
         raise Exception("No pass during this time.")
@@ -205,7 +210,7 @@ def timeToPlane(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianDat
     if alt > 0:
         return jd
     dRaan = raanProcession(sat.tle())
-    while abs(alt) > 2.7e-4: # one arc-second on either side
+    while abs(alt) > 2.7e-4:  # one arc-second on either side
         # todo: improve this guess of dt
         dt = -alt / 360.0
         jd = jd.future(dt)
