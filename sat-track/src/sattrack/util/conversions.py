@@ -19,12 +19,11 @@ def meanMotionToSma(meanMotion: float) -> float:
     meanMotion: Mean motion measured in revolutions per day.
     Returns the semi-major axis in km."""
     mMotionRad = meanMotion * 2 * pi / 86400.0
-    return ((EARTH_MU ** (1.0 / 3.0)) / (mMotionRad ** (2.0 / 3.0))) / 1000.0
-
+    return ((EARTH_MU ** (1.0 / 3.0)) / (mMotionRad ** (2.0 / 3.0)))
 
 def smaToMeanMotion(sma: float) -> float:
     """Converts semi-major axis to mean motion.
     Parameters:
     sma: Semi-major axis measured in km.
     Returns the mean motion in radians per second."""
-    return sqrt(EARTH_MU / ((sma * 1000.0) ** 3))
+    return sqrt(EARTH_MU / (sma ** 3))
