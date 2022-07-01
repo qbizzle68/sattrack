@@ -47,7 +47,7 @@ class OrbitalElements:
         dt = jd.difference(tle.epoch())
         inc = tle.inclination()
         nConvert = tle.meanMotion() * 2 * pi / 86400
-        a0 = ((EARTH_MU / (nConvert * nConvert)) ** (1 / 3)) / 1000  # km
+        a0 = ((EARTH_MU / (nConvert * nConvert)) ** (1 / 3))  # km
         dM = (tle.meanMotion() * dt
               + tle.meanMotionDot() * dt * dt
               + tle.meanMotionDDot() * dt * dt * dt) * 2 * pi
@@ -105,12 +105,11 @@ class OrbitalElements:
         Parameters:
         jd:     Time to compute the state vectors.
         returns: A tuple containing the position and velocity vectors in m and m/s respectively."""
-
         if jd is None:
             jd = self._epoch
-        tAnom = meanToTrue(meanAnomalyAt(jd), self._ecc)
+        tAnom = meanToTrue(meanAnomalyAt(self, jd), self._ecc)
         eAnom = trueToEccentric(tAnom, self._ecc)
-        r = computeRadius(self)
+        r = self._sma * (1 - self._ecc * cos(radians(eAnom)))
         pOrbit = EVector(cos(radians(tAnom)), sin(radians(tAnom)), 0) * r
         vOrbit = EVector(-sin(radians(eAnom)), sqrt(1 - self._ecc * self._ecc) * cos(radians(eAnom)), 0) * (
                 sqrt(EARTH_MU * self._sma) / r)
@@ -215,10 +214,18 @@ def computeEccentricVector(position: EVector, velocity: EVector) -> EVector:
     Parameters:
     position:   Position state of the object.
     velocity:   Velocity state of the object."""
-
-    rtn = velocity * dot(position, velocity)
+# todo: these units arent right
+    '''rtn = velocity * dot(position, velocity)
     rtn = position * ((velocity.mag() ** 2) - (EARTH_MU / position.mag())) - rtn
-    return rtn / EARTH_MU
+    return rtn / EARTH_MU'''
+    '''MU_ADJUST = EARTH_MU * 1e9
+    temp = position * velocity.mag2() - velocity * dot(position, velocity)
+    return temp / MU_ADJUST - norm(position)'''
+    pos = position
+    vel = velocity
+    lhs = pos * (vel.mag2() / EARTH_MU - 1 / pos.mag())
+    rhs = vel * (dot(pos, vel) / EARTH_MU)
+    return lhs - rhs
 
 
 def computeVelocity(elements: OrbitalElements) -> float:
