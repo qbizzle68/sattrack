@@ -33,7 +33,6 @@ def getPVector(geo: GeoPosition, state: tuple[EVector], jd: JulianDate) -> EVect
     y = -lamb[0] * x / lamb[1]
     r = EVector(x, y, 0)
     v = cross(zeta, lamb)
-    # t = dot(r, (gamma - r)) / dot(r, r)
     t = (dot(v, gamma) - dot(v, r)) / v.mag2()
     return r + v * t
 
