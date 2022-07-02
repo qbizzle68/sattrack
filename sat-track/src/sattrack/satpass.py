@@ -3,10 +3,11 @@ from math import cos, radians, pi, sqrt, acos, sin, degrees, asin
 from pyevspace import EVector, cross, dot, norm, vang
 
 from sattrack.position import computeTrueAnomaly, nearestTrueAnomaly
-from sattrack.rotation.order import Axis
-from sattrack.rotation.rotation import getMatrix
+from sattrack.rotation.order import Axis, Order
+from sattrack.rotation.rotation import getMatrix, rotateOrderTo, EulerAngles
+from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.structures.satellite import Satellite
-from sattrack.topos import getPVector, getToposPosition
+from sattrack.topos import getPVector, getToposPosition, toTopocentric, getAltitude
 from sattrack.util.anomalies import trueToMean
 from sattrack.util.conversions import atan2
 from sattrack.spacetime.juliandate import JulianDate
@@ -110,11 +111,16 @@ def nextPass(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Pass:
 
 
 def nextPassMax(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianDate:
+    nextMax = nextPassMaxGuess(sat, geo, time)
+    return maxPassRefine(sat, geo, nextMax)
+
+
+def nextPassMaxGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianDate:
     """Computes the time to the next maximum height that the next satellite pass achieves.
-    Parameters:
-    sat:    The satellite.
-    geo:    GeoPosition the pass is observed from.
-    time:   A time between passes. The pass computed will be the soonest pass after time."""
+        Parameters:
+        sat:    The satellite.
+        geo:    GeoPosition the pass is observed from.
+        time:   A time between passes. The pass computed will be the soonest pass after time."""
     if orbitAltitude(sat, geo, time) < 0:
         t0 = timeToPlane(sat, geo, time)
     else:
@@ -165,7 +171,55 @@ def nextPassMax(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianDat
     return tn
 
 
+def maxPassRefine(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianDate:
+    state = sat.getState(time)
+    sezVel = rotateOrderTo(
+        Order.ZYX,
+        EulerAngles(
+            geo.getLongitude() + earthOffsetAngle(time),
+            90 - geo.getLatitude(),
+            0.0
+        ),
+        state[1]
+    )
+    while abs(sezVel[2]) > 1e-6:
+        futureState = sat.getState(time.future(1/86400))
+        futureSezVel = rotateOrderTo(
+            Order.ZYX,
+            EulerAngles(
+                geo.getLongitude() + earthOffsetAngle(time),
+                90 - geo.getLatitude(),
+                0.0
+            ),
+            futureState[1]
+        )
+
+        dz2dt2 = (futureSezVel[2] - sezVel[2]) / (1 / 86400)
+        dt = -sezVel[2] / dz2dt2
+        time = time.future(dt)
+
+        state = sat.getState(time)
+        sezVel = rotateOrderTo(
+            Order.ZYX,
+            EulerAngles(
+                geo.getLongitude() + earthOffsetAngle(time),
+                90 - geo.getLatitude(),
+                0.0
+            ),
+            state[1]
+        )
+    return time
+
+
 def riseSetTimes(sat: Satellite, geo: GeoPosition, time: JulianDate) -> tuple[JulianDate]:
+    # time needs to be a during the pass
+    riseTime, setTime = riseSetGuess(sat, geo, time)
+    riseTime = horizonTimeRefine(sat, geo, riseTime)
+    setTime = horizonTimeRefine(sat, geo, setTime)
+    return riseTime, setTime
+
+
+def riseSetGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> tuple[JulianDate]:
     # time needs to be a during the pass
     a = sat.tle().sma()
     c = a * sat.tle().eccentricity()
@@ -201,6 +255,31 @@ def riseSetTimes(sat: Satellite, geo: GeoPosition, time: JulianDate) -> tuple[Ju
         return jd1, jd2
     else:
         return jd2, jd1
+
+
+def horizonTimeRefine(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianDate:
+    state = sat.getState(time)
+    sezPos = toTopocentric(state[0], time, geo)
+    alt = asin(sezPos[2] / sezPos.mag())
+    while abs(alt) > radians(1 / 3600):
+        sezVel = rotateOrderTo(
+            Order.ZYX,
+            EulerAngles(
+                geo.getLongitude() + earthOffsetAngle(time),
+                90 - geo.getLatitude(),
+                0.0
+            ),
+            state[1]
+        )
+
+        dz = sezPos.mag() * alt
+        dt = (-dz / sezVel[2]) / 86400.0
+        time = time.future(dt)
+
+        state = sat.getState(time)
+        sezPos = toTopocentric(state[0], time, geo)
+        alt = asin(sezPos[2] / sezPos.mag())
+    return time
 
 
 def timeToPlane(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianDate:
