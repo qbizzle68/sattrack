@@ -7,7 +7,7 @@ from sattrack.rotation.order import Axis, Order
 from sattrack.rotation.rotation import getMatrix, rotateOrderTo, EulerAngles
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.structures.satellite import Satellite
-from sattrack.topos import getPVector, getToposPosition, toTopocentric, getAltitude
+from sattrack.topos import getPVector, getToposPosition, toTopocentric
 from sattrack.util.anomalies import trueToMean
 from sattrack.util.conversions import atan2
 from sattrack.spacetime.juliandate import JulianDate
