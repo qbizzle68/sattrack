@@ -58,13 +58,19 @@ class OrbitalElements:
         aDot = -2 * a0 * n0dot / (3 * n0)
         sma = (a0 + aDot * dt) * 1000
         eDot = -2 * (1 - tleEcc) * n0dot / (3 * n0)
-        ecc = tleEcc + eDot * dt  # todo: do we use this for the next line?
+        ecc = tleEcc + eDot * dt
         temp = (a0 ** -3.5) / ((1 - (tleEcc * tleEcc)) ** 2)
-        # todo: include the moon and sun perturbations to this
+        #   Perturbations
+        #   Non-spherical Earth
         lanJ2Dot = -2.06474e14 * temp * cos(radians(inc))
-        ra = tle.raan() + lanJ2Dot * dt
         aopJ2Dot = 1.03237e14 * temp * (4 - 5 * ((sin(radians(inc))) ** 2))
-        aop = tle.argumentOfPeriapsis() + aopJ2Dot * dt
+        #   Third-Body
+        lanMoon = -0.00338 * cos(inc) / n0
+        lanSun = -0.00154 * cos(inc) / n0
+        aopMoon = 0.00169 * (4 - (5 * sin(inc) ** 2)) / n0
+        aopSun = 0.00077 * (4 - (5 * sin(inc) ** 2)) / n0
+        ra = tle.raan() + (lanJ2Dot + lanMoon + lanSun) * dt
+        aop = tle.argumentOfPeriapsis() + (aopJ2Dot + aopMoon + aopSun) * dt
         return cls(sma=sma, ecc=ecc, inc=inc, raan=ra, aop=aop, meanAnomaly=degrees(M1), epoch=jd)
 
     @classmethod
@@ -209,22 +215,14 @@ def aopProcession(tle: TwoLineElement) -> float:
     return dAopSphere + dAopMoon + dAopSun
 
 
+# todo: figure out if the magnitude here is accurate
 def computeEccentricVector(position: EVector, velocity: EVector) -> EVector:
     """Compute the eccentric vector of an orbit.
     Parameters:
     position:   Position state of the object.
     velocity:   Velocity state of the object."""
-# todo: these units arent right
-    '''rtn = velocity * dot(position, velocity)
-    rtn = position * ((velocity.mag() ** 2) - (EARTH_MU / position.mag())) - rtn
-    return rtn / EARTH_MU'''
-    '''MU_ADJUST = EARTH_MU * 1e9
-    temp = position * velocity.mag2() - velocity * dot(position, velocity)
-    return temp / MU_ADJUST - norm(position)'''
-    pos = position
-    vel = velocity
-    lhs = pos * (vel.mag2() / EARTH_MU - 1 / pos.mag())
-    rhs = vel * (dot(pos, vel) / EARTH_MU)
+    lhs = position * (velocity.mag2() / EARTH_MU - 1 / position.mag())
+    rhs = velocity * (dot(position, velocity) / EARTH_MU)
     return lhs - rhs
 
 
