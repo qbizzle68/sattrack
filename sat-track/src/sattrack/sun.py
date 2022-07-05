@@ -1,9 +1,20 @@
+from enum import Enum
 from math import sin, cos
 
 from pyevspace import EVector
 
 from sattrack.spacetime.juliandate import JulianDate, J2000
+from sattrack.structures.coordinates import GeoPosition
+from sattrack.topos import toTopocentric
 from sattrack.util.constants import AU
+
+
+class TwilightType(Enum):
+    Day = 0
+    Civil = 1
+    Nautical = 2
+    Astronomical = 3
+    Night = 4
 
 
 def getSunPosition(time: JulianDate) -> EVector:
