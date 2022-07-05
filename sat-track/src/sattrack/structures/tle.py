@@ -1,5 +1,6 @@
 from math import pi
 
+from sattrack.exceptions import TokenNumberException, TokenLengthException
 from sattrack.spacetime.juliandate import JulianDate
 import requests
 
@@ -44,31 +45,26 @@ class TwoLineElement:
         """Checks the tokens of the lines and ensures they are of the right format."""
         line1Tokens = [i for i in line1.split(' ') if i != '']
         if len(line1Tokens) != 9:
-            raise Exception(f"Bad number of tokens in line 1 {len(line1Tokens)}.")  # make custom version for this
+            raise TokenNumberException(f"Invalid number of tokens in line 1: '{len(line1Tokens)}'.")
         line1lens = [(1, 2), (6, 7), (6, 9), (14, 15), (9, 11), (7, 9), (7, 9), (1, 2), (2, 6)]
         for tok, vals in zip(line1Tokens, line1lens):
             if not len(tok) in range(vals[0], vals[1]):
-                raise Exception(f"Token of bad length {tok}, {vals}")  # make a custom version and describe which token
+                raise TokenLengthException(f"Token '{tok}' has invalid length '{vals}'.")
 
         line2Tokens = [i for i in line2.split(' ') if i != '']
         if not len(line2Tokens) in [8, 9]:
-            raise Exception(
-                f"Bad number of tokens in line 2. {len(line2Tokens)}y")  # todo: make custom version for this
+            raise TokenNumberException(f"Invalid number of tokens in line1: '{len(line2Tokens)}'.")
         line2lens = [(1, 2), (5, 6), (6, 9), (6, 9), (7, 8), (6, 9), (6, 9)]
         for tok, vals in zip(line2Tokens, line2lens):
             if not len(tok) in range(vals[0], vals[1]):
-                raise Exception(
-                    f"Token of bad length {tok}, {vals}")  # todo: make a custom version and describe which token
+                raise TokenLengthException(f"Token '{tok}' has invalid length '{vals}'.")
         if len(line2Tokens) == 8:
             if not len(line2Tokens[-1]) in range(16, 18):
-                raise Exception(
-                    f"bad token {line2Tokens[-1]}, {(16, 17)}")  # todo: make a custom version and describe
-                # which token
+                raise TokenLengthException(f"Token '{line2Tokens[-1]}' has invalid length '{(16, 17)}'.")
         else:
             for tok, vals in zip(line2Tokens[-2:], [(10, 12), (2, 6)]):
                 if not len(tok) in range(vals[0], vals[1]):
-                    raise Exception(
-                        f"Token of bad length {tok}, {vals}")  # todo: make a custom version and describe which token
+                    raise TokenLengthException(f"Token '{tok}' has invalid length '{vals}'.")
         return line1Tokens, line2Tokens
 
     def _parseLines(self, line1Tokens: list[str], line2Tokens: list[str]) -> None:
