@@ -105,7 +105,6 @@ def geoPositionVector(geo: GeoPosition, jd: JulianDate = None) -> EVector:
         )
 
 
-# todo: create separate method with the bulk of this and call it with either geocentric or geodetic
 def zenithVector(geo: GeoPosition, jd: JulianDate = None) -> EVector:
     if not jd:
         return rotateOrderFrom(
