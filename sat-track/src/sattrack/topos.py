@@ -8,6 +8,7 @@ from sattrack.rotation.rotation import getEulerMatrix, EulerAngles, rotateToThen
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.structures.satellite import Satellite
+from sattrack.sun import TwilightType, getSunPosition
 from sattrack.util.conversions import atan2
 
 
@@ -53,3 +54,19 @@ def getAzimuth(satellite: Satellite, jd: JulianDate, geo: GeoPosition) -> float:
     state = satellite.getState(jd)
     sez = toTopocentric(state[0], jd, geo)
     return degrees(atan2(sez[1], -sez[0]))
+
+
+def getTwilightType(time: JulianDate, geo: GeoPosition) -> TwilightType:
+    sunPos = getSunPosition(time)
+    sunSEZPos = toTopocentric(sunPos, time, geo)
+    sunAngle = degrees(asin(sunSEZPos[2] / sunSEZPos.mag()))
+    if sunAngle < -18:
+        return TwilightType.Night
+    elif sunAngle < -12:
+        return TwilightType.Astronomical
+    elif sunAngle < -6:
+        return TwilightType.Nautical
+    elif sunAngle < -(5.0 / 6.0):
+        return TwilightType.Civil
+    else:
+        return TwilightType.Day
