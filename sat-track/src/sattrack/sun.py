@@ -4,8 +4,6 @@ from math import sin, cos
 from pyevspace import EVector
 
 from sattrack.spacetime.juliandate import JulianDate, J2000
-from sattrack.structures.coordinates import GeoPosition
-from sattrack.topos import toTopocentric
 from sattrack.util.constants import AU
 
 
@@ -25,7 +23,7 @@ def getSunPosition(time: JulianDate) -> EVector:
     returns: An earth centered position vector of the Sun in km."""
 
     #   time since noon TT on Jan 1, 2000
-    n = time.difference() - J2000
+    n = time.difference(J2000)
     #   mean longitude of the Sun
     L = 4.89495042 + 0.0172027924 * n
     #   mean anomaly of the Sun
