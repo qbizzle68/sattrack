@@ -7,8 +7,10 @@ from sattrack.rotation.order import Axis, Order
 from sattrack.rotation.rotation import getMatrix, rotateOrderTo, EulerAngles
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.structures.satellite import Satellite
-from sattrack.topos import getPVector, getToposPosition, toTopocentric
+from sattrack.sun import getSunPosition
+from sattrack.topos import getPVector, toTopocentric
 from sattrack.util.anomalies import trueToMean
+from sattrack.util.constants import EARTH_EQUITORIAL_RADIUS, SUN_RADIUS
 from sattrack.util.conversions import atan2
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.structures.coordinates import GeoPosition, zenithVector, geoPositionVector
@@ -33,7 +35,8 @@ class PositionInfo:
 
     def __str__(self):
         """Generates a string of the data in this class."""
-        return f'Altitude: {self._altitude}\nAzimuth: {self._azimuth}\nTime: {self._time}\nVisibility: {self._visible}'
+        return f'Altitude: {"%.2f" % self._altitude}\nAzimuth: {"%.2f" % self._azimuth}\nTime: {self._time}' \
+               f'\nVisibility: {self._visible}'
 
     def altitude(self) -> float:
         """Returns the altitude measured in degrees.."""
@@ -95,19 +98,42 @@ def nextPass(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Pass:
     nextPassTime = nextPassMax(sat, geo, time)
     riseTime, setTime = riseSetTimes(sat, geo, nextPassTime)
 
-    risePos = getToposPosition(sat, riseTime, geo)
-    riseInfo = PositionInfo(degrees(asin(risePos[2] / risePos.mag())),
-                            degrees(atan2(risePos[1], -risePos[0])),
-                            riseTime)  # todo: check visibility
-    setPos = getToposPosition(sat, setTime, geo)
-    setInfo = PositionInfo(degrees(asin(setPos[2] / setPos.mag())),
-                           degrees(atan2(setPos[1], -setPos[0])),
-                           setTime)  # todo: check visibility
-    maxPos = getToposPosition(sat, nextPassTime, geo)
-    maxInfo = PositionInfo(degrees(asin(maxPos[2] / maxPos.mag())),
-                           degrees(atan2(maxPos[1], -maxPos[0])),
-                           nextPassTime)  # todo: check visibility
+    risePos = sat.getState(riseTime)[0]
+    # risePosSez = getToposPosition(sat, riseTime, geo)
+    risePosSez = toTopocentric(risePos, riseTime, geo)
+    riseVisible = not isEclipsed(risePos, getSunPosition(riseTime))
+    riseInfo = PositionInfo(degrees(asin(risePosSez[2] / risePosSez.mag())),
+                            degrees(atan2(risePosSez[1], -risePosSez[0])),
+                            riseTime, riseVisible)
+
+    setPos = sat.getState(setTime)[0]
+    # setPos = getToposPosition(sat, setTime, geo)
+    setPosSez = toTopocentric(setPos, setTime, geo)
+    setVisible = not isEclipsed(setPos, getSunPosition(setTime))
+    setInfo = PositionInfo(degrees(asin(setPosSez[2] / setPosSez.mag())),
+                           degrees(atan2(setPosSez[1], -setPosSez[0])),
+                           setTime, setVisible)
+
+    maxPos = sat.getState(nextPassTime)[0]
+    #  maxPos = getToposPosition(sat, nextPassTime, geo)
+    maxPosSez = toTopocentric(maxPos, nextPassTime, geo)
+    maxVisible = not isEclipsed(maxPos, getSunPosition(nextPassTime))
+    maxInfo = PositionInfo(degrees(asin(maxPosSez[2] / maxPosSez.mag())),
+                           degrees(atan2(maxPosSez[1], -maxPosSez[0])),
+                           nextPassTime, maxVisible)
+
     return Pass(riseInfo, setInfo, maxInfo)
+
+
+def getPassList(sat: Satellite, geo: GeoPosition, start: JulianDate, duration: float) -> tuple[Pass]:
+    passList = []
+    nPass = nextPass(sat, geo, start)
+    nTime = nPass.maxInfo().time().difference(start)
+    while nTime < duration:
+        passList.append(nPass)
+        nPass = nextPass(sat, geo, nPass.maxInfo().time().future(0.001))
+        nTime = nPass.maxInfo().time().difference(start)
+    return tuple(passList)
 
 
 def nextPassMax(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianDate:
@@ -339,3 +365,29 @@ def orbitAltitude(sat: Satellite, geo: GeoPosition, jd: JulianDate) -> float:
 
     ang = vang(p - gamma, pSat - gamma)
     return ang if pSat.mag2() > p.mag2() else -ang
+
+
+def isEclipsed(satPos: EVector, sunPos: EVector) -> bool:
+    """Determines whether a position is eclipsed by the earth.
+    Parameters:
+    satPos: Position vector of object.
+    sunPos: Position of the Sun at the same time the object is at satPos.
+    returns True if eclipsed by any means, false otherwise."""
+
+    #   vectors are relative to the satellite
+    earthPos = -satPos
+    sunPos = -satPos + sunPos
+    #   semi-diameters of earth and sun
+    # todo: calculate real Earth radius from perspective here
+    thetaE = asin(EARTH_EQUITORIAL_RADIUS / earthPos.mag())
+    thetaS = asin(SUN_RADIUS / sunPos.mag())
+    #   angle between earth and sun centers relative to the satellite
+    theta = vang(earthPos, sunPos)
+
+    #   umbral eclipse
+    if thetaE > thetaS and theta < (thetaE - thetaS):
+        return True
+    #   penumbral eclipse
+    if abs(thetaE - thetaS) < theta < (thetaE + thetaS):
+        return True
+    return thetaS > thetaE and theta < (thetaS - thetaE)
