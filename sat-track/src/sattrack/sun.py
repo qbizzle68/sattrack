@@ -1,4 +1,5 @@
 from enum import Enum
+from functools import total_ordering
 from math import sin, cos
 
 from pyevspace import EVector
@@ -7,12 +8,18 @@ from sattrack.spacetime.juliandate import JulianDate, J2000
 from sattrack.util.constants import AU
 
 
+@total_ordering
 class TwilightType(Enum):
     Day = 0
     Civil = 1
     Nautical = 2
     Astronomical = 3
     Night = 4
+
+    def __lt__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value < other.value
+        return NotImplemented
 
 
 def getSunPosition(time: JulianDate) -> EVector:
