@@ -38,7 +38,6 @@ def getPVector(geo: GeoPosition, state: tuple[EVector], jd: JulianDate) -> EVect
     return r + v * t
 
 
-#   todo: moved these, not sure if i want to keep them like this
 def getToposPosition(satellite: Satellite, jd: JulianDate, geo: GeoPosition) -> EVector:
     state = satellite.getState(jd)
     return toTopocentric(state[0], jd, geo)

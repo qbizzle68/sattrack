@@ -209,7 +209,7 @@ def maxPassRefine(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianD
         state[1]
     )
     while abs(sezVel[2]) > 1e-6:
-        futureState = sat.getState(time.future(1/86400))
+        futureState = sat.getState(time.future(1 / 86400))
         futureSezVel = rotateOrderTo(
             Order.ZYX,
             EulerAngles(
@@ -266,7 +266,6 @@ def riseSetGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> tuple[Ju
     except ValueError:
         # create our own exception type here
         raise Exception("No pass during this time.")
-    # todo: is this atan2 good enough? (range)
     alpha = atan2(dot(zeta, v), dot(zeta, u))
     w1 = alpha + beta
     w2 = alpha - beta
