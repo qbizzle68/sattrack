@@ -8,7 +8,7 @@ from sattrack.rotation.rotation import getMatrix, rotateOrderTo, EulerAngles
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.structures.satellite import Satellite
 from sattrack.sun import getSunPosition, TwilightType
-from sattrack.topos import getPVector, toTopocentric, getTwilightType
+from sattrack.topos import getPVector, toTopocentric, getTwilightType, getAltitude
 from sattrack.util.anomalies import trueToMean
 from sattrack.util.constants import EARTH_EQUITORIAL_RADIUS, SUN_RADIUS
 from sattrack.util.conversions import atan2
@@ -94,28 +94,60 @@ class Pass:
         return self._lastVisible
 
 
-def nextPass(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Pass:
-    nextPassTime = nextPassMax(sat, geo, time)
-    riseTime, setTime = riseSetTimes(sat, geo, nextPassTime)
+class PassConstraints:
+    """Container class to hold values to constrain satellite passes.
 
+    Attributes:
+        minAltitude -- minimum altitude the satellite must achieve in degrees
+        minDuration -- minimum duration the satellite must be above the horizon in minutes
+        illuminated -- whether the satellite is illuminated at any point of the pass
+    """
+
+    def __init__(self, *, minAltitude: float = None, minDuration: float = None, illuminated: bool = None):
+        self.minAltitude = minAltitude
+        self.minDuration = minDuration
+        self.illuminated = illuminated
+
+
+def nextPass(sat: Satellite, geo: GeoPosition, time: JulianDate,
+             constraints: PassConstraints = None) -> Pass:
+    nextPassTime = nextPassMax(sat, geo, time)
+    maxPos = sat.getState(nextPassTime)[0]
+    maxPosSez = toTopocentric(maxPos, nextPassTime, geo)
+    maxAlt = degrees(asin(maxPosSez[2] / maxPosSez.mag()))
+
+    if constraints is not None and constraints.minAltitude is not None:
+        if constraints.minAltitude > maxAlt:
+            return nextPass(sat, geo, nextPassTime.future(0.001), constraints)
+
+    riseTime, setTime = riseSetTimes(sat, geo, nextPassTime)
     risePos = sat.getState(riseTime)[0]
     risePosSez = toTopocentric(risePos, riseTime, geo)
     riseIlluminated = not isEclipsed(risePos, getSunPosition(riseTime))
+    setPos = sat.getState(setTime)[0]
+    setPosSez = toTopocentric(setPos, setTime, geo)
+    setIlluminated = not isEclipsed(setPos, getSunPosition(setTime))
+
+    if constraints is not None:
+        if constraints.illuminated is not None:
+            if constraints.illuminated and not riseIlluminated and not setIlluminated:
+                return nextPass(sat, geo, nextPassTime.future(0.001), constraints)
+            if not constraints.illuminated and riseIlluminated and setIlluminated:
+                return nextPass(sat, geo, nextPassTime.future(0.001), constraints)
+        if constraints.minDuration is not None:
+            if constraints.minDuration > setTime.difference(riseTime) * 1440:
+                return nextPass(sat, geo, nextPassTime.future(0.001), constraints)
+
     riseInfo = PositionInfo(degrees(asin(risePosSez[2] / risePosSez.mag())),
                             degrees(atan2(risePosSez[1], -risePosSez[0])),
                             riseTime,
                             riseIlluminated and getTwilightType(riseTime, geo) > TwilightType.Day)
 
-    setPos = sat.getState(setTime)[0]
-    setPosSez = toTopocentric(setPos, setTime, geo)
-    setIlluminated = not isEclipsed(setPos, getSunPosition(setTime))
     setInfo = PositionInfo(degrees(asin(setPosSez[2] / setPosSez.mag())),
                            degrees(atan2(setPosSez[1], -setPosSez[0])),
                            setTime,
                            setIlluminated and getTwilightType(setTime, geo) > TwilightType.Day)
 
-    maxPos = sat.getState(nextPassTime)[0]
-    maxPosSez = toTopocentric(maxPos, nextPassTime, geo)
     maxIlluminated = not isEclipsed(maxPos, getSunPosition(nextPassTime))
     maxInfo = PositionInfo(degrees(asin(maxPosSez[2] / maxPosSez.mag())),
                            degrees(atan2(maxPosSez[1], -maxPosSez[0])),
@@ -125,14 +157,15 @@ def nextPass(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Pass:
     return Pass(riseInfo, setInfo, maxInfo)
 
 
-def getPassList(sat: Satellite, geo: GeoPosition, start: JulianDate, duration: float) -> tuple[Pass]:
+def getPassList(sat: Satellite, geo: GeoPosition, start: JulianDate, duration: float,
+                constraints: PassConstraints = None) -> tuple[Pass]:
     passList = []
-    nPass = nextPass(sat, geo, start)
-    nTime = nPass.maxInfo().time().difference(start)
-    while nTime < duration:
-        passList.append(nPass)
-        nPass = nextPass(sat, geo, nPass.maxInfo().time().future(0.001))
-        nTime = nPass.maxInfo().time().difference(start)
+    nTime = start.future(-0.001)
+    while nTime.difference(start) < duration:
+        nPass = nextPass(sat, geo, nTime.future(0.001), constraints)
+        nTime = nPass.maxInfo().time()
+        if nPass.maxInfo().time().difference(start) < duration:
+            passList.append(nPass)
     return tuple(passList)
 
 
@@ -201,24 +234,24 @@ def maxPassRefine(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianD
     # todo: utilize the dadt values to future time increase
     '''this works, but feels like overkill (many iterations with small dt) to achieve accurate answer.
     can we use either the dadt or break it down into dzdt and dxydt terms, and create a meaningful empirical guess?'''
-    jd = time
-    state = sat.getState(jd)
-    futureState = sat.getState(jd.future(0.1 / 86400))
-    sezPos = toTopocentric(state[0], jd, geo)
-    futureSezPos = toTopocentric(futureState[0], jd.future(0.1 / 86400), geo)
-    alt = asin(sezPos[2] / sezPos.mag())
-    futureAlt = asin(futureSezPos[2] / futureSezPos.mag())
-    dadt = (futureAlt - alt) / 0.1
 
-    while dadt > 0:
-        jd = jd.future(0.1 / 86400)
-        state = sat.getState(jd)
-        futureState = sat.getState(jd.future(0.1 / 86400))
-        sezPos = toTopocentric(state[0], jd, geo)
-        futureSezPos = toTopocentric(futureState[0], jd.future(0.1 / 86400), geo)
-        alt = asin(sezPos[2] / sezPos.mag())
-        futureAlt = asin(futureSezPos[2] / futureSezPos.mag())
-        dadt = (futureAlt - alt) / 0.1
+    alt = getAltitude(sat, time, geo)
+    futureAlt = getAltitude(sat, time.future(0.1 / 86400), geo)
+    pastAlt = getAltitude(sat, time.future(-0.1 / 86400), geo)
+
+    if alt >= futureAlt and alt >= pastAlt:
+        return time
+    elif alt < futureAlt:
+        parity = 1
+    elif alt < pastAlt:
+        parity = -1
+
+    jd = time
+    nextAlt = getAltitude(sat, time.future(parity * 0.1 / 86400), geo)
+    while alt < nextAlt:
+        jd = jd.future(parity * 0.1 / 86400)
+        alt = getAltitude(sat, jd, geo)
+        nextAlt = getAltitude(sat, jd.future(parity * 0.1 / 86400), geo)
 
     return jd
 
