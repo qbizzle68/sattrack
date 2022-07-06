@@ -334,6 +334,7 @@ def orbitAltitude(sat: Satellite, geo: GeoPosition, jd: JulianDate) -> float:
     # normalized angular momentum, vector equation for orbital plane
     lamb = norm(cross(state[0], state[1]))
 
+    # todo: ensure lamb[1] != 0 and use other solution if it is
     # compute intermediate values to find solution to parameterized vector intersection
     x = dot(zeta, gamma) / (zeta[0] - (zeta[1] * lamb[0] / lamb[1]))
     y = -lamb[0] * x / lamb[1]
