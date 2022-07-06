@@ -7,8 +7,8 @@ from sattrack.rotation.order import Axis, Order
 from sattrack.rotation.rotation import getMatrix, rotateOrderTo, EulerAngles
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.structures.satellite import Satellite
-from sattrack.sun import getSunPosition
-from sattrack.topos import getPVector, toTopocentric
+from sattrack.sun import getSunPosition, TwilightType
+from sattrack.topos import getPVector, toTopocentric, getTwilightType
 from sattrack.util.anomalies import trueToMean
 from sattrack.util.constants import EARTH_EQUITORIAL_RADIUS, SUN_RADIUS
 from sattrack.util.conversions import atan2
@@ -99,28 +99,28 @@ def nextPass(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Pass:
     riseTime, setTime = riseSetTimes(sat, geo, nextPassTime)
 
     risePos = sat.getState(riseTime)[0]
-    # risePosSez = getToposPosition(sat, riseTime, geo)
     risePosSez = toTopocentric(risePos, riseTime, geo)
-    riseVisible = not isEclipsed(risePos, getSunPosition(riseTime))
+    riseIlluminated = not isEclipsed(risePos, getSunPosition(riseTime))
     riseInfo = PositionInfo(degrees(asin(risePosSez[2] / risePosSez.mag())),
                             degrees(atan2(risePosSez[1], -risePosSez[0])),
-                            riseTime, riseVisible)
+                            riseTime,
+                            riseIlluminated and getTwilightType(riseTime, geo) > TwilightType.Day)
 
     setPos = sat.getState(setTime)[0]
-    # setPos = getToposPosition(sat, setTime, geo)
     setPosSez = toTopocentric(setPos, setTime, geo)
-    setVisible = not isEclipsed(setPos, getSunPosition(setTime))
+    setIlluminated = not isEclipsed(setPos, getSunPosition(setTime))
     setInfo = PositionInfo(degrees(asin(setPosSez[2] / setPosSez.mag())),
                            degrees(atan2(setPosSez[1], -setPosSez[0])),
-                           setTime, setVisible)
+                           setTime,
+                           setIlluminated and getTwilightType(setTime, geo) > TwilightType.Day)
 
     maxPos = sat.getState(nextPassTime)[0]
-    #  maxPos = getToposPosition(sat, nextPassTime, geo)
     maxPosSez = toTopocentric(maxPos, nextPassTime, geo)
-    maxVisible = not isEclipsed(maxPos, getSunPosition(nextPassTime))
+    maxIlluminated = not isEclipsed(maxPos, getSunPosition(nextPassTime))
     maxInfo = PositionInfo(degrees(asin(maxPosSez[2] / maxPosSez.mag())),
                            degrees(atan2(maxPosSez[1], -maxPosSez[0])),
-                           nextPassTime, maxVisible)
+                           nextPassTime,
+                           maxIlluminated and getTwilightType(nextPassTime, geo) > TwilightType.Day)
 
     return Pass(riseInfo, setInfo, maxInfo)
 
@@ -198,43 +198,29 @@ def nextPassMaxGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Juli
 
 
 def maxPassRefine(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianDate:
-    state = sat.getState(time)
-    sezVel = rotateOrderTo(
-        Order.ZYX,
-        EulerAngles(
-            geo.getLongitude() + earthOffsetAngle(time),
-            90 - geo.getLatitude(),
-            0.0
-        ),
-        state[1]
-    )
-    while abs(sezVel[2]) > 1e-6:
-        futureState = sat.getState(time.future(1 / 86400))
-        futureSezVel = rotateOrderTo(
-            Order.ZYX,
-            EulerAngles(
-                geo.getLongitude() + earthOffsetAngle(time),
-                90 - geo.getLatitude(),
-                0.0
-            ),
-            futureState[1]
-        )
+    # todo: utilize the dadt values to future time increase
+    '''this works, but feels like overkill (many iterations with small dt) to achieve accurate answer.
+    can we use either the dadt or break it down into dzdt and dxydt terms, and create a meaningful empirical guess?'''
+    jd = time
+    state = sat.getState(jd)
+    futureState = sat.getState(jd.future(0.1 / 86400))
+    sezPos = toTopocentric(state[0], jd, geo)
+    futureSezPos = toTopocentric(futureState[0], jd.future(0.1 / 86400), geo)
+    alt = asin(sezPos[2] / sezPos.mag())
+    futureAlt = asin(futureSezPos[2] / futureSezPos.mag())
+    dadt = (futureAlt - alt) / 0.1
 
-        dz2dt2 = (futureSezVel[2] - sezVel[2]) / (1 / 86400)
-        dt = -sezVel[2] / dz2dt2
-        time = time.future(dt)
+    while dadt > 0:
+        jd = jd.future(0.1 / 86400)
+        state = sat.getState(jd)
+        futureState = sat.getState(jd.future(0.1 / 86400))
+        sezPos = toTopocentric(state[0], jd, geo)
+        futureSezPos = toTopocentric(futureState[0], jd.future(0.1 / 86400), geo)
+        alt = asin(sezPos[2] / sezPos.mag())
+        futureAlt = asin(futureSezPos[2] / futureSezPos.mag())
+        dadt = (futureAlt - alt) / 0.1
 
-        state = sat.getState(time)
-        sezVel = rotateOrderTo(
-            Order.ZYX,
-            EulerAngles(
-                geo.getLongitude() + earthOffsetAngle(time),
-                90 - geo.getLatitude(),
-                0.0
-            ),
-            state[1]
-        )
-    return time
+    return jd
 
 
 def riseSetTimes(sat: Satellite, geo: GeoPosition, time: JulianDate) -> tuple[JulianDate]:
@@ -381,7 +367,7 @@ def isEclipsed(satPos: EVector, sunPos: EVector) -> bool:
     thetaE = asin(EARTH_EQUITORIAL_RADIUS / earthPos.mag())
     thetaS = asin(SUN_RADIUS / sunPos.mag())
     #   angle between earth and sun centers relative to the satellite
-    theta = vang(earthPos, sunPos)
+    theta = radians(vang(earthPos, sunPos))
 
     #   umbral eclipse
     if thetaE > thetaS and theta < (thetaE - thetaS):
