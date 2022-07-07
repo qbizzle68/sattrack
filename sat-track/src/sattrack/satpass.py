@@ -176,7 +176,7 @@ def nextPassMax(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianDat
 
 def nextPassMaxGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianDate:
     """Computes the time to the next maximum height that the next satellite pass achieves.
-        Parameters:
+    Parameters:
         sat:    The satellite.
         geo:    GeoPosition the pass is observed from.
         time:   A time between passes. The pass computed will be the soonest pass after time."""
@@ -239,6 +239,7 @@ def maxPassRefine(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianD
     futureAlt = getAltitude(sat, time.future(0.1 / 86400), geo)
     pastAlt = getAltitude(sat, time.future(-0.1 / 86400), geo)
 
+    parity = 0  # to please the editor
     if alt >= futureAlt and alt >= pastAlt:
         return time
     elif alt < futureAlt:
