@@ -36,7 +36,7 @@ class OrbitalElements:
         self._epoch = epoch
 
     @classmethod
-    def fromTLE(cls, tle: TwoLineElement, jd: JulianDate = 0):
+    def fromTle(cls, tle: TwoLineElement, jd: JulianDate = 0):
         """Class method used to instantiate an object from a two-line element object at a given time.
         Parameters:
         tle:    Two-Line element of the object to obtain orbital elements of.
@@ -56,7 +56,7 @@ class OrbitalElements:
         n0 = tle.meanMotion()
         n0dot = tle.meanMotionDot() * 2
         aDot = -2 * a0 * n0dot / (3 * n0)
-        sma = (a0 + aDot * dt) * 1000
+        sma = (a0 + aDot * dt)
         eDot = -2 * (1 - tleEcc) * n0dot / (3 * n0)
         ecc = tleEcc + eDot * dt
         temp = (a0 ** -3.5) / ((1 - (tleEcc * tleEcc)) ** 2)

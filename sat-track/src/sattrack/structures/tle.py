@@ -196,7 +196,7 @@ class TwoLineElement:
 CELESTRAK_URL = "https://celestrak.com/NORAD/elements/gp.php?{}={}&FORMAT=TLE"
 
 
-def getTLE(value: str, query: str = 'name') -> TwoLineElement | None:
+def getTle(value: str, query: str = 'name') -> TwoLineElement | None:
     """Retrieves a TLE from the Celestrak online repository of continually updating TLEs via HTTP.
     Parameters:
     query:  The querying type, possible values are:
