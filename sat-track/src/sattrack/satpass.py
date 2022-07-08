@@ -399,7 +399,7 @@ def isEclipsed(satPos: EVector, sunPos: EVector) -> bool:
     sunPos = -satPos + sunPos
     #   semi-diameters of earth and sun
     # todo: calculate real Earth radius from perspective here
-    thetaE = asin(EARTH_EQUITORIAL_RADIUS / earthPos.mag())
+    thetaE = asin(6371 / earthPos.mag()) # average earth radius
     thetaS = asin(SUN_RADIUS / sunPos.mag())
     #   angle between earth and sun centers relative to the satellite
     theta = radians(vang(earthPos, sunPos))
