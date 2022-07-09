@@ -50,7 +50,7 @@ class Satellite:
         return self._tle
 
     def elements(self) -> OrbitalElements:
-        return self._elements if self._elements else OrbitalElements.fromTLE(self._tle)
+        return self._elements if self._elements else OrbitalElements.fromTle(self._tle)
 
     def epoch(self) -> JulianDate:
         if not self._epoch:

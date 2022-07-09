@@ -253,5 +253,8 @@ def meanAnomalyAt(elements: OrbitalElements, jd: JulianDate) -> float:
 
 def timeToMeanAnomaly(elements: OrbitalElements, meanAnom: float) -> float:
     n = smaToMeanMotion(elements.getSma())
-    dM = (meanAnom - elements.getMeanAnomaly()) % 360.0
+    m1 = elements.getMeanAnomaly()
+    dM = (meanAnom - m1) % 360.0
+    if m1 < meanAnom:
+        dM += 2 * pi
     return radians(dM) / n / 86400.0
