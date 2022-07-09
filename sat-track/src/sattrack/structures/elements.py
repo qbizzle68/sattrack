@@ -51,7 +51,7 @@ class OrbitalElements:
         dM = (tle.meanMotion() * dt
               + tle.meanMotionDot() * dt * dt
               + tle.meanMotionDDot() * dt * dt * dt) * 2 * pi
-        M1 = (2 * pi * (tle.meanAnomaly() / 360) + dM % (2 * pi))
+        M1 = ((pi * (tle.meanAnomaly() / 180) + dM) % (2 * pi))
         tleEcc = tle.eccentricity()
         n0 = tle.meanMotion()
         n0dot = tle.meanMotionDot() * 2
