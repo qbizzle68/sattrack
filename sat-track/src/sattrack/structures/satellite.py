@@ -1,7 +1,7 @@
-from math import radians, pi, ceil, floor, degrees
+from math import radians, pi, floor, degrees
 
 from pyevspace import EVector
-from sattrack.structures._sgp4 import _SGP4_Propagator
+from sattrack.structures.sgp4 import SGP4_Propagator
 
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.structures.body import Body, EARTH_BODY
@@ -16,7 +16,7 @@ class Satellite:
     def __init__(self, obj: TwoLineElement | OrbitalElements, body: Body = EARTH_BODY):
         if type(obj) == TwoLineElement:
             self._tle = obj
-            self._propagator = _SGP4_Propagator(obj)
+            self._propagator = SGP4_Propagator(obj)
             self._epoch = obj.epoch()
             self._elements = None
             dt = -radians(obj.meanAnomaly()) / (2 * pi * obj.meanMotion())
@@ -39,14 +39,15 @@ class Satellite:
     def getState(self, jd: JulianDate) -> tuple[EVector]:
         if self._tle:
             rawState = self._propagator.getState(self._tle, jd)
-            return EVector(rawState[0][0], rawState[0][1], rawState[0][2]), EVector(rawState[1][0], rawState[1][1], rawState[1][2])
+            return EVector(rawState[0][0], rawState[0][1], rawState[0][2]), EVector(rawState[1][0], rawState[1][1],
+                                                                                    rawState[1][2])
         else:
             return self._elements.getState(jd)
 
     def update(self, obj: TwoLineElement | OrbitalElements):
         if type(obj) == TwoLineElement:
             self._tle = obj
-            self._propagator = _SGP4_Propagator(obj)
+            self._propagator = SGP4_Propagator(obj)
             self._epoch = obj.epoch()
             self._elements = None
             dt = -radians(obj.meanAnomaly()) / (2 * pi * obj.meanMotion())
