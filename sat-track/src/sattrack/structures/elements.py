@@ -16,6 +16,7 @@ class OrbitalElements:
         semi-major axis, eccentricity, inclination, right-ascension of ascending node, argument of periapsis,
         true anomaly and the epoch of the true anomaly."""
 
+    # todo: set epoch to default to None
     def __init__(self, *, sma: float, ecc: float, inc: float, raan: float, aop: float, meanAnomaly: float,
                  epoch: JulianDate = 0):
         """Constructs an instance with the given values, with the epoch optional.
