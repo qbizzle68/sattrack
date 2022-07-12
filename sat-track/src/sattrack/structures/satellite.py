@@ -83,25 +83,69 @@ class Satellite:
     def getPeriapsisPassage(self) -> float:
         return self._periapsisPassage
 
-    def timeToNextMeanAnomaly(self, mAnom: float, time: JulianDate) -> float:
+    def timeToNextMeanAnomaly(self, mAnom: float, time: JulianDate) -> JulianDate:
         """Computes the next time the satellite passes through the mean anomaly
-        after the time given. The returned value is the time in solar days from
-        the time provided.
+        after the time given.
         Parameters:
             mAnom -- mean anomaly in degrees
             time -- relative time to find the next anomaly
-        Returns the number of solar days after time tha satellite achieves the mean anomaly."""
+        Returns the time the satellite's position is mAnom.
+        """
+
+        return self.timeToNextMeanAnomalyRad(radians(mAnom), time)
+
+    def timeToNextMeanAnomalyRad(self, mAnom: float, time: JulianDate) -> JulianDate:
+        """Computes the next time the satellite passes through the mean anomaly
+        after the time given.
+        Parameters:
+            mAnom -- mean anomaly in radians
+            time -- relative time to find the next anomaly
+        Returns the time the satellite's position is mAnom.
+        """
+
         twoPi = 2 * pi
         if self._tle:
-            n = self._tle.meanMotion() # rev/day
+            n = self._tle.meanMotion()  # rev/day
         else:
             n = smaToMeanMotion(self._elements.getSma()) * 86400 / twoPi
-        # number of revolutions
+        # number of revolutions since self._periapsisPassage
         revs = time.difference(self._periapsisPassage) * n
         m0 = (revs - floor(revs)) * twoPi
-        m1 = radians(mAnom)
-        if m1 < m0:
-            dm = m1 + twoPi - m0
+        if mAnom < m0:
+            dm = mAnom + twoPi - m0
         else:
-            dm = m1 - m0
+            dm = mAnom - m0
+        return time.future((dm / n) / twoPi)
+
+    def timeToPrevMeanAnomaly(self, mAnom: float, time: JulianDate) -> JulianDate:
+        """Computes the previous time the satellite passed through the mean anomaly
+        before the given time.
+        Parameters:
+            mAnom -- mean anomaly in degrees
+            time -- relative time to find the previous anomaly
+        Returns the time the satellite's position is mAnom.
+        """
+
+        return self.timeToPrevMeanAnomalyRad(radians(mAnom), time)
+
+    def timeToPrevMeanAnomalyRad(self, mAnom: float, time: JulianDate) -> JulianDate:
+        """Computes the previous time the satellite passed through the mean anomaly
+        before the given time.
+        Parameters:
+            mAnom -- mean anomaly in radians
+            time -- relative time to find the previous anomaly
+        Returns the time the satellite's position is mAnom.
+        """
+
+        twoPi = 2 * pi
+        if self._tle:
+            n = self._tle.meanMotion()  # rev/day
+        else:
+            n = smaToMeanMotion(self._elements.getSma()) * 86400 / twoPi
+        revs = time.difference(self._periapsisPassage) * n
+        m0 = (revs - floor(revs)) * twoPi
+        if m0 < mAnom:
+            dm = mAnom - twoPi - m0
+        else:
+            dm = mAnom - m0
         return time.future((dm / n) / twoPi)
