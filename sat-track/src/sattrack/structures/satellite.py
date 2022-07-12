@@ -1,4 +1,4 @@
-from math import radians, pi, ceil, floor
+from math import radians, pi, ceil, floor, degrees
 
 from pyevspace import EVector
 from sattrack.structures._sgp4 import _SGP4_Propagator
@@ -7,6 +7,7 @@ from sattrack.spacetime.juliandate import JulianDate
 from sattrack.structures.body import Body, EARTH_BODY
 from sattrack.structures.elements import OrbitalElements
 from sattrack.structures.tle import TwoLineElement
+from sattrack.util.anomalies import trueToMean
 from sattrack.util.conversions import smaToMeanMotion
 
 
@@ -149,3 +150,63 @@ class Satellite:
         else:
             dm = mAnom - m0
         return time.future((dm / n) / twoPi)
+
+    def timeToNextTrueAnomaly(self, tAnom: float, time: JulianDate) -> JulianDate:
+        """Computes the next time the satellite passes through the true anomaly
+        after the time given.
+        Parameters:
+            tAnom -- true anomaly in degrees
+            time -- relative time to find the next anomaly
+        Returns the time the satellite's position is tAnom.
+        """
+
+        if self._tle:
+            ecc = self._tle.eccentricity()
+        else:
+            ecc = self._elements.getEcc()
+        return self.timeToNextMeanAnomalyRad(radians(trueToMean(tAnom, ecc)), time)
+
+    def timeToNextTrueAnomalyRad(self, tAnom: float, time: JulianDate) -> JulianDate:
+        """Computes the next time the satellite passes through the true anomaly
+        after the time given.
+        Parameters:
+            tAnom -- true anomaly in radians
+            time -- relative time to find the next anomaly
+        Returns the time the satellite's position is tAnom.
+        """
+
+        if self._tle:
+            ecc = self._tle.eccentricity()
+        else:
+            ecc = self._elements.getEcc()
+        return self.timeToNextMeanAnomalyRad(radians(trueToMean(degrees(tAnom), ecc)), time)
+
+    def timeToPrevTrueAnomaly(self, tAnom: float, time: JulianDate) -> JulianDate:
+        """Computes the previous time the satellite passed through the true anomaly
+        before the given time.
+        Parameters:
+            tAnom -- true anomaly in degrees
+            time -- relative time to find the previous anomaly
+        Returns the time the satellite's position is tAnom.
+        """
+
+        if self._tle:
+            ecc = self._tle.eccentricity()
+        else:
+            ecc = self._elements.getEcc()
+        return self.timeToPrevMeanAnomalyRad(radians(trueToMean(tAnom, ecc)), time)
+
+    def timeToPrevTrueAnomalyRad(self, tAnom: float, time: JulianDate) -> JulianDate:
+        """Computes the previous time the satellite passed through the true anomaly
+        before the given time.
+        Parameters:
+            tAnom -- true anomaly in radians
+            time -- relative time to find the previous anomaly
+        Returns the time the satellite's position is tAnom.
+        """
+
+        if self._tle:
+            ecc = self._tle.eccentricity()
+        else:
+            ecc = self._elements.getEcc()
+        return self.timeToPrevMeanAnomalyRad(radians(trueToMean(degrees(tAnom), ecc)), time)
