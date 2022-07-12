@@ -1,4 +1,6 @@
-﻿from math import sqrt, sin, cos, radians, degrees
+﻿from math import sqrt, sin, cos, radians, degrees, pi, floor
+
+from sattrack.spacetime.juliandate import JulianDate
 from sattrack.util.conversions import atan2
 
 
@@ -90,3 +92,18 @@ def __m2ENewtonRaphson(M: float, ecc: float) -> float:
             return degrees(Ej1)
         else:
             Ej = Ej1
+
+
+def timeToNextMeanAnomaly(meanMotion: float, m0: float, epoch0: JulianDate, m1: float, time: JulianDate) -> JulianDate:
+    """meanMotion in rad/s. m0 - epoch0 mean anomaly and time, time to m1 after time"""
+    twoPi = 2 * pi
+    n = meanMotion * 86400 / twoPi
+    pePass = epoch0.future(-radians(m0) / (twoPi * n))
+    revs = time.difference(pePass) * n
+    m0 = (revs - floor(revs)) * twoPi
+    m1 = radians(m1)
+    if m1 < m0:
+        dm = m1 + twoPi - m0
+    else:
+        dm = m1 - m0
+    return time.future((dm / n) / twoPi)
