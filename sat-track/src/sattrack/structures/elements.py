@@ -46,13 +46,13 @@ class OrbitalElements:
         if jd == 0:
             jd = tle.epoch()
         dt = jd.difference(tle.epoch())
-        inc = tle.inclination()
+        inc = radians(tle.inclination())
         n = tle.meanMotionRad()
         a0 = ((EARTH_MU / (n*n)) ** (1/3))  # km todo: replace this with the sma() method?
-        dM = (tle.meanMotion() * dt
+        dM = (tle.meanMotion() * dt # todo: regroup this for better efficiency
               + tle.meanMotionDot() * dt * dt
               + tle.meanMotionDDot() * dt * dt * dt) * 2 * pi
-        M1 = (tle.meanAnomaly() + dM) % (2 * pi)
+        M1 = (radians(tle.meanAnomaly()) + dM) % (2 * pi)
         tleEcc = tle.eccentricity()
         n0 = tle.meanMotion()
         n0dot = tle.meanMotionDot() * 2
@@ -70,9 +70,9 @@ class OrbitalElements:
         lanSun = -0.00154 * cos(inc) / n0
         aopMoon = 0.00169 * (4 - (5 * sin(inc) ** 2)) / n0
         aopSun = 0.00077 * (4 - (5 * sin(inc) **2)) / n0
-        ra = tle.raan() + radians(lanJ2Dot + lanMoon + lanSun) * dt
-        aop = tle.argumentOfPeriapsis() + radians(aopJ2Dot + aopMoon + aopSun) * dt
-        return cls(sma=sma, ecc=ecc, inc=inc, raan=ra, aop=aop, meanAnomaly=M1, epoch=jd)
+        ra = (tle.raan() + (lanJ2Dot + lanMoon + lanSun) * dt) % 360
+        aop = (tle.argumentOfPeriapsis() + (aopJ2Dot + aopMoon + aopSun) * dt) % 360
+        return cls(sma=sma, ecc=ecc, inc=degrees(inc), raan=ra, aop=aop, meanAnomaly=degrees(M1), epoch=jd)
 
         '''if jd == 0:
             jd = tle.epoch()
@@ -151,7 +151,7 @@ class OrbitalElements:
         pOrbit = EVector(cos(tAnom), sin(tAnom), 0) * r
         vOrbit = EVector(-sin(eAnom), sqrt(1 - self._ecc * self._ecc) * cos(eAnom), 0) * (
                 sqrt(EARTH_MU * self._sma) / r)
-        rot = getEulerMatrix(Order.ZXZ, EulerAngles(degrees(self._raan), degrees(self._inc), degrees(self._aop)))
+        rot = getEulerMatrix(Order.ZXZ, EulerAngles(self._raan, self._inc, self._aop))
         return rotateMatrixFrom(rot, pOrbit), rotateMatrixFrom(rot, vOrbit)
 
     def setSma(self, sma: float):
