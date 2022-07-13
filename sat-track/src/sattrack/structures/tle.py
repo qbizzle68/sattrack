@@ -1,4 +1,4 @@
-from math import pi
+from math import pi, radians
 
 from sattrack.exceptions import TokenNumberException, TokenLengthException
 from sattrack.spacetime.juliandate import JulianDate
@@ -15,10 +15,10 @@ class TwoLineElement:
     def __init__(self, tle: str):
         tokens = tle.splitlines()
         if len(tokens) != 3:
-            raise Exception("Incorrect number of lines")  # make a custom version for this
+            raise Exception("Incorrect number of lines")  # todo: make a custom version for this
         for i in range(1, 3):
             if not self._checksum(tokens[i]):
-                raise Exception(f"Checksum failed for line {tokens[i]}")  # make a custom version for this
+                raise Exception(f"Checksum failed for line {tokens[i]}")  # todo: make a custom version for this
         line1Tokens, line2Tokens = self._checkTokens(tokens[1], tokens[2])
         self._parseLines(line1Tokens, line2Tokens)
         self._name = tokens[0]
@@ -182,6 +182,10 @@ class TwoLineElement:
     def meanMotion(self) -> float:
         """Returns the mean motion in revolutions per day."""
         return self._meanMotion
+
+    def meanMotionRad(self) -> float:
+        """Returns the mean motion in radians per second."""
+        return self._meanMotion * 2 * pi / 86400.0
 
     def revolutionNumber(self) -> int:
         """Returns the revolution number of the satellite."""

@@ -89,17 +89,6 @@ class Satellite:
         """Computes the next time the satellite passes through the mean anomaly
         after the time given.
         Parameters:
-            mAnom -- mean anomaly in degrees
-            time -- relative time to find the next anomaly
-        Returns the time the satellite's position is mAnom.
-        """
-
-        return self.timeToNextMeanAnomalyRad(radians(mAnom), time)
-
-    def timeToNextMeanAnomalyRad(self, mAnom: float, time: JulianDate) -> JulianDate:
-        """Computes the next time the satellite passes through the mean anomaly
-        after the time given.
-        Parameters:
             mAnom -- mean anomaly in radians
             time -- relative time to find the next anomaly
         Returns the time the satellite's position is mAnom.
@@ -120,17 +109,6 @@ class Satellite:
         return time.future((dm / n) / twoPi)
 
     def timeToPrevMeanAnomaly(self, mAnom: float, time: JulianDate) -> JulianDate:
-        """Computes the previous time the satellite passed through the mean anomaly
-        before the given time.
-        Parameters:
-            mAnom -- mean anomaly in degrees
-            time -- relative time to find the previous anomaly
-        Returns the time the satellite's position is mAnom.
-        """
-
-        return self.timeToPrevMeanAnomalyRad(radians(mAnom), time)
-
-    def timeToPrevMeanAnomalyRad(self, mAnom: float, time: JulianDate) -> JulianDate:
         """Computes the previous time the satellite passed through the mean anomaly
         before the given time.
         Parameters:
@@ -156,21 +134,6 @@ class Satellite:
         """Computes the next time the satellite passes through the true anomaly
         after the time given.
         Parameters:
-            tAnom -- true anomaly in degrees
-            time -- relative time to find the next anomaly
-        Returns the time the satellite's position is tAnom.
-        """
-
-        if self._tle:
-            ecc = self._tle.eccentricity()
-        else:
-            ecc = self._elements.getEcc()
-        return self.timeToNextMeanAnomalyRad(radians(trueToMean(tAnom, ecc)), time)
-
-    def timeToNextTrueAnomalyRad(self, tAnom: float, time: JulianDate) -> JulianDate:
-        """Computes the next time the satellite passes through the true anomaly
-        after the time given.
-        Parameters:
             tAnom -- true anomaly in radians
             time -- relative time to find the next anomaly
         Returns the time the satellite's position is tAnom.
@@ -180,27 +143,12 @@ class Satellite:
             ecc = self._tle.eccentricity()
         else:
             ecc = self._elements.getEcc()
-        return self.timeToNextMeanAnomalyRad(radians(trueToMean(degrees(tAnom), ecc)), time)
+        return self.timeToNextMeanAnomaly(trueToMean(tAnom, ecc), time)
 
     def timeToPrevTrueAnomaly(self, tAnom: float, time: JulianDate) -> JulianDate:
         """Computes the previous time the satellite passed through the true anomaly
         before the given time.
         Parameters:
-            tAnom -- true anomaly in degrees
-            time -- relative time to find the previous anomaly
-        Returns the time the satellite's position is tAnom.
-        """
-
-        if self._tle:
-            ecc = self._tle.eccentricity()
-        else:
-            ecc = self._elements.getEcc()
-        return self.timeToPrevMeanAnomalyRad(radians(trueToMean(tAnom, ecc)), time)
-
-    def timeToPrevTrueAnomalyRad(self, tAnom: float, time: JulianDate) -> JulianDate:
-        """Computes the previous time the satellite passed through the true anomaly
-        before the given time.
-        Parameters:
             tAnom -- true anomaly in radians
             time -- relative time to find the previous anomaly
         Returns the time the satellite's position is tAnom.
@@ -210,4 +158,4 @@ class Satellite:
             ecc = self._tle.eccentricity()
         else:
             ecc = self._elements.getEcc()
-        return self.timeToPrevMeanAnomalyRad(radians(trueToMean(degrees(tAnom), ecc)), time)
+        return self.timeToPrevMeanAnomaly(trueToMean(tAnom, ecc), time)

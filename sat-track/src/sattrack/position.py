@@ -18,9 +18,9 @@ def computeTrueAnomaly(position: EVector, velocity: EVector) -> float:
     if norm(position) == eccVec:
         return 0
     elif norm(-position) == eccVec:
-        return 180
-    ang = vang(position, eccVec)
-    return 360 - ang if norm(cross(position, eccVec)) == norm(cross(position, velocity)) else ang
+        return pi
+    ang = radians(vang(position, eccVec))
+    return (2*pi) - ang if norm(cross(position, eccVec)) == norm(cross(position, velocity)) else ang
 
 
 def nearestTrueAnomaly(sat: Satellite, time: JulianDate, trueAnom: float) -> JulianDate:
@@ -28,15 +28,15 @@ def nearestTrueAnomaly(sat: Satellite, time: JulianDate, trueAnom: float) -> Jul
     meanAnom0 = trueToMean(computeTrueAnomaly(state[0], state[1]), sat.tle().eccentricity())
     meanAnom1 = trueToMean(trueAnom, sat.tle().eccentricity())
     if meanAnom1 < meanAnom0:
-        if meanAnom0 - meanAnom1 < 180:
-            dma = radians(meanAnom1 - meanAnom0)
+        if meanAnom0 - meanAnom1 < pi:
+            dma = meanAnom1 - meanAnom0
         else:
-            dma = radians(meanAnom1 + 360 - meanAnom0)
+            dma = meanAnom1 + (2*pi) - meanAnom0
     else:
-        if meanAnom1 - meanAnom0 > 180:
-            dma = radians(meanAnom1 - 360 - meanAnom0)
+        if meanAnom1 - meanAnom0 > pi:
+            dma = meanAnom1 - (2*pi) - meanAnom0
         else:
-            dma = radians(meanAnom1 - meanAnom0)
+            dma = meanAnom1 - meanAnom0
     n = sat.tle().meanMotion() * 2 * pi
     return time.future(dma / n)
 

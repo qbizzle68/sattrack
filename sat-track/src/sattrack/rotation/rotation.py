@@ -10,9 +10,9 @@ from sattrack.rotation.order import Axis, EulerOrder
 def _xRotation(angle: float) -> EMatrix:
     rtn = EMatrix()
     rtn.set(0, 0, 1.0)
-    angleRad = radians(angle)
-    angleCos = cos(angleRad)
-    angleSin = sin(angleRad)
+    #angleRad = radians(angle)
+    angleCos = cos(angle)
+    angleSin = sin(angle)
     rtn.set(1, 1, angleCos)
     rtn.set(2, 2, angleCos)
     rtn.set(1, 2, -angleSin)
@@ -23,9 +23,9 @@ def _xRotation(angle: float) -> EMatrix:
 def _yRotation(angle: float) -> EMatrix:
     rtn = EMatrix()
     rtn.set(1, 1, 1.0)
-    angleRad = radians(angle)
-    angleCos = cos(angleRad)
-    angleSin = sin(angleRad)
+    #angleRad = radians(angle)
+    angleCos = cos(angle)
+    angleSin = sin(angle)
     rtn.set(0, 0, angleCos)
     rtn.set(2, 2, angleCos)
     rtn.set(2, 0, -angleSin)
@@ -36,9 +36,9 @@ def _yRotation(angle: float) -> EMatrix:
 def _zRotation(angle: float) -> EMatrix:
     rtn = EMatrix()
     rtn.set(2, 2, 1.0)
-    angleRad = radians(angle)
-    angleCos = cos(angleRad)
-    angleSin = sin(angleRad)
+    #angleRad = radians(angle)
+    angleCos = cos(angle)
+    angleSin = sin(angle)
     rtn.set(0, 0, angleCos)
     rtn.set(1, 1, angleCos)
     rtn.set(0, 1, -angleSin)
@@ -49,6 +49,12 @@ def _zRotation(angle: float) -> EMatrix:
 class EulerAngles:
 
     def __init__(self, alpha: float, beta: float, gamma: float):
+        """Parameters:
+            alpha -- the first rotation angle in radians
+            beta -- the second rotation angle in radians
+            gamma -- the third rotation angle in radians
+        """
+
         self._angles = [alpha, beta, gamma]
 
     def __getitem__(self, i: int) -> float:
@@ -82,7 +88,7 @@ def getMatrix(axis: Axis, angle: float) -> EMatrix:
     """Creates a rotation matrix for rotating extrinsically around a single axis.
     Parameters:
     axis:   The axis to rotate around, an Axis enumerated type.
-    angle:  The angle to rotate by, measured in degrees."""
+    angle:  The angle to rotate by, measured in radians."""
     if axis == Axis.X_AXIS:
         return _xRotation(angle)
     elif axis == Axis.Y_AXIS:
@@ -123,7 +129,7 @@ def rotateAxisTo(axis: Axis, angle: float, vector: EVector) -> EVector:
     represented by the single axis rotation.
     Parameters:
     axis:   One of the order.Axis enumerated types.
-    angle:  The angle of rotation measured in degrees.
+    angle:  The angle of rotation measured in radians.
     vector: The vector to rotate."""
     return transpose(getMatrix(axis, angle)) @ vector
 
@@ -133,7 +139,7 @@ def rotateAxisFrom(axis: Axis, angle: float, vector: EVector) -> EVector:
     represented by the single axis rotation.
     Parameters:
     axis:   One of the order.Axis enumerated types.
-    angle:  The angle of rotation measured in degrees.
+    angle:  The angle of rotation measured in radians.
     vector: The vector to rotate."""
     return getMatrix(axis, angle) @ vector
 

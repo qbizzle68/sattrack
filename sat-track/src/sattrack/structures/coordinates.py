@@ -86,11 +86,11 @@ def geoPositionVector(geo: GeoPosition, jd: JulianDate = None) -> EVector:
         return rotateOrderFrom(
             Order.ZYX,
             EulerAngles(
-                geo.getLatitude(),
-                -geodeticToGeocentric(geo.getLatitude()),
+                radians(geo.getLatitude()),
+                radians(-geodeticToGeocentric(geo.getLatitude())),
                 0.0),
             EVector(
-                radiusAtLatitude(geo.getLatitude()),
+                radians(radiusAtLatitude(geo.getLatitude())),
                 0.0,
                 0.0)
         )
@@ -110,8 +110,8 @@ def zenithVector(geo: GeoPosition, jd: JulianDate = None) -> EVector:
         return rotateOrderFrom(
             Order.ZYX,
             EulerAngles(
-                geo.getLatitude(),
-                geo.getLatitude(),
+                radians(geo.getLatitude()),
+                radians(geo.getLatitude()),
                 0.0),
             EVector(
                 radiusAtLatitude(geo.getLatitude()),

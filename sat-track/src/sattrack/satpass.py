@@ -190,14 +190,16 @@ def nextPassMaxGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Juli
     pVec = getPVector(geo, state, t0)
     ma0 = trueToMean(computeTrueAnomaly(state[0], state[1]), sat.tle().eccentricity())
     eccVec = computeEccentricVector(state[0], state[1])
-    ta1 = vang(eccVec, pVec)
+    ta1 = radians(vang(eccVec, pVec))
     if norm(cross(eccVec, pVec)) != norm(cross(state[0], state[1])):
-        ta1 = 360 - ta1
+        ta1 = (2*pi) - ta1
     ma1 = trueToMean(ta1, sat.tle().eccentricity())
     if ma1 < ma0:
-        dma0 = radians(ma1 + 360 - ma0)
+        dma0 = ma1 + (2*pi) - ma0
+        # dma0 = radians(ma1 + 360 - ma0)
     else:
-        dma0 = radians(ma1 - ma0)
+        dma0 = ma1 - ma0
+        # dma0 = radians(ma1 - ma0)
     tn = t0.future(dma0 / (sat.tle().meanMotion() * 2 * pi))
 
     # iterate towards answer moving forward or backward
@@ -208,20 +210,25 @@ def nextPassMaxGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Juli
         eccVec = computeEccentricVector(state[0], state[1])
         tan = computeTrueAnomaly(state[0], state[1])
         man = trueToMean(tan, sat.tle().eccentricity())
-        tan1 = vang(eccVec, pVec)
+        tan1 = radians(vang(eccVec, pVec))
         if norm(cross(eccVec, pVec)) != norm(cross(state[0], state[1])):
-            tan1 = 360 - tan1
+            tan1 = (2*pi) - tan1
+            # tan1 = 360 - tan1
         man1 = trueToMean(tan1, sat.tle().eccentricity())
         if tan1 <= tan:
-            if (tan - tan1) < 180:
-                dma = radians(man1 - man)
+            if (tan - tan1) < pi:
+                dma = man1 - man
+                # dma = radians(man1 - man)
             else:
-                dma = radians(man1 + 360 - man)
+                dma = man1 + (2*pi) - man
+                # dma = radians(man1 + 360 - man)
         else:
-            if (tan1 - tan) > 180:
-                dma = radians(man1 - 360 - man)
+            if (tan1 - tan) > pi:
+                dma = man1 - (2*pi) - man
+                # dma = radians(man1 - 360 - man)
             else:
-                dma = radians(man1 - man)
+                dma = man1 - man
+                # dma = radians(man1 - man)
         tn = tn.future(dma / (sat.tle().meanMotion() * 2 * pi))
         state = sat.getState(tn)
         pVec = getPVector(geo, state, tn)
@@ -284,16 +291,16 @@ def riseSetGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> tuple[Ju
     try:
         beta = acos(dot(zeta, gamma - ce) / R)
     except ValueError:
-        # create our own exception type here
+        # todo: create our own exception type here
         raise Exception("No pass during this time.")
     alpha = atan2(dot(zeta, v), dot(zeta, u))
     w1 = alpha + beta
     w2 = alpha - beta
 
     rho1 = (u * cos(w1) + v * sin(w1)).mag()
-    ta1 = degrees(atan2(rho1 * sin(w1), rho1 * cos(w1) - a * sat.tle().eccentricity()))
+    ta1 = atan2(rho1 * sin(w1), rho1 * cos(w1) - a * sat.tle().eccentricity())
     rho2 = (u * cos(w2) + v * sin(w2)).mag()
-    ta2 = degrees(atan2(rho2 * sin(w2), rho2 * cos(w2) - a * sat.tle().eccentricity()))
+    ta2 = atan2(rho2 * sin(w2), rho2 * cos(w2) - a * sat.tle().eccentricity())
     jd1 = nearestTrueAnomaly(sat, time, ta1)
     jd2 = nearestTrueAnomaly(sat, time, ta2)
     if jd1.value() < jd2.value():
@@ -310,8 +317,8 @@ def horizonTimeRefine(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Jul
         sezVel = rotateOrderTo(
             Order.ZYX,
             EulerAngles(
-                geo.getLongitude() + earthOffsetAngle(time),
-                90 - geo.getLatitude(),
+                radians(geo.getLongitude() + earthOffsetAngle(time)),
+                radians(90 - geo.getLatitude()),
                 0.0
             ),
             state[1]
@@ -380,8 +387,8 @@ def orbitAltitude(sat: Satellite, geo: GeoPosition, jd: JulianDate) -> float:
     p = v * t + r
 
     # find the true anomaly of this vector if it were a position vector
-    trueAnom = vang(computeEccentricVector(state[0], state[1]), p)
-    pSat = norm(p) * ((sma * (1 - ecc * ecc)) / (1 + ecc * cos(radians(trueAnom))))
+    trueAnom = radians(vang(computeEccentricVector(state[0], state[1]), p))
+    pSat = norm(p) * ((sma * (1 - ecc * ecc)) / (1 + ecc * cos(trueAnom)))
 
     ang = vang(p - gamma, pSat - gamma)
     return ang if pSat.mag2() > p.mag2() else -ang

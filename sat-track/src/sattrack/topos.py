@@ -1,4 +1,4 @@
-from math import degrees, asin
+from math import degrees, asin, radians
 
 from pyevspace import EVector, cross, dot, norm
 
@@ -17,8 +17,8 @@ def toTopocentric(vec: EVector, jd: JulianDate, geo: GeoPosition) -> EVector:
     mat = getEulerMatrix(
         Order.ZYX,
         EulerAngles(
-            geo.getLongitude() + earthOffsetAngle(jd),
-            90 - geo.getLatitude(),
+            radians(geo.getLongitude() + earthOffsetAngle(jd)),
+            radians(90 - geo.getLatitude()),
             0.0
         )
     )

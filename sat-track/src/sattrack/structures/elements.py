@@ -30,20 +30,51 @@ class OrbitalElements:
         epoch:  Epoch used to distinguish when the mean anomaly occurs."""
         self._sma = sma
         self._ecc = ecc
-        self._inc = inc
-        self._raan = raan
-        self._aop = aop
-        self._meanAnomaly = meanAnomaly
+        self._inc = radians(inc)
+        self._raan = radians(raan)
+        self._aop = radians(aop)
+        self._meanAnomaly = radians(meanAnomaly)
         self._epoch = epoch
 
     @classmethod
     def fromTle(cls, tle: TwoLineElement, jd: JulianDate = 0):
         """Class method used to instantiate an object from a two-line element object at a given time.
         Parameters:
-        tle:    Two-Line element of the object to obtain orbital elements of.
-        jd:     Julian Date of the time to compute orbital elements of."""
+            tle -- Two-Line element of the object to obtain orbital elements of.
+            jd -- Julian Date of the time to compute orbital elements of"""
 
         if jd == 0:
+            jd = tle.epoch()
+        dt = jd.difference(tle.epoch())
+        inc = tle.inclination()
+        n = tle.meanMotionRad()
+        a0 = ((EARTH_MU / (n*n)) ** (1/3))  # km todo: replace this with the sma() method?
+        dM = (tle.meanMotion() * dt
+              + tle.meanMotionDot() * dt * dt
+              + tle.meanMotionDDot() * dt * dt * dt) * 2 * pi
+        M1 = (tle.meanAnomaly() + dM) % (2 * pi)
+        tleEcc = tle.eccentricity()
+        n0 = tle.meanMotion()
+        n0dot = tle.meanMotionDot() * 2
+        aDot = -2 * a0 * n0dot / (3 * n0)
+        sma = a0 + aDot * dt
+        eDot = -2 * (1 - tleEcc) * n0dot / (3 * n0)
+        ecc = tleEcc + eDot * dt
+        temp = (a0 ** -3.5) / ((1 - (tleEcc * tleEcc)) ** 2)
+        #   Perturbations
+        #   Non-spherical Earth
+        lanJ2Dot = -2.06474e14 * temp * cos(inc)
+        aopJ2Dot = 1.03237e14 * temp * (4 - 5 * ((sin(inc)) ** 2))
+        #   Third-Body
+        lanMoon = -0.00338 * cos(inc) / n0
+        lanSun = -0.00154 * cos(inc) / n0
+        aopMoon = 0.00169 * (4 - (5 * sin(inc) ** 2)) / n0
+        aopSun = 0.00077 * (4 - (5 * sin(inc) **2)) / n0
+        ra = tle.raan() + radians(lanJ2Dot + lanMoon + lanSun) * dt
+        aop = tle.argumentOfPeriapsis() + radians(aopJ2Dot + aopMoon + aopSun) * dt
+        return cls(sma=sma, ecc=ecc, inc=inc, raan=ra, aop=aop, meanAnomaly=M1, epoch=jd)
+
+        '''if jd == 0:
             jd = tle.epoch()
         dt = jd.difference(tle.epoch())
         inc = tle.inclination()
@@ -72,7 +103,7 @@ class OrbitalElements:
         aopSun = 0.00077 * (4 - (5 * sin(inc) ** 2)) / n0
         ra = tle.raan() + (lanJ2Dot + lanMoon + lanSun) * dt
         aop = tle.argumentOfPeriapsis() + (aopJ2Dot + aopMoon + aopSun) * dt
-        return cls(sma=sma, ecc=ecc, inc=inc, raan=ra, aop=aop, meanAnomaly=degrees(M1), epoch=jd)
+        return cls(sma=sma, ecc=ecc, inc=inc, raan=ra, aop=aop, meanAnomaly=degrees(M1), epoch=jd)'''
 
     @classmethod
     def fromState(cls, position: EVector, velocity: EVector, jd: JulianDate = 0):
@@ -87,25 +118,25 @@ class OrbitalElements:
         eccVec = computeEccentricVector(position, velocity)
 
         ecc = eccVec.mag()
-        inc = degrees(acos(angMom[2] / angMom.mag()))
-        ra = degrees(acos(lineOfNodes[0] / lineOfNodes.mag()))
+        inc = acos(angMom[2] / angMom.mag())
+        ra = acos(lineOfNodes[0] / lineOfNodes.mag())
         if lineOfNodes[1] < 0:
-            ra = 360 - ra
-        aop = degrees(acos(dot(lineOfNodes, eccVec) / (lineOfNodes.mag() * eccVec.mag())))
+            ra = (2*pi) - ra
+        aop = acos(dot(lineOfNodes, eccVec) / (lineOfNodes.mag() * eccVec.mag()))
         if eccVec[2] < 0:
-            aop = 360 - aop
-        tAnom = degrees(acos(dot(eccVec, position) / (eccVec.mag() * position.mag())))
+            aop = (2*pi) - aop
+        tAnom = acos(dot(eccVec, position) / (eccVec.mag() * position.mag()))
         if dot(position, velocity) < 0:
-            tAnom = 360 - tAnom
+            tAnom = (2*pi) - tAnom
         sma = (angMom.mag() ** 2) / ((1 - (ecc * ecc)) * EARTH_MU)
         return cls(sma=sma, ecc=ecc, inc=inc, raan=ra, aop=aop, meanAnomaly=trueToMean(tAnom, ecc), epoch=jd)
 
     def __str__(self) -> str:
         """Returns a string representation of the orbital elements."""
 
-        return (f'Semi-major axis: {self._sma}, Eccentricity: {self._ecc}, Inclination: {self._inc}\n'
-                + f'RAAN: {self._raan}, Argument of Perigee: {self._aop}, Mean Anomaly: {self._meanAnomaly}\n'
-                + f'Epoch: {str(self._epoch)}')
+        return (f'Semi-major axis: {self._sma}, Eccentricity: {self._ecc}, Inclination: {degrees(self._inc)}\n'
+                + f'RAAN: {degrees(self._raan)}, Argument of Perigee: {degrees(self._aop)}, '
+                  f'Mean Anomaly: {degrees(self._meanAnomaly)}\nEpoch: {str(self._epoch)}')
 
     def getState(self, jd: JulianDate = None) -> tuple[EVector]:
         """Computes state vectors based on the orbital elements at a given time.
@@ -116,11 +147,11 @@ class OrbitalElements:
             jd = self._epoch
         tAnom = meanToTrue(meanAnomalyAt(self, jd), self._ecc)
         eAnom = trueToEccentric(tAnom, self._ecc)
-        r = self._sma * (1 - self._ecc * cos(radians(eAnom)))
-        pOrbit = EVector(cos(radians(tAnom)), sin(radians(tAnom)), 0) * r
-        vOrbit = EVector(-sin(radians(eAnom)), sqrt(1 - self._ecc * self._ecc) * cos(radians(eAnom)), 0) * (
+        r = self._sma * (1 - self._ecc * cos(eAnom))
+        pOrbit = EVector(cos(tAnom), sin(tAnom), 0) * r
+        vOrbit = EVector(-sin(eAnom), sqrt(1 - self._ecc * self._ecc) * cos(eAnom), 0) * (
                 sqrt(EARTH_MU * self._sma) / r)
-        rot = getEulerMatrix(Order.ZXZ, EulerAngles(self._raan, self._inc, self._aop))
+        rot = getEulerMatrix(Order.ZXZ, EulerAngles(degrees(self._raan), degrees(self._inc), degrees(self._aop)))
         return rotateMatrixFrom(rot, pOrbit), rotateMatrixFrom(rot, vOrbit)
 
     def setSma(self, sma: float):
@@ -142,38 +173,38 @@ class OrbitalElements:
         return self._ecc
 
     def setInc(self, inc: float):
-        """Sets the inclination of the orbit in degrees."""
+        """Sets the inclination of the orbit in radians."""
         self._inc = inc
 
     def getInc(self):
-        """Returns the inclination of the orbit in degrees."""
+        """Returns the inclination of the orbit in radians."""
         return self._inc
 
     def setRaan(self, raan: float):
-        """Sets the right-ascension of the ascending node in degrees.
+        """Sets the right-ascension of the ascending node in radians.
             Synonymous with longitude of ascending node."""
         self._raan = raan
 
     def getRaan(self):
-        """Returns the right-ascension of the ascending node in degrees.
+        """Returns the right-ascension of the ascending node in radians.
             Synonymous with longitude of ascending node."""
         return self._raan
 
     def setAop(self, aop: float):
-        """Sets the argument of periapsis measured in degrees."""
+        """Sets the argument of periapsis measured in radians."""
         self._aop = aop
 
     def getAop(self):
-        """Returns the argument of periapsis measured in degrees."""
+        """Returns the argument of periapsis measured in radians."""
         return self._aop
 
     def setMeanAnomaly(self, meanAnom: float):
-        """Sets the mean anomaly of the orbit in degrees. For the positional methods to work properly
+        """Sets the mean anomaly of the orbit in radians. For the positional methods to work properly
         the epoch should be changed whenever this value is changed."""
         self._meanAnomaly = meanAnom
 
     def getMeanAnomaly(self):
-        """Returns the mean anomaly of the orbit in degrees."""
+        """Returns the mean anomaly of the orbit in radians."""
         return self._meanAnomaly
 
     def setEpoch(self, epoch: JulianDate):
@@ -191,14 +222,14 @@ def raanProcession(tle: TwoLineElement) -> float:
      and the non-spherical earth. Values are negative for a prograde (direct) orbit, positive for retrograde.
     Parameters:
     tle:    Two-line element set for an object.
-    returns: The rate of procession of the RAAN in degrees per day."""
+    returns: The rate of procession of the RAAN in radians per day."""
 
     a = meanMotionToSma(tle.meanMotion())
-    dRaanSphere = -2.06474e14 * (a ** -3.5) * cos(radians(tle.inclination())) / (
+    dRaanSphere = -2.06474e14 * (a ** -3.5) * cos(tle.inclination()) / (
                 (1 - tle.eccentricity() * tle.eccentricity()) ** 2)
-    dRaanMoon = -0.00338 * cos(radians(tle.inclination())) / tle.meanMotion()
-    dRaanSun = -0.00154 * cos(radians(tle.inclination())) / tle.meanMotion()
-    return dRaanSphere + dRaanMoon + dRaanSun
+    dRaanMoon = -0.00338 * cos(tle.inclination()) / tle.meanMotion()
+    dRaanSun = -0.00154 * cos(tle.inclination()) / tle.meanMotion()
+    return radians(dRaanSphere + dRaanMoon + dRaanSun)
 
 
 def aopProcession(tle: TwoLineElement) -> float:
@@ -206,14 +237,14 @@ def aopProcession(tle: TwoLineElement) -> float:
     non-spherical Earth. Values are positive for a prograde (direct) orbit, negative for retrograde.
     Parameters:
     tle:    Two-line element set for an object.
-    returns: The rate of procession of the AOP in degrees per day."""
+    returns: The rate of procession of the AOP in radians per day."""
 
     a = meanMotionToSma(tle.meanMotion())
-    dAopSphere = 1.03237e14 * (a ** -3.5) * (4 - 5 * (sin(radians(tle.inclination())) ** 2)) / \
+    dAopSphere = 1.03237e14 * (a ** -3.5) * (4 - 5 * (sin(tle.inclination()) ** 2)) / \
         ((1 - tle.eccentricity() * tle.eccentricity()) ** 2)
-    dAopMoon = 0.00169 * (4 - 5 * (sin(radians(tle.inclination())) ** 2)) / tle.meanMotion()
-    dAopSun = 0.00077 * (4 - 5 * (sin(radians(tle.inclination())) ** 2)) / tle.meanMotion()
-    return dAopSphere + dAopMoon + dAopSun
+    dAopMoon = 0.00169 * (4 - 5 * (sin(tle.inclination()) ** 2)) / tle.meanMotion()
+    dAopSun = 0.00077 * (4 - 5 * (sin(tle.inclination()) ** 2)) / tle.meanMotion()
+    return radians(dAopSphere + dAopMoon + dAopSun)
 
 
 # todo: figure out if the magnitude here is accurate
@@ -235,12 +266,12 @@ def computeVelocity(elements: OrbitalElements) -> float:
 def computeRadius(elements: OrbitalElements) -> float:
     tAnom = meanToTrue(elements.getMeanAnomaly(), elements.getEcc())
     ecc = elements.getEcc()
-    return elements.getSma() * (1 - ecc * ecc) / (1 + ecc * cos(radians(tAnom)))
+    return elements.getSma() * (1 - ecc * ecc) / (1 + ecc * cos(tAnom))
 
 
 def computeFlightAngle(elements: OrbitalElements) -> float:
-    tAnomRad = radians(meanToTrue(elements.getMeanAnomaly(), elements.getEcc()))
-    return atan((elements.getEcc() * sin(tAnomRad)) / (1 + elements.getEcc() * cos(tAnomRad)))
+    tAnom = meanToTrue(elements.getMeanAnomaly(), elements.getEcc())
+    return atan((elements.getEcc() * sin(tAnom)) / (1 + elements.getEcc() * cos(tAnom)))
 
 
 def meanAnomalyAt(elements: OrbitalElements, jd: JulianDate) -> float:
@@ -248,14 +279,14 @@ def meanAnomalyAt(elements: OrbitalElements, jd: JulianDate) -> float:
         raise ValueError('Epoch was not set for this instance.')
     n = smaToMeanMotion(elements.getSma())
     dt = jd.difference(elements.getEpoch()) * 86400.0
-    mAnomRad = n * dt + radians(elements.getMeanAnomaly())
-    return degrees(mAnomRad) % 360.0
+    mAnom = n * dt + elements.getMeanAnomaly()
+    return mAnom % (2*pi)
 
 
 def timeToMeanAnomaly(elements: OrbitalElements, meanAnom: float) -> float:
     n = smaToMeanMotion(elements.getSma())
     m1 = elements.getMeanAnomaly()
-    dM = (meanAnom - m1) % 360.0
+    dM = (meanAnom - m1) % (2*pi)
     if meanAnom < m1:
-        dM += 360
-    return radians(dM) / n / 86400.0
+        dM += (2*pi)
+    return dM / n / 86400.0
