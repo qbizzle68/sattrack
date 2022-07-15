@@ -1,4 +1,4 @@
-﻿from math import sqrt, sin, cos, pi, floor
+﻿from math import sqrt, sin, cos, floor
 
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.util.constants import TWOPI
@@ -117,6 +117,7 @@ def timeToNextMeanAnomaly(meanMotion: float, m0: float, epoch0: JulianDate, m1: 
         dm = m1 - m0
     return time.future((dm / n) / TWOPI)
 
+
 def timeToPrevMeanAnomaly(meanMotion: float, m0: float, epoch0: JulianDate, m1: float, time: JulianDate) -> JulianDate:
     """Computes the previous time the satellite passed through the mean anomaly before the given time.
     Parameters
@@ -168,7 +169,7 @@ def timeToPrevTrueAnomaly(meanMotion: float, ecc: float, t0: float, epoch0: Juli
     Returns the previous time the satellites position is t1.
     """
 
-    return timeToPrevMeanAnomaly(meanMotion, trueToMean(t0, ecc), epoch0, trueToMean(t1, ecc), t1, time)
+    return timeToPrevMeanAnomaly(meanMotion, trueToMean(t0, ecc), epoch0, trueToMean(t1, ecc), time)
 
 
 def meanAnomalyAt(meanMotion: float, m0: float, epoch0: JulianDate, epoch: JulianDate) -> float:
