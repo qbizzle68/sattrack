@@ -14,7 +14,7 @@ from sattrack.util.constants import EARTH_EQUITORIAL_RADIUS, SUN_RADIUS
 from sattrack.util.conversions import atan2
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.structures.coordinates import GeoPosition, zenithVector, geoPositionVector
-from sattrack.structures.elements import computeEccentricVector, raanProcession
+from sattrack.structures.elements import computeEccentricVector, raanProcessionRate
 
 
 class PositionInfo:
@@ -340,7 +340,7 @@ def timeToPlane(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianDat
     alt = orbitAltitude(sat, geo, jd)
     if alt > 0:
         return jd
-    dRaan = raanProcession(sat.tle())
+    dRaan = raanProcessionRate(sat.tle())
     while abs(alt) > 2.7e-4:  # one arc-second on either side
         # todo: improve this guess of dt
         dt = -alt / 360.0
