@@ -1,6 +1,7 @@
 ﻿from math import sqrt, sin, cos, pi, floor
 
 from sattrack.spacetime.juliandate import JulianDate
+from sattrack.util.constants import TWOPI
 from sattrack.util.conversions import atan2
 
 
@@ -11,7 +12,7 @@ def meanToTrue(meanAnomaly: float, ecc: float) -> float:
     ecc:            Eccentricity of the orbit.
     returns:        The true anomaly measured in radians."""
 
-    eAnom = __m2ENewtonRaphson(meanAnomaly, ecc) % (2*pi)
+    eAnom = __m2ENewtonRaphson(meanAnomaly, ecc) % TWOPI
     # eAnom = eTemp if eTemp >= 0 else eTemp + 360.0
     y = sqrt(1 - (ecc * ecc)) * sin(eAnom)
     return atan2(y, cos(eAnom) - ecc)
@@ -24,7 +25,7 @@ def meanToEccentric(meanAnomaly: float, eccentricity: float) -> float:
     ecc:            Eccentricity of the orbit.
     returns:        The eccentric anomaly measured in radians."""
 
-    return __m2ENewtonRaphson(meanAnomaly, eccentricity) % (2*pi)
+    return __m2ENewtonRaphson(meanAnomaly, eccentricity) % TWOPI
     # e = __m2ENewtonRaphson(meanAnomaly, eccentricity) % 360.0
     # return e if e >= 0 else e + 360.0
 
@@ -49,7 +50,7 @@ def trueToMean(trueAnom: float, ecc: float) -> float:
 
     y = sqrt(1 - (ecc * ecc)) * sin(trueAnom)
     eAnom = atan2(y, cos(trueAnom) + ecc)
-    return eAnom - ecc * sin(eAnom) % (2*pi)
+    return eAnom - ecc * sin(eAnom) % TWOPI
     # return m if m >= 0 else m + 360.0
 
 
@@ -71,7 +72,7 @@ def eccentricToMean(eccAnom: float, ecc: float) -> float:
     ecc:        Eccentricity of the orbit.
     returns:    The mean anomaly measured in radians."""
 
-    return (eccAnom - ecc * sin(eccAnom)) % (2*pi)
+    return (eccAnom - ecc * sin(eccAnom)) % TWOPI
     # return m if m >= 0 else m + 360.0
 
 
@@ -96,14 +97,103 @@ def __m2ENewtonRaphson(M: float, ecc: float) -> float:
 
 
 def timeToNextMeanAnomaly(meanMotion: float, m0: float, epoch0: JulianDate, m1: float, time: JulianDate) -> JulianDate:
-    """meanMotion in rad/s. m0 - epoch0 mean anomaly and time, time to m1 after time"""
-    twoPi = 2 * pi
-    n = meanMotion * 86400 / twoPi
-    pePass = epoch0.future(-m0 / (twoPi * n))
+    """Computes the next time a satellite passes through the mean anomaly after the given time.
+    Parameters
+        meanMotion -- mean motion of the satellite in radians / second
+        m0 -- a known mean anomaly at epoch0 in radians
+        epoch0 -- the epoch the satellite has a mean anomaly of m0
+        m1 -- mean anomaly in radians
+        time -- relative time to find the next anomaly
+    Returns the next time the satellite's position is m1.
+    """
+
+    n = meanMotion * 86400 / TWOPI
+    pePass = epoch0.future(-m0 / (TWOPI * n))
     revs = time.difference(pePass) * n
-    m0 = (revs - floor(revs)) * twoPi
+    m0 = (revs - floor(revs)) * TWOPI
     if m1 < m0:
-        dm = m1 + twoPi - m0
+        dm = m1 + TWOPI - m0
     else:
         dm = m1 - m0
-    return time.future((dm / n) / twoPi)
+    return time.future((dm / n) / TWOPI)
+
+def timeToPrevMeanAnomaly(meanMotion: float, m0: float, epoch0: JulianDate, m1: float, time: JulianDate) -> JulianDate:
+    """Computes the previous time the satellite passed through the mean anomaly before the given time.
+    Parameters
+        meanMotion -- mean motion of the satellite in radians / second
+        m0 -- a known mean anomaly at epoch0 in radians
+        epoch0 -- the epoch the satellite has a mean anomaly of m0
+        m1 -- mean anomaly in radians
+        time -- relative time to find the previous anomaly
+    Returns the previous time the satellite's position was m1.s
+    """
+
+    n = meanMotion * 86400 / TWOPI
+    pePass = epoch0.future(-m0 / (TWOPI * n))
+    revs = time.difference(pePass) * n
+    m0 = (revs - floor(revs)) * TWOPI
+    if m0 < m1:
+        dm = m1 - TWOPI - m0
+    else:
+        dm = m1 - m0
+    return time.future((dm / n) / TWOPI)
+
+
+def timeToNextTrueAnomaly(meanMotion: float, ecc: float, t0: float, epoch0: JulianDate, t1: float,
+                          time: JulianDate) -> JulianDate:
+    """Computes the next time the satellite passes through the true anomaly after the time given.
+    Parameters
+        meanMotion -- mean motion of the satellite in radians / second
+        ecc -- eccentricity of the orbit
+        t0 -- a known true anomaly at epoch0 in radians
+        epoch0 -- the epoch the satellite has a true anomaly of t0
+        t1 -- true anomaly in radians
+        time -- relative time to find the next anomaly
+    Returns the next time the satellites position is t1.
+    """
+
+    return timeToNextMeanAnomaly(meanMotion, trueToMean(t0, ecc), epoch0, trueToMean(t1, ecc), time)
+
+
+def timeToPrevTrueAnomaly(meanMotion: float, ecc: float, t0: float, epoch0: JulianDate, t1: float,
+                          time: JulianDate) -> JulianDate:
+    """Computes the previous time the satellite passes through the true anomaly before the time given.
+    Parameters
+        meanMotion -- mean motion of the satellite in radians / second
+        ecc -- eccentricity of the orbit
+        t0 -- a known true anomaly at epoch0 in radians
+        epoch0 -- the epoch the satellite has a true anomaly of t0
+        t1 -- true anomaly in radians
+        time -- relative time to find the previous anomaly
+    Returns the previous time the satellites position is t1.
+    """
+
+    return timeToPrevMeanAnomaly(meanMotion, trueToMean(t0, ecc), epoch0, trueToMean(t1, ecc), t1, time)
+
+
+def meanAnomalyAt(meanMotion: float, m0: float, epoch0: JulianDate, epoch: JulianDate) -> float:
+    """Computes the mean anomaly of a satellite at a given epoch.
+    Parameters
+        meanMotion -- mean motion of the satellite in radians / second
+        m0 -- a known mean anomaly at epoch0
+        epoch0 -- epoch of m0
+        epoch -- epoch to find the mean anomaly
+    Returns the mean anomaly in radians.
+    """
+
+    dM = meanMotion * epoch.difference(epoch0) * 86400.0
+    return (m0 + dM) % TWOPI
+
+
+def trueAnomalyAt(meanMotion: float, ecc: float, t0: float, epoch0: JulianDate, epoch: JulianDate) -> float:
+    """Computes the true anomaly of a satellite at a given epoch.
+    Parameters
+        meanMotion -- mean motion of the satellite in radians / second
+        ecc -- eccentricity of the orbit
+        t0 -- a known true anomaly at epoch0
+        epoch0 -- epoch of t0
+        epoch -- epoch to find the true anomaly
+    Returns the true anomaly in radians.
+    """
+
+    return meanToTrue(meanAnomalyAt(meanMotion, trueToMean(t0, ecc), epoch0, epoch), ecc)
