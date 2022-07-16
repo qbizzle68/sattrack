@@ -1,20 +1,47 @@
-from math import radians, pi, floor, degrees
+from math import radians, pi
 
 from pyevspace import EVector
 from sattrack.structures.sgp4 import SGP4_Propagator
 
+from sattrack.rotation.order import Order
+from sattrack.rotation.rotation import ReferenceFrame, EulerAngles
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.structures.body import Body, EARTH_BODY
 from sattrack.structures.elements import OrbitalElements
 from sattrack.structures.tle import TwoLineElement
-from sattrack.util.anomalies import trueToMean
+from sattrack.util.anomalies import trueToMean, timeToNextMeanAnomaly, timeToPrevMeanAnomaly, meanToTrue
 from sattrack.util.conversions import smaToMeanMotion
+
+
+'''class Satellite2:
+    """make with tle, state or elements. tle can do all, state can create elements, elements can be used
+    to do basics (mostly find anomalies not accounting for perturbations."""
+
+    def __init__(self, obj: TwoLineElement | tuple[EVector] | OrbitalElements, epoch: JulianDate = None):
+        if type(obj) == TwoLineElement:
+            self._tle = obj
+            self._elements = None
+            self._epoch = obj.epoch()
+            dt = -radians(obj.meanAnomaly()) / (2 * pi * obj.meanMotion())
+            self._periapsisPassage = self._epoch.future(dt)
+        elif type(obj) == OrbitalElements:
+            self._tle = None
+            self._elements = obj
+            self._epoch = obj.getEpoch()
+            dt = -radians(obj.getMeanAnomaly()) / smaToMeanMotion(obj.getSma())
+            self._periapsisPassage = self._epoch.future(dt)
+        else:
+            pass
+
+    @classmethod
+    def fromTle(cls, tle: TwoLineElement):
+        pass'''
 
 
 class Satellite:
 
     def __init__(self, obj: TwoLineElement | OrbitalElements, body: Body = EARTH_BODY):
-        if type(obj) == TwoLineElement:
+        '''if type(obj) == TwoLineElement:
             self._tle = obj
             self._propagator = SGP4_Propagator(obj)
             self._epoch = obj.epoch()
@@ -26,16 +53,24 @@ class Satellite:
             self._propagator = None
             self._epoch = obj.getEpoch()
             self._elements = obj
-            if obj.getEpoch() != 0:
+            if obj.getEpoch() is not None:
                 dt = -radians(obj.getMeanAnomaly()) / smaToMeanMotion(obj.getSma())
                 self._periapsisPassage = self._epoch.future(dt)
             else:
-                self._periapsisPassage = None
+                self._periapsisPassage = None'''
+        # todo: add name to the sat (need a name from elements)
+        self._tle = None
+        self._propagator = None
+        self._epoch = None
+        self._elements = None
+        self._periapsisPassage = None
+        self.update(obj)
         self._body = body
 
     def __str__(self) -> str:
         pass
 
+    # todo: add a stack to store states, with bool parameter that defaults to false
     def getState(self, jd: JulianDate) -> tuple[EVector]:
         if self._tle:
             rawState = self._propagator.getState(self._tle, jd)
@@ -57,7 +92,7 @@ class Satellite:
             self._propagator = None
             self._epoch = obj.getEpoch()
             self._elements = obj
-            if obj.getEpoch() != 0:
+            if obj.getEpoch() is not None:
                 dt = -radians(obj.getMeanAnomaly()) / smaToMeanMotion(obj.getSma())
                 self._periapsisPassage = self._epoch.future(dt)
             else:
@@ -85,6 +120,45 @@ class Satellite:
     def getPeriapsisPassage(self) -> float:
         return self._periapsisPassage
 
+    def getReferenceFrame(self, time: JulianDate = None) -> ReferenceFrame:
+        """Computes the rotation object for the perifocal reference frame """
+        if time is None:
+            return ReferenceFrame(
+                Order.ZXZ,
+                EulerAngles(
+                    radians(self._tle.raan()),
+                    radians(self._tle.inclination()),
+                    radians(self._tle.argumentOfPeriapsis())
+                )
+            )
+        else:
+            elements = OrbitalElements.fromTle(self._tle, time)
+            return ReferenceFrame(
+                Order.ZXZ,
+                EulerAngles(
+                    elements.getRaan(),
+                    elements.getInc(),
+                    elements.getAop()
+                )
+            )
+
+    def getEccentricVector(self, time: JulianDate = None) -> EVector:
+        if time is None:
+            rot = ReferenceFrame(Order.ZXZ, EulerAngles(
+                    radians(self._tle.raan()),
+                    radians(self._tle.inclination()),
+                    radians(self._tle.argumentOfPeriapsis())
+                ))
+            return rot.RotateFrom(EVector.e1) * self._tle.eccentricity()
+        else:
+            elements = OrbitalElements.fromTle(self._tle, time)
+            rot = ReferenceFrame(Order.ZXZ, EulerAngles(
+                    elements.getRaan(),
+                    elements.getInc(),
+                    elements.getAop()
+                ))
+            return rot.RotateTo(EVector.e1) * elements.getEcc()
+
     def timeToNextMeanAnomaly(self, mAnom: float, time: JulianDate) -> JulianDate:
         """Computes the next time the satellite passes through the mean anomaly
         after the time given.
@@ -94,7 +168,7 @@ class Satellite:
         Returns the time the satellite's position is mAnom.
         """
 
-        twoPi = 2 * pi
+        '''twoPi = 2 * pi
         if self._tle:
             n = self._tle.meanMotion()  # rev/day
         else:
@@ -106,7 +180,18 @@ class Satellite:
             dm = mAnom + twoPi - m0
         else:
             dm = mAnom - m0
-        return time.future((dm / n) / twoPi)
+        return time.future((dm / n) / twoPi)'''
+        if self._tle:
+            elements = OrbitalElements.fromTle(self._tle, time)
+        else:
+            elements = self._elements
+        return timeToNextMeanAnomaly(
+            smaToMeanMotion(elements.getSma()),
+            elements.getMeanAnomaly(),
+            elements.getEpoch(),
+            mAnom,
+            time
+        )
 
     def timeToPrevMeanAnomaly(self, mAnom: float, time: JulianDate) -> JulianDate:
         """Computes the previous time the satellite passed through the mean anomaly
@@ -117,7 +202,7 @@ class Satellite:
         Returns the time the satellite's position is mAnom.
         """
 
-        twoPi = 2 * pi
+        '''twoPi = 2 * pi
         if self._tle:
             n = self._tle.meanMotion()  # rev/day
         else:
@@ -128,7 +213,18 @@ class Satellite:
             dm = mAnom - twoPi - m0
         else:
             dm = mAnom - m0
-        return time.future((dm / n) / twoPi)
+        return time.future((dm / n) / twoPi)'''
+        if self._tle:
+            elements = OrbitalElements.fromTle(self._tle, time)
+        else:
+            elements = self._elements
+        return timeToPrevMeanAnomaly(
+            smaToMeanMotion(elements.getSma()),
+            elements.getMeanAnomaly(),
+            elements.getEpoch(),
+            mAnom,
+            time
+        )
 
     def timeToNextTrueAnomaly(self, tAnom: float, time: JulianDate) -> JulianDate:
         """Computes the next time the satellite passes through the true anomaly
@@ -139,11 +235,23 @@ class Satellite:
         Returns the time the satellite's position is tAnom.
         """
 
-        if self._tle:
+        '''if self._tle:
             ecc = self._tle.eccentricity()
         else:
             ecc = self._elements.getEcc()
-        return self.timeToNextMeanAnomaly(trueToMean(tAnom, ecc), time)
+        return self.timeToNextMeanAnomaly(trueToMean(tAnom, ecc), time)'''
+        if self._tle:
+            elements = OrbitalElements.fromTle(self._tle, time)
+        else:
+            elements = self._elements
+        mAnom = timeToNextMeanAnomaly(
+            smaToMeanMotion(elements.getSma()),
+            elements.getMeanAnomaly(),
+            elements.getEpoch(),
+            trueToMean(tAnom, elements.getEcc()),
+            time
+        )
+        return meanToTrue(mAnom, elements.getEcc())
 
     def timeToPrevTrueAnomaly(self, tAnom: float, time: JulianDate) -> JulianDate:
         """Computes the previous time the satellite passed through the true anomaly
@@ -154,8 +262,20 @@ class Satellite:
         Returns the time the satellite's position is tAnom.
         """
 
-        if self._tle:
+        '''if self._tle:
             ecc = self._tle.eccentricity()
         else:
             ecc = self._elements.getEcc()
-        return self.timeToPrevMeanAnomaly(trueToMean(tAnom, ecc), time)
+        return self.timeToPrevMeanAnomaly(trueToMean(tAnom, ecc), time)'''
+        if self._tle:
+            elements = OrbitalElements.fromTle(self._tle, time)
+        else:
+            elements = self._elements
+        mAnom = timeToPrevMeanAnomaly(
+            smaToMeanMotion(elements.getSma()),
+            elements.getMeanAnomaly(),
+            elements.getEpoch(),
+            trueToMean(tAnom, elements.getEcc()),
+            time
+        )
+        return meanToTrue(mAnom, elements.getEcc())
