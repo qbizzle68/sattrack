@@ -2,7 +2,7 @@ from math import sqrt, radians, degrees, pi, sin, cos, acos, atan
 
 from pyevspace import EVector, dot, cross, norm, vang
 
-from sattrack.rotation.order import Order
+from sattrack.rotation.order import ZXZ
 from sattrack.rotation.rotation import getEulerMatrix, EulerAngles, rotateMatrixFrom, ReferenceFrame
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.structures.tle import TwoLineElement
@@ -243,7 +243,7 @@ class OrbitalElements:
         pOrbit = EVector(cos(tAnom), sin(tAnom), 0) * r
         vOrbit = EVector(-sin(eAnom), sqrt(1 - elements['ecc'] * elements['ecc']) * cos(eAnom), 0) * (
                 sqrt(EARTH_MU * elements['sma']) / r)
-        rot = getEulerMatrix(Order.ZXZ, EulerAngles(elements['raan'], elements['inc'], elements['aop']))
+        rot = getEulerMatrix(ZXZ, EulerAngles(elements['raan'], elements['inc'], elements['aop']))
         return rot @ pOrbit, rot @ vOrbit
 
     def getReferenceFrame(self, time: JulianDate = None) -> ReferenceFrame:
@@ -257,13 +257,13 @@ class OrbitalElements:
 
         if self._tle and time is not None:
             elements = self.__tleToElements(time)
-            return ReferenceFrame(Order.ZXZ, EulerAngles(
+            return ReferenceFrame(ZXZ, EulerAngles(
                 radians(elements['raan']),
                 radians(elements['inc']),
                 radians(elements['aop'])
             ))
         else:
-            return ReferenceFrame(Order.ZXZ, EulerAngles(
+            return ReferenceFrame(ZXZ, EulerAngles(
                 self._raan,
                 self._inc,
                 self._aop

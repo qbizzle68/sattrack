@@ -3,7 +3,7 @@ from math import sin, cos, tan, atan, radians, degrees, sqrt
 from sattrack.util.constants import EARTH_FLATTENING, EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS
 from pyevspace import EVector
 from sattrack.rotation.rotation import rotateOrderFrom, EulerAngles
-from sattrack.rotation.order import Order
+from sattrack.rotation.order import ZYX
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
 
@@ -84,7 +84,7 @@ def radiusAtLatitude(lat: float) -> float:
 def geoPositionVector(geo: GeoPosition, jd: JulianDate = None) -> EVector:
     if not jd:
         return rotateOrderFrom(
-            Order.ZYX,
+            ZYX,
             EulerAngles(
                 radians(geo.getLatitude()),
                 radians(-geodeticToGeocentric(geo.getLatitude())),
@@ -108,7 +108,7 @@ def geoPositionVector(geo: GeoPosition, jd: JulianDate = None) -> EVector:
 def zenithVector(geo: GeoPosition, jd: JulianDate = None) -> EVector:
     if not jd:
         return rotateOrderFrom(
-            Order.ZYX,
+            ZYX,
             EulerAngles(
                 radians(geo.getLatitude()),
                 radians(geo.getLatitude()),

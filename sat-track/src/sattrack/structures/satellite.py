@@ -3,7 +3,7 @@ from math import radians, pi
 from pyevspace import EVector
 from sattrack.structures.sgp4 import SGP4_Propagator
 
-from sattrack.rotation.order import Order
+from sattrack.rotation.order import ZXZ
 from sattrack.rotation.rotation import ReferenceFrame, EulerAngles
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.structures.body import Body, EARTH_BODY
@@ -124,7 +124,7 @@ class Satellite:
         """Computes the rotation object for the perifocal reference frame """
         if time is None:
             return ReferenceFrame(
-                Order.ZXZ,
+                ZXZ,
                 EulerAngles(
                     radians(self._tle.raan()),
                     radians(self._tle.inclination()),
@@ -134,7 +134,7 @@ class Satellite:
         else:
             elements = OrbitalElements.fromTle(self._tle, time)
             return ReferenceFrame(
-                Order.ZXZ,
+                ZXZ,
                 EulerAngles(
                     elements.getRaan(),
                     elements.getInc(),
@@ -144,7 +144,7 @@ class Satellite:
 
     def getEccentricVector(self, time: JulianDate = None) -> EVector:
         if time is None:
-            rot = ReferenceFrame(Order.ZXZ, EulerAngles(
+            rot = ReferenceFrame(ZXZ, EulerAngles(
                     radians(self._tle.raan()),
                     radians(self._tle.inclination()),
                     radians(self._tle.argumentOfPeriapsis())
@@ -152,7 +152,7 @@ class Satellite:
             return rot.RotateFrom(EVector.e1) * self._tle.eccentricity()
         else:
             elements = OrbitalElements.fromTle(self._tle, time)
-            rot = ReferenceFrame(Order.ZXZ, EulerAngles(
+            rot = ReferenceFrame(ZXZ, EulerAngles(
                     elements.getRaan(),
                     elements.getInc(),
                     elements.getAop()
