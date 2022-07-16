@@ -1,4 +1,4 @@
-from copy import deepcopy
+from copy import deepcopy, copy
 from math import cos, sin, radians
 
 from pyevspace import EVector, EMatrix, transpose
@@ -191,7 +191,7 @@ def rotateFromTo(orderFrom: EulerOrder, angsFrom: EulerAngles, orderTo: EulerOrd
     return getMatrixFromTo(orderFrom, angsFrom, orderTo, angsTo) @ vector
 
 
-class Rotation:
+class ReferenceFrame:
     """Rotation object that contains a rotation order, and the angles of the rotations.
     This object also contains an internal rotation matrix representing the rotation.
     The angles can be adjusted, as they naturally tend to do for a non-inertial reference frame,
@@ -214,7 +214,8 @@ class Rotation:
         return self._order
 
     def getMatrix(self) -> EMatrix:
-        return deepcopy(self._matrix)
+        # todo: make this a deepcopy (error is EMatrix can't be pickled)
+        return self._matrix
 
     # rotate vector to the reference frame represented by the rotation
     def RotateTo(self, vector: EVector) -> EVector:
