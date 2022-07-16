@@ -1,5 +1,5 @@
-from copy import deepcopy, copy
-from math import cos, sin, radians
+from copy import deepcopy
+from math import cos, sin
 
 from pyevspace import EVector, EMatrix, transpose
 
@@ -10,7 +10,6 @@ from sattrack.rotation.order import Axis, EulerOrder
 def _xRotation(angle: float) -> EMatrix:
     rtn = EMatrix()
     rtn.set(0, 0, 1.0)
-    #angleRad = radians(angle)
     angleCos = cos(angle)
     angleSin = sin(angle)
     rtn.set(1, 1, angleCos)
@@ -23,7 +22,6 @@ def _xRotation(angle: float) -> EMatrix:
 def _yRotation(angle: float) -> EMatrix:
     rtn = EMatrix()
     rtn.set(1, 1, 1.0)
-    #angleRad = radians(angle)
     angleCos = cos(angle)
     angleSin = sin(angle)
     rtn.set(0, 0, angleCos)
@@ -36,7 +34,6 @@ def _yRotation(angle: float) -> EMatrix:
 def _zRotation(angle: float) -> EMatrix:
     rtn = EMatrix()
     rtn.set(2, 2, 1.0)
-    #angleRad = radians(angle)
     angleCos = cos(angle)
     angleSin = sin(angle)
     rtn.set(0, 0, angleCos)
@@ -47,25 +44,55 @@ def _zRotation(angle: float) -> EMatrix:
 
 
 class EulerAngles:
+    """
+    A container class to hold the rotation angle values of an Euler rotation.
+
+    The angle values correspond to the axes in the EulerOrder object, i.e. the index of the angle should match the index
+    of the axis in the corresponding EulerOrder. All angles are measured in radians.
+    """
 
     def __init__(self, alpha: float, beta: float, gamma: float):
-        """Parameters:
-            alpha -- the first rotation angle in radians
-            beta -- the second rotation angle in radians
-            gamma -- the third rotation angle in radians
+        """
+        Initializes the angles to the parameters given.
+        Args:
+            alpha: The angle of the first rotation in radians.
+            beta: The angle of the second rotation in radians.
+            gamma: The angle of the third rotation in radians.
         """
 
         self._angles = [alpha, beta, gamma]
 
-    def __getitem__(self, i: int) -> float:
-        if i < 0 or i > 2:
-            raise ValueError("Index value out of range.")
-        return self._angles[i]
+    def __getitem__(self, index: int) -> float:
+        """
+        Returns the specified rotation angle.
 
-    def __setitem__(self, i: int, val: float) -> None:
-        if i < 0 or i > 2:
+        Args:
+            index: The index of the desired angle.
+
+        Returns:
+            The rotation angle in radians.
+
+        Raises:
+            ValueError: If the index is not in the range (0, 2).
+        """
+        if index < 0 or index > 2:
             raise ValueError("Index value out of range.")
-        self._angles[i] = val
+        return self._angles[index]
+
+    def __setitem__(self, index: int, value: float) -> None:
+        """
+        Sets the specified rotation angle.
+
+        Args:
+            index: The index of the angle to change.
+            value: The value to set the angle in radians.
+
+        Raises:
+            ValueError: If the index is not in the range (0, 2).
+        """
+        if index < 0 or index > 2:
+            raise ValueError("Index value out of range.")
+        self._angles[index] = value
 
     def __str__(self) -> str:
         return str([i for i in self._angles])
@@ -83,6 +110,7 @@ class EulerAngles:
             raise StopIteration
 
 
+# purposefully not documenting these since I intend to implement this in C.
 # is an extrinsic rotation
 def getMatrix(axis: Axis, angle: float) -> EMatrix:
     """Creates a rotation matrix for rotating extrinsically around a single axis.
@@ -192,52 +220,116 @@ def rotateFromTo(orderFrom: EulerOrder, angsFrom: EulerAngles, orderTo: EulerOrd
 
 
 class ReferenceFrame:
-    """Rotation object that contains a rotation order, and the angles of the rotations.
-    This object also contains an internal rotation matrix representing the rotation.
-    The angles can be adjusted, as they naturally tend to do for a non-inertial reference frame,
-    however the rotation order is not expected to change. Therefore, if you wish to represent a
-    rotation that has a different order, you should create a new Rotation object altogether."""
+    """
+    Class that represents a rotation between reference frames.
+
+    Each of the rotation components are stored in and are accessible through the class. The angles can be adjusted, as
+    they naturally tend to do for a non-inertial reference frame, however the rotation order is not expected to change,
+    so they are not mutable after instantiation. The benefit of the class is the ability to conveniently store all
+    objects relating to a rotation, as well as the built-in methods for rotating EVector's between the reference frames.
+    """
 
     def __init__(self, order: EulerOrder, angles: EulerAngles):
+        """Initializes the internal matrix based on the order and angle arguments."""
         self._order = order
         self._angles = angles
         self._matrix = getEulerMatrix(order, angles)
 
     def setAngles(self, angles: EulerAngles):
+        """Sets the rotation angles and updates the internal rotation matrix."""
         self._angles = angles
         self._matrix = getEulerMatrix(self._order, angles)
 
     def getAngles(self) -> EulerAngles:
+        """Returns a copy of the EulerAngles for this rotation."""
+        # todo: figure out why we can't do this
         return deepcopy(self._angles)
 
     def getOrder(self) -> EulerOrder:
+        """Returns the EulerOrder that describes this rotation."""
         return self._order
 
     def getMatrix(self) -> EMatrix:
+        """Returns the rotation matrix that corresponds to this rotation."""
         # todo: make this a deepcopy (error is EMatrix can't be pickled)
         return self._matrix
 
-    # rotate vector to the reference frame represented by the rotation
     def RotateTo(self, vector: EVector) -> EVector:
+        """
+        Rotates a vector from inertial reference frame coordinates, to the rotated reference frame coordinates.
+
+        For rotating to a non-inertial reference frame, use the RotateToFrame() class method.
+
+        Args:
+            vector: Vector to be rotated.
+
+        Returns:
+            The vector rotated to the reference frame represented by the instance.
+        """
+
         return transpose(self._matrix) @ vector
 
-    # rotate a vector from the reference frame represented by the rotation
     def RotateFrom(self, vector: EVector) -> EVector:
+        """
+        Rotates a vector from the rotated reference frame's coordinates, to inertial reference frame coordinates.
+
+        For rotating from a non-inertial reference frame, use the RotateFromFrame() class method.
+
+        Args:
+            vector: Vector to be rotated.
+
+        Returns:
+            The vector rotated from the reference frame represented by the instance.
+        """
+
         return self._matrix @ vector
 
-    def RotateToFrame(self, rotation, vector: EVector) -> EVector:
-        return transpose(rotation.getMatrix()) @ self._matrix @ vector
+    def RotateToFrame(self, refFrame: ReferenceFrame, vector: EVector) -> EVector:
+        """
+        Rotates a vector from this reference frame's coordinates, to another reference frame's coordinates.
 
-    def RotateFromFrame(self, rotation, vector: EVector) -> EVector:
-        return transpose(self._matrix) @ rotation.getMatrix() @ vector
+        For rotating to an inertial reference frame, use the RotateTo() class method.
+
+        Args:
+            refFrame: Non-inertial ReferenceFrame object.
+            vector: Vector to be rotated
+
+        Returns:
+            The vector rotated to the ReferenceFrame parameter's reference frame.
+        """
+
+        return transpose(refFrame.getMatrix()) @ self._matrix @ vector
+
+    def RotateFromFrame(self, refFrame: ReferenceFrame, vector: EVector) -> EVector:
+        """
+        Rotates a vector from a reference frame's coordinates, to this reference frame's coordinates.
+
+        For rotating from an inertial reference frame, use the RotateFrame() class method.
+
+        Args:
+            refFrame: Non-inertial ReferenceFrame object.
+            vector: Vector to be rotated.
+
+        Returns:
+            The vector rotated from the ReferenceFrame parameter's reference frame.
+        """
+
+        return transpose(self._matrix) @ refFrame.getMatrix() @ vector
 
 
 def rotateToThenOffset(rotation: EMatrix, offset: EVector, original: EVector) -> EVector:
-    """Rotates a vector to a rotated and offset reference frame.
-    Parameters:
-    rotation:   Rotation matrix to reference frame.
-    offset:     Offset vector between reference frame origins.
-    original:   Original vector to be rotated."""
+    """
+    Rotates a vector to a rotated and offset reference frame.
+
+    Args:
+        rotation: Rotation matrix of offset reference frame.
+        offset: Offset vector between reference frame origins.
+        original: Original vector to be rotated.
+
+    Returns:
+        The original vector in the rotated and offset reference frame.
+    """
+
     rotatedOriginal = transpose(rotation) @ original
     rotatedOffset = transpose(rotation) @ offset
     return rotatedOriginal - rotatedOffset
