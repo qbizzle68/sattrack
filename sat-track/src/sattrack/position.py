@@ -25,8 +25,8 @@ def computeTrueAnomaly(position: EVector, velocity: EVector) -> float:
 # todo: put this in anomalies
 def nearestTrueAnomaly(sat: Satellite, time: JulianDate, trueAnom: float) -> JulianDate:
     state = sat.getState(time)
-    meanAnom0 = trueToMean(computeTrueAnomaly(state[0], state[1]), sat.tle().eccentricity())
-    meanAnom1 = trueToMean(trueAnom, sat.tle().eccentricity())
+    meanAnom0 = trueToMean(computeTrueAnomaly(state[0], state[1]), sat.tle().getEcc())
+    meanAnom1 = trueToMean(trueAnom, sat.tle().getEcc())
     if meanAnom1 < meanAnom0:
         if meanAnom0 - meanAnom1 < pi:
             dma = meanAnom1 - meanAnom0
@@ -37,7 +37,7 @@ def nearestTrueAnomaly(sat: Satellite, time: JulianDate, trueAnom: float) -> Jul
             dma = meanAnom1 - (2*pi) - meanAnom0
         else:
             dma = meanAnom1 - meanAnom0
-    n = sat.tle().meanMotion() * 2 * pi
+    n = sat.tle().getMeanMotion() * 2 * pi
     return time.future(dma / n)
 
 # todo: what do we do with this? do we need it?

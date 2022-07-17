@@ -1,6 +1,6 @@
-from math import pi, radians
+from math import pi
 
-from sattrack.exceptions import TokenNumberException, TokenLengthException
+from sattrack.exceptions import TokenNumberException, TokenLengthException, LineNumberException, ChecksumException
 from sattrack.spacetime.juliandate import JulianDate
 import requests
 
@@ -13,12 +13,13 @@ class TwoLineElement:
     appropriate model, namely the SGP4 and SDP4."""
 
     def __init__(self, tle: str):
+        """Initializes the class with a TLE in string form."""
         tokens = tle.splitlines()
         if len(tokens) != 3:
-            raise Exception("Incorrect number of lines")  # todo: make a custom version for this
+            raise LineNumberException(f'Incorrect number of lines: {len(tokens)}')
         for i in range(1, 3):
             if not self._checksum(tokens[i]):
-                raise Exception(f"Checksum failed for line {tokens[i]}")  # todo: make a custom version for this
+                raise ChecksumException(f'Checksum failed for line {tokens[i]}')
         line1Tokens, line2Tokens = self._checkTokens(tokens[1], tokens[2])
         self._parseLines(line1Tokens, line2Tokens)
         self._name = tokens[0]
@@ -26,6 +27,7 @@ class TwoLineElement:
         self._line2 = tokens[2]
 
     def __str__(self) -> str:
+        """Returns the original TLE string."""
         return f'{self._name}\n{self._line1}\n{self._line2}'
 
     @staticmethod
@@ -115,16 +117,16 @@ class TwoLineElement:
     def getLine2(self) -> str:
         return self._line2
 
-    def catalogNumber(self) -> int:
+    def getCatalogNumber(self) -> int:
         """Return the catalog number of the satellite."""
         return self._catNum
 
-    def classification(self) -> str:
+    def getClassification(self) -> str:
         """Return the classification of the satellite.
         U: Unclassified, C: Classified, S: Secret"""
         return self._class
 
-    def cosparID(self) -> str:
+    def getCosparID(self) -> str:
         """Returns the COSPAR ID (international designator) of the satellite of the form:
 
             XXYYYZZZ, where:
@@ -134,64 +136,64 @@ class TwoLineElement:
             ZZZ:    Piece of the launch (staring with single letters)."""
         return self._cospar
 
-    def epoch(self) -> JulianDate:
+    def getEpoch(self) -> JulianDate:
         """Returns the epoch of the TLE as a Julian date."""
         return self._epoch
 
-    def meanMotionDot(self) -> float:
+    def getMeanMotionDot(self) -> float:
         """Returns the first derivative of mean motion / 2, also known as the ballistic coefficient,
         in radians / s^2."""
         return self._nDot
 
-    def meanMotionDDot(self) -> float:
+    def getMeanMotionDDot(self) -> float:
         """Returns the second derivative of mean motion / 6 in radians / s^3."""
         return self._nDDot
 
-    def bStar(self) -> float:
+    def getBStar(self) -> float:
         """Returns the B*, the drag term, or radiation pressure coefficient."""
         return self._bStar
 
-    def ephemeris(self) -> int:
+    def getEphemeris(self) -> int:
         """Returns the ephemeris type, should always be 0 for distributed TLE data."""
         return self._ephemeris
 
-    def setNumber(self) -> int:
+    def getSetNumber(self) -> int:
         """Returns the element set number, incremented when a new TLE is generated."""
         return self._revNum
 
-    def inclination(self) -> float:
+    def getInc(self) -> float:
         """Returns the inclination of the orbit in degrees."""
         return self._inc
 
-    def raan(self) -> float:
+    def getRaan(self) -> float:
         """Returns the right-ascension of the ascending node in degrees."""
         return self._raan
 
-    def eccentricity(self) -> float:
+    def getEcc(self) -> float:
         """Returns the eccentricity of the orbit."""
         return self._ecc
 
-    def argumentOfPeriapsis(self) -> float:
+    def getAop(self) -> float:
         """Returns the argument of periapsis in degrees."""
         return self._aop
 
-    def meanAnomaly(self) -> float:
+    def getMeanAnomaly(self) -> float:
         """Returns the mean anomaly in degrees."""
         return self._meanAnom
 
-    def meanMotion(self) -> float:
+    def getMeanMotion(self) -> float:
         """Returns the mean motion in revolutions per day."""
         return self._meanMotion
 
-    def meanMotionRad(self) -> float:
+    def getMeanMotionRad(self) -> float:
         """Returns the mean motion in radians per second."""
         return self._meanMotion * 2 * pi / 86400.0
 
-    def revolutionNumber(self) -> int:
+    def getRevolutionNumber(self) -> int:
         """Returns the revolution number of the satellite."""
         return self._revNum
 
-    def sma(self) -> float:
+    def getSma(self) -> float:
         """Computes the semi-major axis (m) from the mean motion (rev/day)."""
         mMotionRad = self._meanMotion * 2 * pi / 86400.0
         return (EARTH_MU ** (1.0 / 3.0)) / (mMotionRad ** (2.0 / 3.0))
@@ -201,16 +203,22 @@ CELESTRAK_URL = "https://celestrak.com/NORAD/elements/gp.php?{}={}&FORMAT=TLE"
 
 
 def getTle(value: str, query: str = 'name') -> TwoLineElement | None:
-    """Retrieves a TLE from the Celestrak online repository of continually updating TLEs via HTTP.
-    Parameters:
-    query:  The querying type, possible values are:
-        CATNR: Catalog Number (1 to 9 digits). Allows return of data fora  single catalog number
-        INTDES: International Designator (yyyy-nnn). Allows return of data for all objects
-                associated with a particular launch.
-        GROUP:  Groups of satellites provided on the CelesTrak CurrentDate page.
-        NAME:   Satellite Name (Default). Allows searching for satellites by parts of their name.
-        SPECIAL:Special data sets for the GEO Protected Zone (GPZ) or GPZ Plus:
-    value:  The value to search for, which depends on the querying type."""
+    """
+    Retrieves a TLE from the Celestrak online repository of continually updating TLEs via HTTP.
+
+    Args:
+        value: The value to search for, which depends on the querying type.
+        query: The querying type (Default = 'name'), possible values are:
+            CATNR: Catalog Number (1 to 9 digits). Allows return of data fora  single catalog number
+            INTDES: International Designator (yyyy-nnn). Allows return of data for all objects associated with a
+                    particular launch.
+            GROUP:  Groups of satellites provided on the CelesTrak CurrentDate page.
+            NAME:   Satellite Name (Default). Allows searching for satellites by parts of their name.
+            SPECIAL:Special data sets for the GEO Protected Zone (GPZ) or GPZ Plus.
+    Returns:
+        A TwoLineElement object from the search parameters.
+    """
+
     response = requests.get(CELESTRAK_URL.format(query.upper(), value.replace(' ', '%20')))
     lines = response.text.splitlines()
 

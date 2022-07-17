@@ -129,15 +129,15 @@ class OrbitalElements:
 
     @classmethod
     def __tleToElements(cls, tle: TwoLineElement, time: JulianDate) -> dict:
-        dt = time.difference(tle.epoch())
-        args = {'inc': tle.inclination()}
-        inc = radians(tle.inclination())
-        n0 = tle.meanMotion()
-        dM = (dt * (n0 + dt * (tle.meanMotionDot() + dt * tle.meanMotionDDot()))) * 360.0
-        args['meanAnomaly'] = (tle.meanAnomaly() + dM) % 360.0
-        ecc0 = tle.eccentricity()
-        n0dot = tle.meanMotionDot() * 2  # todo: ensure this is multiplied by 2 (if not move it up before dM)
-        a0 = tle.sma()
+        dt = time.difference(tle.getEpoch())
+        args = {'inc': tle.getInc()}
+        inc = radians(tle.getInc())
+        n0 = tle.getMeanMotion()
+        dM = (dt * (n0 + dt * (tle.getMeanMotionDot() + dt * tle.getMeanMotionDDot()))) * 360.0
+        args['meanAnomaly'] = (tle.getMeanAnomaly() + dM) % 360.0
+        ecc0 = tle.getEcc()
+        n0dot = tle.getMeanMotionDot() * 2  # todo: ensure this is multiplied by 2 (if not move it up before dM)
+        a0 = tle.getSma()
         aDot = -2 * a0 * n0dot / (3 * n0)
         args['sma'] = a0 + aDot * dt
         eDot = -2 * (1 - ecc0) * n0dot / (3 * n0)
@@ -154,8 +154,8 @@ class OrbitalElements:
         aopMoon = 0.00169 * (4 - (5 * sin(inc) ** 2)) / n0
         aopSun = 0.00077 * (4 - (5 * sin(inc) ** 2)) / n0
 
-        args['raan'] = (tle.raan() + (lanJ2Dot + lanMoon + lanSun) * dt) % 360.0
-        args['aop'] = (tle.argumentOfPeriapsis() + (aopJ2Dot + aopMoon + aopSun) * dt) % 360.0
+        args['raan'] = (tle.getRaan() + (lanJ2Dot + lanMoon + lanSun) * dt) % 360.0
+        args['aop'] = (tle.getAop() + (aopJ2Dot + aopMoon + aopSun) * dt) % 360.0
         args['epoch'] = time
         return args
 
@@ -282,10 +282,10 @@ class OrbitalElements:
         if self._epoch is None:
             raise ValueError('Epoch was not set for this instance.')
         if self._tle is not None:
-            dt = time.difference(self._tle.epoch())
-            dM = (dt * (self._tle.meanMotion() + dt * (self._tle.meanMotionDot() + dt * self._tle.meanMotionDDot()))) \
+            dt = time.difference(self._tle.getEpoch())
+            dM = (dt * (self._tle.getMeanMotion() + dt * (self._tle.getMeanMotionDot() + dt * self._tle.getMeanMotionDDot()))) \
                  * TWOPI
-            return (radians(self._tle.meanAnomaly()) + dM) % TWOPI
+            return (radians(self._tle.getMeanAnomaly()) + dM) % TWOPI
         #   non-TLE computation
         dt = time.difference(self._epoch)
         dM = smaToMeanMotion(self._sma) * dt * 86400.0
@@ -380,11 +380,11 @@ def raanProcessionRate(tle: TwoLineElement) -> float:
     tle:    Two-line element set for an object.
     returns: The rate of procession of the RAAN in radians per day."""
 
-    a = meanMotionToSma(tle.meanMotion())
-    dRaanSphere = -2.06474e14 * (a ** -3.5) * cos(tle.inclination()) / (
-            (1 - tle.eccentricity() * tle.eccentricity()) ** 2)
-    dRaanMoon = -0.00338 * cos(tle.inclination()) / tle.meanMotion()
-    dRaanSun = -0.00154 * cos(tle.inclination()) / tle.meanMotion()
+    a = meanMotionToSma(tle.getMeanMotion())
+    dRaanSphere = -2.06474e14 * (a ** -3.5) * cos(tle.getInc()) / (
+            (1 - tle.getEcc() * tle.getEcc()) ** 2)
+    dRaanMoon = -0.00338 * cos(tle.getInc()) / tle.getMeanMotion()
+    dRaanSun = -0.00154 * cos(tle.getInc()) / tle.getMeanMotion()
     return radians(dRaanSphere + dRaanMoon + dRaanSun)
 
 
@@ -395,11 +395,11 @@ def aopProcessionRate(tle: TwoLineElement) -> float:
     tle:    Two-line element set for an object.
     returns: The rate of procession of the AOP in radians per day."""
 
-    a = meanMotionToSma(tle.meanMotion())
-    dAopSphere = 1.03237e14 * (a ** -3.5) * (4 - 5 * (sin(tle.inclination()) ** 2)) / \
-        ((1 - tle.eccentricity() * tle.eccentricity()) ** 2)
-    dAopMoon = 0.00169 * (4 - 5 * (sin(tle.inclination()) ** 2)) / tle.meanMotion()
-    dAopSun = 0.00077 * (4 - 5 * (sin(tle.inclination()) ** 2)) / tle.meanMotion()
+    a = meanMotionToSma(tle.getMeanMotion())
+    dAopSphere = 1.03237e14 * (a ** -3.5) * (4 - 5 * (sin(tle.getInc()) ** 2)) / \
+                 ((1 - tle.getEcc() * tle.getEcc()) ** 2)
+    dAopMoon = 0.00169 * (4 - 5 * (sin(tle.getInc()) ** 2)) / tle.getMeanMotion()
+    dAopSun = 0.00077 * (4 - 5 * (sin(tle.getInc()) ** 2)) / tle.getMeanMotion()
     return radians(dAopSphere + dAopMoon + dAopSun)
 
 

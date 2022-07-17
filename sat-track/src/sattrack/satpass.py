@@ -188,19 +188,19 @@ def nextPassMaxGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Juli
     # rough estimate to next maximum height moving forward
     state = sat.getState(t0)
     pVec = getPVector(geo, state, t0)
-    ma0 = trueToMean(computeTrueAnomaly(state[0], state[1]), sat.tle().eccentricity())
+    ma0 = trueToMean(computeTrueAnomaly(state[0], state[1]), sat.tle().getEcc())
     eccVec = computeEccentricVector(state[0], state[1])
     ta1 = radians(vang(eccVec, pVec))
     if norm(cross(eccVec, pVec)) != norm(cross(state[0], state[1])):
         ta1 = (2*pi) - ta1
-    ma1 = trueToMean(ta1, sat.tle().eccentricity())
+    ma1 = trueToMean(ta1, sat.tle().getEcc())
     if ma1 < ma0:
         dma0 = ma1 + (2*pi) - ma0
         # dma0 = radians(ma1 + 360 - ma0)
     else:
         dma0 = ma1 - ma0
         # dma0 = radians(ma1 - ma0)
-    tn = t0.future(dma0 / (sat.tle().meanMotion() * 2 * pi))
+    tn = t0.future(dma0 / (sat.tle().getMeanMotion() * 2 * pi))
 
     # iterate towards answer moving forward or backward
     state = sat.getState(tn)
@@ -209,12 +209,12 @@ def nextPassMaxGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Juli
         pVec = getPVector(geo, state, tn)
         eccVec = computeEccentricVector(state[0], state[1])
         tan = computeTrueAnomaly(state[0], state[1])
-        man = trueToMean(tan, sat.tle().eccentricity())
+        man = trueToMean(tan, sat.tle().getEcc())
         tan1 = radians(vang(eccVec, pVec))
         if norm(cross(eccVec, pVec)) != norm(cross(state[0], state[1])):
             tan1 = (2*pi) - tan1
             # tan1 = 360 - tan1
-        man1 = trueToMean(tan1, sat.tle().eccentricity())
+        man1 = trueToMean(tan1, sat.tle().getEcc())
         if tan1 <= tan:
             if (tan - tan1) < pi:
                 dma = man1 - man
@@ -229,7 +229,7 @@ def nextPassMaxGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Juli
             else:
                 dma = man1 - man
                 # dma = radians(man1 - man)
-        tn = tn.future(dma / (sat.tle().meanMotion() * 2 * pi))
+        tn = tn.future(dma / (sat.tle().getMeanMotion() * 2 * pi))
         state = sat.getState(tn)
         pVec = getPVector(geo, state, tn)
     if orbitAltitude(sat, geo, tn) < 0:
@@ -274,8 +274,8 @@ def riseSetTimes(sat: Satellite, geo: GeoPosition, time: JulianDate) -> tuple[Ju
 
 def riseSetGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> tuple[JulianDate]:
     # time needs to be a during the pass
-    a = sat.tle().sma()
-    c = a * sat.tle().eccentricity()
+    a = sat.tle().getSma()
+    c = a * sat.tle().getEcc()
     b = sqrt(a * a - c * c)
 
     state = sat.getState(time)
@@ -298,9 +298,9 @@ def riseSetGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> tuple[Ju
     w2 = alpha - beta
 
     rho1 = (u * cos(w1) + v * sin(w1)).mag()
-    ta1 = atan2(rho1 * sin(w1), rho1 * cos(w1) - a * sat.tle().eccentricity())
+    ta1 = atan2(rho1 * sin(w1), rho1 * cos(w1) - a * sat.tle().getEcc())
     rho2 = (u * cos(w2) + v * sin(w2)).mag()
-    ta2 = atan2(rho2 * sin(w2), rho2 * cos(w2) - a * sat.tle().eccentricity())
+    ta2 = atan2(rho2 * sin(w2), rho2 * cos(w2) - a * sat.tle().getEcc())
     jd1 = nearestTrueAnomaly(sat, time, ta1)
     jd2 = nearestTrueAnomaly(sat, time, ta2)
     if jd1.value() < jd2.value():
@@ -365,8 +365,8 @@ def orbitAltitude(sat: Satellite, geo: GeoPosition, jd: JulianDate) -> float:
     sma:    Semi-major axis of the orbit in meters."""
 
     state = sat.getState(jd)
-    ecc = sat.tle().eccentricity()
-    sma = sat.tle().sma()
+    ecc = sat.tle().getEcc()
+    sma = sat.tle().getSma()
 
     # zenith vector for the GeoPosition
     zeta = norm(zenithVector(geo, jd))

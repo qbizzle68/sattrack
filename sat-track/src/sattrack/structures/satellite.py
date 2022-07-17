@@ -83,9 +83,9 @@ class Satellite:
         if type(obj) == TwoLineElement:
             self._tle = obj
             self._propagator = SGP4_Propagator(obj)
-            self._epoch = obj.epoch()
+            self._epoch = obj.getEpoch()
             self._elements = None
-            dt = -radians(obj.meanAnomaly()) / (2 * pi * obj.meanMotion())
+            dt = -radians(obj.getMeanAnomaly()) / (2 * pi * obj.getMeanMotion())
             self._periapsisPassage = self._epoch.future(dt)
         elif type(obj) == OrbitalElements:
             self._tle = None
@@ -126,9 +126,9 @@ class Satellite:
             return ReferenceFrame(
                 ZXZ,
                 EulerAngles(
-                    radians(self._tle.raan()),
-                    radians(self._tle.inclination()),
-                    radians(self._tle.argumentOfPeriapsis())
+                    radians(self._tle.getRaan()),
+                    radians(self._tle.getInc()),
+                    radians(self._tle.getAop())
                 )
             )
         else:
@@ -145,11 +145,11 @@ class Satellite:
     def getEccentricVector(self, time: JulianDate = None) -> EVector:
         if time is None:
             rot = ReferenceFrame(ZXZ, EulerAngles(
-                    radians(self._tle.raan()),
-                    radians(self._tle.inclination()),
-                    radians(self._tle.argumentOfPeriapsis())
+                    radians(self._tle.getRaan()),
+                    radians(self._tle.getInc()),
+                    radians(self._tle.getAop())
                 ))
-            return rot.RotateFrom(EVector.e1) * self._tle.eccentricity()
+            return rot.RotateFrom(EVector.e1) * self._tle.getEcc()
         else:
             elements = OrbitalElements.fromTle(self._tle, time)
             rot = ReferenceFrame(ZXZ, EulerAngles(
