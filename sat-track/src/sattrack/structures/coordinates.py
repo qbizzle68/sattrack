@@ -97,7 +97,7 @@ def geoPositionVector(geo: GeoPosition, jd: JulianDate = None) -> EVector:
     else:
         radiusAtLat = radiusAtLatitude(geo.getLatitude())
         geocentricLat = radians(geodeticToGeocentric(geo.getLatitude()))
-        lst = radians(geo.getLongitude() + earthOffsetAngle(jd))
+        lst = radians(geo.getLongitude()) + earthOffsetAngle(jd)
         return EVector(
             radiusAtLat * cos(geocentricLat) * cos(lst),
             radiusAtLat * cos(geocentricLat) * sin(lst),
@@ -121,7 +121,7 @@ def zenithVector(geo: GeoPosition, jd: JulianDate = None) -> EVector:
     else:
         radiusAtLat = radiusAtLatitude(geo.getLatitude())
         lat = radians(geo.getLatitude())
-        lst = radians(geo.getLongitude() + earthOffsetAngle(jd))
+        lst = radians(geo.getLongitude()) + earthOffsetAngle(jd)
         return EVector(
             radiusAtLat * cos(lat) * cos(lst),
             radiusAtLat * cos(lat) * sin(lst),
