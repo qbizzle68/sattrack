@@ -284,7 +284,7 @@ class ReferenceFrame:
 
         return self._matrix @ vector
 
-    def RotateToFrame(self, refFrame: ReferenceFrame, vector: EVector) -> EVector:
+    def RotateToFrame(self, refFrame, vector: EVector) -> EVector:
         """
         Rotates a vector from this reference frame's coordinates, to another reference frame's coordinates.
 
@@ -300,7 +300,7 @@ class ReferenceFrame:
 
         return transpose(refFrame.getMatrix()) @ self._matrix @ vector
 
-    def RotateFromFrame(self, refFrame: ReferenceFrame, vector: EVector) -> EVector:
+    def RotateFromFrame(self, refFrame, vector: EVector) -> EVector:
         """
         Rotates a vector from a reference frame's coordinates, to this reference frame's coordinates.
 

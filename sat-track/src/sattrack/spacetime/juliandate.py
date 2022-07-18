@@ -69,7 +69,7 @@ class JulianDate:
         """Returns the fraction part of the JulianDate."""
         return self._day_fraction
 
-    def future(self, days: float) -> JulianDate:
+    def future(self, days: float):
         """
         Returns a future or past date, relative to the calling date. A positive argument computes a future date, a
         negative value computes a past date.
@@ -90,7 +90,7 @@ class JulianDate:
             rtn._day_fraction -= 1.0
         return rtn
 
-    def difference(self, jd: JulianDate) -> float:
+    def difference(self, jd) -> float:
         """
         Returns the difference in time between two JulianDates. The value is relative to the calling object, so if the
         argument value is before the calling object, the returned value is positive. The opposite returns a negative
