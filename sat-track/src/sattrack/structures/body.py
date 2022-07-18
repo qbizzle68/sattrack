@@ -1,3 +1,5 @@
+from pyevspace import EVector
+
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.util.constants import EARTH_MU, EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS
@@ -22,6 +24,10 @@ radius at a latitude
 
 
 class Body:
+    """
+    A class for representing a celestial body. The class holds the most significant values of a body needed for various
+    calculations.
+    """
 
     def __init__(self, name: str, mu: float, re: float, revPeriod: float, *, rp: float = 0, parent=None):
         """
@@ -45,34 +51,47 @@ class Body:
         self._revPeriod = revPeriod
 
     def __str__(self):
+        """Returns a string representation of the body."""
         rtn = f'{self._name}\nMU: {"%.4f" % self._MU} km^3s^-2\nEquitorial radius: {"%.3f" % self._radiusEq} km\n' \
               f'Polar radius: {"%.3f" % self._radiusPl} km\nSidereal day: {self._revPeriod} seconds'
         if self._parent is not None:
-            rtn += f'\nParent: {self._parent._name}'
+            rtn += f'\nParent: {self._parent.getName()}'
         return rtn
 
     def getName(self) -> str:
+        """Returns the name of the body."""
         return self._name
 
     def getMu(self) -> float:
+        """Returns the gravitational parameter of the body."""
         return self._MU
 
     def getEquitorialRadius(self) -> float:
+        """Returns the equitorial radius in kilometers."""
         return self._radiusEq
 
     def getPolarRadius(self) -> float:
+        """Returns the polar radius in kilometers."""
         return self._radiusPl
 
     def getFlattening(self) -> float:
+        """Returns the flattening rate of the body if it is not a perfect sphere."""
         return self._flattening
 
     def getParent(self):
+        """Returns the parent body this body orbits."""
         return self._parent
 
     def getSiderealPeriod(self) -> float:
+        """Returns the time of a sidereal day in seconds."""
         return self._revPeriod
 
     def getOffsetAngle(self, time: JulianDate) -> float:
+        """Method for computing the offset angle of the body."""
+        pass
+
+    def getPosition(self, time: JulianDate) -> EVector:
+        """Method for computing body position, should be set for each individual body."""
         pass
 
     # other methods here
