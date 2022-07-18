@@ -2,15 +2,14 @@ from math import cos, radians, pi, sqrt, acos, sin, degrees, asin
 
 from pyevspace import EVector, cross, dot, norm, vang
 
-from sattrack.position import computeTrueAnomaly, nearestTrueAnomaly
-from sattrack.rotation.order import Axis, Order
+from sattrack.rotation.order import Axis, ZYX
 from sattrack.rotation.rotation import getMatrix, rotateOrderTo, EulerAngles
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.structures.satellite import Satellite
 from sattrack.sun import getSunPosition, TwilightType
 from sattrack.topos import getPVector, toTopocentric, getTwilightType, getAltitude
-from sattrack.util.anomalies import trueToMean
-from sattrack.util.constants import EARTH_EQUITORIAL_RADIUS, SUN_RADIUS
+from sattrack.util.anomalies import trueToMean, timeToNearestTrueAnomaly, computeTrueAnomaly
+from sattrack.util.constants import EARTH_EQUITORIAL_RADIUS, SUN_RADIUS, TWOPI
 from sattrack.util.conversions import atan2
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.structures.coordinates import GeoPosition, zenithVector, geoPositionVector
@@ -301,8 +300,13 @@ def riseSetGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> tuple[Ju
     ta1 = atan2(rho1 * sin(w1), rho1 * cos(w1) - a * sat.getTle().getEcc())
     rho2 = (u * cos(w2) + v * sin(w2)).mag()
     ta2 = atan2(rho2 * sin(w2), rho2 * cos(w2) - a * sat.getTle().getEcc())
-    jd1 = nearestTrueAnomaly(sat, time, ta1)
-    jd2 = nearestTrueAnomaly(sat, time, ta2)
+    ta10 = computeTrueAnomaly(*sat.getState(time))
+    ta20 = computeTrueAnomaly(*sat.getState(time))
+    n = sat.getTle().getMeanMotion() * TWOPI / 86400.0
+    jd1 = timeToNearestTrueAnomaly(n, sat.getTle().getEcc(), ta10, time, ta1)
+    jd2 = timeToNearestTrueAnomaly(n, sat.getTle().getEcc(), ta20, time, ta2)
+    # jd1 = nearestTrueAnomaly(sat, time, ta1)
+    # jd2 = nearestTrueAnomaly(sat, time, ta2)
     if jd1.value() < jd2.value():
         return jd1, jd2
     else:
@@ -315,9 +319,9 @@ def horizonTimeRefine(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Jul
     alt = asin(sezPos[2] / sezPos.mag())
     while abs(alt) > radians(1 / 3600):
         sezVel = rotateOrderTo(
-            Order.ZYX,
+            ZYX,
             EulerAngles(
-                radians(geo.getLongitude() + earthOffsetAngle(time)),
+                radians(geo.getLongitude()) + earthOffsetAngle(time),
                 radians(90 - geo.getLatitude()),
                 0.0
             ),

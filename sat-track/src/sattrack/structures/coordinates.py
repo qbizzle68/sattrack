@@ -1,11 +1,12 @@
 from abc import ABC, abstractmethod
-from math import sin, cos, tan, atan, radians, degrees, sqrt
+from math import sin, cos, tan, atan, radians, degrees, sqrt, asin
 from sattrack.util.constants import EARTH_FLATTENING, EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS
 from pyevspace import EVector
 from sattrack.rotation.rotation import rotateOrderFrom, EulerAngles
 from sattrack.rotation.order import ZYX
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
+from sattrack.util.conversions import atan2
 
 
 class Coordinates(ABC):
@@ -252,3 +253,22 @@ class CelestialCoordinates(Coordinates):
     def _fmod(self, val: float) -> float:
         """Modulates the right-ascension value to between (0, 24}."""
         return val % 24.0
+
+
+def getSubPoint(position: EVector, time: JulianDate) -> GeoPosition:
+    """
+    Computes the geo-position directly under a satellite.
+
+    Args:
+        position: Position vector of the satellite.
+        time: Time the satellite is at the position vector.
+
+    Returns:
+        The GeoPosition directly below the satellite.
+    """
+
+    dec = degrees(asin(position[2] / position.mag()))
+    lng = (degrees(atan2(position[1], position[0]) - earthOffsetAngle(time))) % 360.0
+    if lng > 180.0:
+        lng = lng - 360.0
+    return GeoPosition(geocentricToGeodetic(dec), lng)

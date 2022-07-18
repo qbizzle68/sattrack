@@ -1,7 +1,9 @@
-﻿from math import sqrt, sin, cos, floor
+﻿from math import sqrt, sin, cos, floor, pi, radians
+
+from pyevspace import EVector, norm, vang, cross, dot
 
 from sattrack.spacetime.juliandate import JulianDate
-from sattrack.util.constants import TWOPI
+from sattrack.util.constants import TWOPI, EARTH_MU
 from sattrack.util.conversions import atan2
 
 
@@ -252,3 +254,63 @@ def trueAnomalyAt(meanMotion: float, ecc: float, t0: float, epoch0: JulianDate, 
     """
 
     return meanToTrue(meanAnomalyAt(meanMotion, trueToMean(t0, ecc), epoch0, epoch), ecc)
+
+
+def computeTrueAnomaly(position: EVector, velocity: EVector) -> float:
+    """
+    Computes the true anomaly
+
+    Args:
+        position: Position vector of the satellite.
+        velocity: Velocity vector of the satellite.
+
+    Returns:
+        The true anomaly at the given position in radians.
+    """
+
+    lhs = position * (velocity.mag2() / EARTH_MU - 1 / position.mag())
+    rhs = velocity * (dot(position, velocity) / EARTH_MU)
+    eccVec = lhs - rhs
+    # eccVec = computeEccentricVector(position, velocity)
+    # todo: fix this in pyevspace module
+    if norm(position) == eccVec:
+        return 0
+    elif norm(-position) == eccVec:
+        return pi
+    ang = radians(vang(position, eccVec))
+    return TWOPI - ang if norm(cross(position, eccVec)) == norm(cross(position, velocity)) else ang
+
+
+# todo: make a computeMeanAnomaly method from a state
+
+def timeToNearestTrueAnomaly(meanMotion: float, ecc: float, t0: float, time0: JulianDate, t1: float) -> JulianDate:
+    """
+    Computes the nearest true anomaly of a position.
+
+    Args:
+        meanMotion: Mean motion of the satellite in radians per second.
+        ecc: Eccentricity of the orbit.
+        t0: A known true anomaly at time0 in radians.
+        time0: Time the satellite's true anomaly is t0.
+        t1: True anomaly to find the time of.
+
+    Returns:
+        The nearest time the satellite's position is the true anomaly.
+    """
+
+    m0 = trueToMean(t0, ecc)
+    m1 = trueToMean(t1, ecc)
+    if m1 < m0:
+        if m0 - m1 < pi:
+            dma = m1 - m0
+        else:
+            dma = m1 + TWOPI - m0
+    else:
+        if m1 - m0 > pi:
+            dma = m1 - TWOPI - m0
+        else:
+            dma = m1 - m0
+    return time0.future(dma / (meanMotion * 86400.0))
+
+
+# todo: make a timeToNearestMeanAnomaly method
