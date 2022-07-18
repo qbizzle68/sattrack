@@ -2,14 +2,15 @@ from math import cos, radians, pi, sqrt, acos, sin, degrees, asin
 
 from pyevspace import EVector, cross, dot, norm, vang
 
+from sattrack.exceptions import NoPassException
 from sattrack.rotation.order import Axis, ZYX
 from sattrack.rotation.rotation import getMatrix, rotateOrderTo, EulerAngles
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.structures.satellite import Satellite
 from sattrack.sun import getSunPosition, TwilightType
-from sattrack.topos import getPVector, toTopocentric, getTwilightType, getAltitude
+from sattrack.topos import getPVector, toTopocentric, getTwilightType, getAltitude, azimuthAngleString
 from sattrack.util.anomalies import trueToMean, timeToNearestTrueAnomaly, computeTrueAnomaly
-from sattrack.util.constants import EARTH_EQUITORIAL_RADIUS, SUN_RADIUS, TWOPI
+from sattrack.util.constants import SUN_RADIUS, TWOPI
 from sattrack.util.conversions import atan2
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.structures.coordinates import GeoPosition, zenithVector, geoPositionVector
@@ -17,59 +18,106 @@ from sattrack.structures.elements import computeEccentricVector, raanProcessionR
 
 
 class PositionInfo:
-    """Helper class containing the information about a given position during a satellite pass. This
-    structure holds the altitude and azimuth data for an instance of a pass, for example at the rise
-    point or at the point of maximum altitude.
-    Parameters:
-    altitude:   Altitude of the satellite above the horizon.
-    azimuth:    Azimuth of the satellite measured clockwise from north.
-    time:       Time of this instance in the pass.
-    visible:    Visibility of the satellite, defaults to false."""
+    """
+    A helper class used for storing the information about a given position during a satellite pass. This structure holds
+    the altitude and azimuth data for an instance of a pass, for example at the rise point or at the point of maximum
+    altitude.
+
+    Attributes
+        altitude: Altitude of the satellite above the horizon.
+        azimuth: Azimuth of the satellite measured clockwise from north.
+        direction: Compass direction of the azimuth direction.
+        time: Time of this instance in the pass.
+        visible: Visibility of the satellite, defaults to false.
+    """
 
     def __init__(self, altitude: float, azimuth: float, time: JulianDate, visible: bool = False):
+        """
+        Initializes the values to the parameters.
+        Args:
+            altitude: Altitude of the satellite in degrees.
+            azimuth: Azimuth of the satellite in degrees.
+            time: Time of this instance in the pass.
+            visible: Visibility of the satellite (Default = False).
+        """
+
         self._altitude = altitude
         self._azimuth = azimuth
+        self._direction = azimuthAngleString(azimuth)
         self._time = time
         self._visible = visible
 
     def __str__(self):
         """Generates a string of the data in this class."""
-        return f'Altitude: {"%.2f" % self._altitude}\nAzimuth: {"%.2f" % self._azimuth}\nTime: {self._time}' \
-               f'\nVisibility: {self._visible}'
+        return f'Altitude: {"%.2f" % self._altitude}\nAzimuth: {"%.2f" % self._azimuth} ({self._direction})\nTime: ' \
+               f'{self._time}\nVisibility: {self._visible}'
 
-    def altitude(self) -> float:
+    def getAltitude(self) -> float:
         """Returns the altitude measured in degrees.."""
         return self._altitude
 
-    def azimuth(self) -> float:
+    def getAzimuth(self) -> float:
         """Returns the azimuth, measured clockwise from north in degrees."""
         return self._azimuth
 
-    def time(self) -> JulianDate:
+    def getDirection(self) -> str:
+        """Returns the azimuth compass direction."""
+        return self._direction
+
+    def getTime(self) -> JulianDate:
         """Returns a JulianDate representing the time of this instance."""
         return self._time
 
-    def visibility(self) -> bool:
+    def getVisibility(self) -> bool:
         """Returns the visibility of the satellite."""
         return self._visible
 
 
 class Pass:
-    """set first if rise isn't visible, this determines pass visibility."""
+    """
+    A class which contains the information for an overhead satellite pass. The class contains information for the rise
+    and set times as well as the time it achieves maximum altitude. If the satellite enters and/or exits the Earths
+    shadow during the pass, information regarding the time and position of their occurrences can be held by the Pass
+    class as well.
 
-    def __init__(self, riseInfo: PositionInfo, setInfo: PositionInfo, maxInfo: PositionInfo,
+    Attributes
+        riseInfo: PositionInfo for the rise time of the satellite pass.
+        setInfo: PositionInfo for the set time of the satellite pass.
+        maxInfo: PositionInfo for the max time of the satellite pass.
+        firstInfo: PositionInfo for when the satellite is illuminated, if not the same as riseInfo.
+        lastInfo: PositionInfo for when the satellite is eclipsed, if not the same as setInfo.
+        visible: Boolean value for if the pass is visible at any point during the transit.
+    """
+
+    def __init__(self, riseInfo: PositionInfo, setInfo: PositionInfo, maxInfo: PositionInfo, *,
                  firstInfo: PositionInfo = None, lastInfo: PositionInfo = None):
+        """
+        Initializes a pass with the given values. firstInfo and lastInfo should only be set if the satellite enters or
+        leaves the Earth's shadow during the transit. If the riseInfo visibility attribute is true or a firstInfo value
+        is set, the visibility of the pass is set to true, otherwise it is set to false.
+
+        Args:
+            riseInfo: Information for the rise time of the satellite pass.
+            setInfo: Information for the set time of the satellite pass.
+            maxInfo: Information for the maximum time of the satellite pass.
+            firstInfo: Information for the first time the satellite is illuminated if it's not the same as the rise time
+                (Default = None).
+            lastInfo: Information for the last time the satellite is illuminated if it's not the same as the set time
+                (Default = None).
+        """
+
         self._riseInfo = riseInfo
         self._setInfo = setInfo
         self._maxInfo = maxInfo
         self._firstVisible = firstInfo
         self._lastVisible = lastInfo
-        if firstInfo is not None or riseInfo.visibility():
+        if firstInfo is not None or riseInfo.getVisibility():
             self._visible = True
         else:
             self._visible = False
 
     def __str__(self):
+        """Returns a string containing all the pass's information."""
         rtn = f'Rise:\n{self._riseInfo}\nMax:\n{self._maxInfo}\nSet:\n{self._setInfo}'
         if self._firstVisible is not None:
             rtn += f'First Visible:\n{self._firstVisible}'
@@ -77,32 +125,39 @@ class Pass:
             rtn += f'Last Visible:\n{self._lastVisible}'
         return rtn
 
-    def riseInfo(self) -> PositionInfo:
+    def getRiseInfo(self) -> PositionInfo:
+        """Returns the rise time information."""
         return self._riseInfo
 
-    def setInfo(self) -> PositionInfo:
+    def getSetInfo(self) -> PositionInfo:
+        """Returns the set time information."""
         return self._setInfo
 
-    def maxInfo(self) -> PositionInfo:
+    def getMaxInfo(self) -> PositionInfo:
+        """Returns the max time information."""
         return self._maxInfo
 
-    def firstVisibleInfo(self) -> PositionInfo:
+    def getFirstVisibleInfo(self) -> PositionInfo:
+        """Returns the first visible time information if set."""
         return self._firstVisible
 
-    def lastVisibleInfo(self) -> PositionInfo:
+    def getLastVisibleInfo(self) -> PositionInfo:
+        """Returns the last visible time information if set."""
         return self._lastVisible
 
 
 class PassConstraints:
-    """Container class to hold values to constrain satellite passes.
+    """
+    Container class to hold values to constrain satellite passes.
 
     Attributes:
-        minAltitude -- minimum altitude the satellite must achieve in degrees
-        minDuration -- minimum duration the satellite must be above the horizon in minutes
-        illuminated -- whether the satellite is illuminated at any point of the pass
+        minAltitude: Minimum altitude the satellite must achieve in degrees.
+        minDuration: Minimum duration the satellite must be above the horizon in minutes.
+        illuminated: Whether the satellite is illuminated at any point of the pass.
     """
 
     def __init__(self, *, minAltitude: float = None, minDuration: float = None, illuminated: bool = None):
+        """Initializes the values to the argument values."""
         self.minAltitude = minAltitude
         self.minDuration = minDuration
         self.illuminated = illuminated
@@ -110,6 +165,21 @@ class PassConstraints:
 
 def nextPass(sat: Satellite, geo: GeoPosition, time: JulianDate,
              constraints: PassConstraints = None) -> Pass:
+    """
+    Computes the next overhead pass of a satellite for a geo-position. A PassConstraints object can be set to restrict
+    which passes one wishes to find. The default behaviour is any pass is computed, regardless of visibility or height
+    (as long as it's greater than zero).
+
+    Args:
+        sat: Satellite to find the next pass of.
+        geo: GeoPosition to view the pass.
+        time: Relative time to find the next pass.
+        constraints: A PassConstraints object to constrain allowable passes (Default = 0).
+
+    Returns:
+        A Pass object containing the details of the satellite pass.
+    """
+
     nextPassTime = nextPassMax(sat, geo, time)
     maxPos = sat.getState(nextPassTime)[0]
     maxPosSez = toTopocentric(maxPos, nextPassTime, geo)
@@ -158,27 +228,61 @@ def nextPass(sat: Satellite, geo: GeoPosition, time: JulianDate,
 
 def getPassList(sat: Satellite, geo: GeoPosition, start: JulianDate, duration: float,
                 constraints: PassConstraints = None) -> tuple[Pass]:
+    """
+    Generates a list of overhead satellite passes. A PassConstraints object can be used to restrict the types of passes
+    allowed in the list.
+
+    Args:
+        sat: The satellite to find overhead passes of.
+        geo: The GeoPosition which the passes are viewed from.
+        start: The time to start finding valid passes.
+        duration: The duration of which to find passes, in solar days.
+        constraints: A PassConstraints object to constrain allowable passes (Default = None).
+
+    Returns:
+        A tuple of Pass objects in chronological order, each containing information for unique passes.
+    """
+
     passList = []
     nTime = start.future(-0.001)
     while nTime.difference(start) < duration:
         nPass = nextPass(sat, geo, nTime.future(0.001), constraints)
-        nTime = nPass.maxInfo().time()
-        if nPass.maxInfo().time().difference(start) < duration:
+        nTime = nPass.getMaxInfo().getTime()
+        if nPass.getMaxInfo().getTime().difference(start) < duration:
             passList.append(nPass)
     return tuple(passList)
 
 
 def nextPassMax(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianDate:
+    """
+    Computes the maximum time of the next pass from the time parameter.
+
+    Args:
+        sat: Satellite to find the overhead pass of.
+        geo: The GeoPosition which the pass is viewed from.
+        time: The relative time to find the next maximum altitude.
+
+    Returns:
+        The time the satellite achieves the next maximum altitude.
+    """
+
     nextMax = nextPassMaxGuess(sat, geo, time)
     return maxPassRefine(sat, geo, nextMax)
 
 
 def nextPassMaxGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianDate:
-    """Computes the time to the next maximum height that the next satellite pass achieves.
-    Parameters:
-        sat:    The satellite.
-        geo:    GeoPosition the pass is observed from.
-        time:   A time between passes. The pass computed will be the soonest pass after time."""
+    """
+    Computes the initial guess the satellite achieves its maximum height.
+
+    Args:
+        sat: Satellite to find the overhead pass of.
+        geo: The GeoPosition which the pass is viewed from.
+        time: The relative time to find the next maximum altitude.
+
+    Returns:
+        The approximate time the satellite achieves the next maximum altitude.
+    """
+
     if orbitAltitude(sat, geo, time) < 0:
         t0 = timeToPlane(sat, geo, time)
     else:
@@ -191,15 +295,13 @@ def nextPassMaxGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Juli
     eccVec = computeEccentricVector(state[0], state[1])
     ta1 = radians(vang(eccVec, pVec))
     if norm(cross(eccVec, pVec)) != norm(cross(state[0], state[1])):
-        ta1 = (2*pi) - ta1
+        ta1 = TWOPI - ta1
     ma1 = trueToMean(ta1, sat.getTle().getEcc())
     if ma1 < ma0:
-        dma0 = ma1 + (2*pi) - ma0
-        # dma0 = radians(ma1 + 360 - ma0)
+        dma0 = ma1 + TWOPI - ma0
     else:
         dma0 = ma1 - ma0
-        # dma0 = radians(ma1 - ma0)
-    tn = t0.future(dma0 / (sat.getTle().getMeanMotion() * 2 * pi))
+    tn = t0.future(dma0 / (sat.getTle().getMeanMotion() * TWOPI))
 
     # iterate towards answer moving forward or backward
     state = sat.getState(tn)
@@ -211,24 +313,19 @@ def nextPassMaxGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Juli
         man = trueToMean(tan, sat.getTle().getEcc())
         tan1 = radians(vang(eccVec, pVec))
         if norm(cross(eccVec, pVec)) != norm(cross(state[0], state[1])):
-            tan1 = (2*pi) - tan1
-            # tan1 = 360 - tan1
+            tan1 = TWOPI - tan1
         man1 = trueToMean(tan1, sat.getTle().getEcc())
         if tan1 <= tan:
             if (tan - tan1) < pi:
                 dma = man1 - man
-                # dma = radians(man1 - man)
             else:
-                dma = man1 + (2*pi) - man
-                # dma = radians(man1 + 360 - man)
+                dma = man1 + TWOPI - man
         else:
             if (tan1 - tan) > pi:
-                dma = man1 - (2*pi) - man
-                # dma = radians(man1 - 360 - man)
+                dma = man1 - TWOPI - man
             else:
                 dma = man1 - man
-                # dma = radians(man1 - man)
-        tn = tn.future(dma / (sat.getTle().getMeanMotion() * 2 * pi))
+        tn = tn.future(dma / (sat.getTle().getMeanMotion() * TWOPI))
         state = sat.getState(tn)
         pVec = getPVector(geo, *state, tn)
     if orbitAltitude(sat, geo, tn) < 0:
@@ -237,9 +334,18 @@ def nextPassMaxGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Juli
 
 
 def maxPassRefine(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianDate:
-    # todo: utilize the dadt values to future time increase
-    '''this works, but feels like overkill (many iterations with small dt) to achieve accurate answer.
-    can we use either the dadt or break it down into dzdt and dxydt terms, and create a meaningful empirical guess?'''
+    """
+    Refines the maximum height of a satellite pass to it's exact value.
+
+    Args:
+        sat: Satellite to find the overhead pass of.
+        geo: The GeoPosition which the pass is viewed from.
+        time: The relative time to find the next maximum altitude.
+
+    Returns:
+        The refined time the satellite achieves the next maximum altitude.
+    """
+    # todo: utilize the dadt values to future time increase and make this a more empirically derived guess
 
     alt = getAltitude(sat, time, geo)
     futureAlt = getAltitude(sat, time.future(0.1 / 86400), geo)
@@ -264,7 +370,18 @@ def maxPassRefine(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianD
 
 
 def riseSetTimes(sat: Satellite, geo: GeoPosition, time: JulianDate) -> tuple[JulianDate]:
-    # time needs to be a during the pass
+    """
+    Computes the rise and set times of a satellite pass.
+
+    Args:
+        sat: Satellite to find the overhead pass of.
+        geo: The GeoPosition which the pass is viewed from.
+        time: Must be a time that occurs during a pass, i.e. between the rise and set times.
+
+    Returns:
+        A tuple with the rise and set times of the pass.
+    """
+
     riseTime, setTime = riseSetGuess(sat, geo, time)
     riseTime = horizonTimeRefine(sat, geo, riseTime)
     setTime = horizonTimeRefine(sat, geo, setTime)
@@ -272,7 +389,18 @@ def riseSetTimes(sat: Satellite, geo: GeoPosition, time: JulianDate) -> tuple[Ju
 
 
 def riseSetGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> tuple[JulianDate]:
-    # time needs to be a during the pass
+    """
+    Estimates the rise and set times of a satellite pass.
+
+    Args:
+        sat: Satellite to find the overhead pass of.
+        geo: The GeoPosition which the pass is viewed from.
+        time: Must be a time that occurs during a pass, i.e. between the rise and set times.
+
+    Returns:
+        A tuple with the estimated rise and set times of the pass.
+    """
+
     a = sat.getTle().getSma()
     c = a * sat.getTle().getEcc()
     b = sqrt(a * a - c * c)
@@ -290,8 +418,7 @@ def riseSetGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> tuple[Ju
     try:
         beta = acos(dot(zeta, gamma - ce) / R)
     except ValueError:
-        # todo: create our own exception type here
-        raise Exception("No pass during this time.")
+        raise NoPassException(f'No pass during this time: {time}.')
     alpha = atan2(dot(zeta, v), dot(zeta, u))
     w1 = alpha + beta
     w2 = alpha - beta
@@ -305,8 +432,6 @@ def riseSetGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> tuple[Ju
     n = sat.getTle().getMeanMotion() * TWOPI / 86400.0
     jd1 = timeToNearestTrueAnomaly(n, sat.getTle().getEcc(), ta10, time, ta1)
     jd2 = timeToNearestTrueAnomaly(n, sat.getTle().getEcc(), ta20, time, ta2)
-    # jd1 = nearestTrueAnomaly(sat, time, ta1)
-    # jd2 = nearestTrueAnomaly(sat, time, ta2)
     if jd1.value() < jd2.value():
         return jd1, jd2
     else:
@@ -314,6 +439,18 @@ def riseSetGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> tuple[Ju
 
 
 def horizonTimeRefine(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianDate:
+    """
+    Refines a rise or set time of a satellite pass to its correct values.
+
+    Args:
+        sat: Satellite to find the overhead pass of.
+        geo: The GeoPosition which the pass is viewed from.
+        time: The rise or set time to be refined.
+
+    Returns:
+        The corrected rise or set time.
+    """
+
     state = sat.getState(time)
     sezPos = toTopocentric(state[0], time, geo)
     alt = asin(sezPos[2] / sezPos.mag())
@@ -339,6 +476,17 @@ def horizonTimeRefine(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Jul
 
 
 def timeToPlane(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianDate:
+    """
+    Computes the time until the orbital path begins to rise above the horizon of a given geo-position.
+
+    Args:
+        sat: Satellite to find the overhead pass of.
+        geo: The GeoPosition which the pass is viewed from.
+        time: Relative time of which to find the next time the orbital path is visible.
+
+    Returns:
+        The next time the orbital path rises above the horizon.
+    """
     jd = time
     state = sat.getState(jd)
     alt = orbitAltitude(sat, geo, jd)
@@ -355,27 +503,30 @@ def timeToPlane(sat: Satellite, geo: GeoPosition, time: JulianDate) -> JulianDat
     return jd
 
 
-def orbitAltitude(sat: Satellite, geo: GeoPosition, jd: JulianDate) -> float:
-    """Computes the angle above or below the horizon, of the nearest point along the orbit to
-    a GeoPosition at a given time. This in essence tells you if the path of the orbit can be seen
-    above a given horizon. A negative value indicates the nearest point on the orbital path
-    is below the horizon, where a positive path indicates both that an overhead pass is
-    possible, and tells you the maximum height a pass can achieve.
-    Parameters:
-    geo:    GeoPosition of the horizon.
-    jd:     Time to of the horizon.
-    state:  State vectors of the satellite.
-    ecc:    Eccentricity of the orbit.
-    sma:    Semi-major axis of the orbit in meters."""
+def orbitAltitude(sat: Satellite, geo: GeoPosition, time: JulianDate) -> float:
+    """
+    Computes the angle above or below the horizon, of the nearest point along the orbit to a GeoPosition at a given
+    time. This in essence tells you if the path of the orbit can be seen above a given horizon. A negative value
+    indicates the nearest point on the orbital path is below the horizon, where a positive value indicates both that an
+    overhead pass is possible, and tells you the maximum height a pass can achieve.
 
-    state = sat.getState(jd)
+    Args:
+        sat: Satellite to find the orbital path altitude of.
+        geo: The GeoPosition which the satellite is viewed from.
+        time: Time to find the orbital altitude.
+
+    Returns:
+        The maximum orbital path altitude in degrees.
+    """
+
+    state = sat.getState(time)
     ecc = sat.getTle().getEcc()
     sma = sat.getTle().getSma()
 
     # zenith vector for the GeoPosition
-    zeta = norm(zenithVector(geo, jd))
+    zeta = norm(zenithVector(geo, time))
     # GeoPosition vector in geocentric reference frame
-    gamma = geoPositionVector(geo, jd)
+    gamma = geoPositionVector(geo, time)
     # normalized angular momentum, vector equation for orbital plane
     lamb = norm(cross(state[0], state[1]))
 
@@ -399,18 +550,23 @@ def orbitAltitude(sat: Satellite, geo: GeoPosition, jd: JulianDate) -> float:
 
 
 def isEclipsed(satPos: EVector, sunPos: EVector) -> bool:
-    """Determines whether a position is eclipsed by the earth.
-    Parameters:
-    satPos: Position vector of object.
-    sunPos: Position of the Sun at the same time the object is at satPos.
-    returns True if eclipsed by any means, false otherwise."""
+    """
+    Determines whether a satellite is eclipsed by the Earth.
+
+    Args:
+        satPos: Position vector of the satellite in kilometers.
+        sunPos: Position vector of the Sun in kilometers.
+
+    Returns:
+        True if the satellite is eclipsed, false otherwise.
+    """
 
     #   vectors are relative to the satellite
     earthPos = -satPos
     sunPos = -satPos + sunPos
     #   semi-diameters of earth and sun
     # todo: calculate real Earth radius from perspective here
-    thetaE = asin(6371 / earthPos.mag()) # average earth radius
+    thetaE = asin(6371 / earthPos.mag())    # average earth radius
     thetaS = asin(SUN_RADIUS / sunPos.mag())
     #   angle between earth and sun centers relative to the satellite
     theta = radians(vang(earthPos, sunPos))
