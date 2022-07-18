@@ -5,9 +5,10 @@ from pyevspace import EVector, dot, cross, norm
 from sattrack.rotation.order import ZXZ
 from sattrack.rotation.rotation import getEulerMatrix, EulerAngles, ReferenceFrame
 from sattrack.spacetime.juliandate import JulianDate
+from sattrack.structures.body import Body, EARTH_BODY
 from sattrack.structures.tle import TwoLineElement
 from sattrack.util.anomalies import meanToTrue, trueToMean, trueToEccentric
-from sattrack.util.constants import EARTH_MU, TWOPI
+from sattrack.util.constants import TWOPI
 from sattrack.util.conversions import meanMotionToSma, smaToMeanMotion
 
 
@@ -18,7 +19,7 @@ class OrbitalElements:
     of use, but the angles are converted and implemented as radians."""
 
     def __init__(self, *, sma: float, ecc: float, inc: float, raan: float, aop: float, meanAnomaly: float,
-                 epoch: JulianDate = None):
+                 epoch: JulianDate = None, body: Body = EARTH_BODY):
         """
         Constructs an instance with the given values. Not including an epoch will not allow future
         anomalies to be computed. For ease of user interface the angle parameters are measured in degrees,
@@ -33,6 +34,7 @@ class OrbitalElements:
             aop: Argument of periapsis in degrees.
             meanAnomaly: Mean anomaly at epoch in degrees.
             epoch: Epoch of meanAnomaly (Default = None)
+            body: Body of the orbiting satellite (Default = EARTH_BODY).
         """
 
         self._sma = sma
@@ -43,6 +45,7 @@ class OrbitalElements:
         self._meanAnomaly = radians(meanAnomaly)
         self._epoch = epoch
         self._tle = None
+        self._body = body
 
     @classmethod
     def fromTle(cls, tle: TwoLineElement, time: JulianDate = None):
@@ -54,12 +57,12 @@ class OrbitalElements:
             time: Julian Date of the time to compute orbital elements of.
         """
 
-        rtn = cls(**cls.__tleToElements(tle, time))
+        rtn = cls(**cls.__tleToElements(tle, time), body=EARTH_BODY)
         rtn._tle = tle
         return rtn
 
     @classmethod
-    def fromState(cls, position: EVector, velocity: EVector, time: JulianDate = None):
+    def fromState(cls, position: EVector, velocity: EVector, *, time: JulianDate = None, body: Body = EARTH_BODY):
         """
         Class method used to instantiate an object from a known state at a given time.
 
@@ -67,10 +70,11 @@ class OrbitalElements:
             position: Position state of the object at epoch.
             velocity: Velocity state of the object at epoch.
             time: Julian Date of the time to compute orbital elements of.
+            body: Body of the orbiting satellite (Default = EARTH_BODY).
         """
 
-        elements = cls.__stateToElements(position, velocity, time)
-        return cls(**elements)
+        elements = cls.__stateToElements(position, velocity, time, body)
+        return cls(**elements, body=body)
 
     def __str__(self) -> str:
         """Returns a string representation of the orbital elements."""
@@ -113,7 +117,8 @@ class OrbitalElements:
         return args
 
     @classmethod
-    def __stateToElements(cls, position: EVector, velocity: EVector, time: JulianDate) -> dict:
+    def __stateToElements(cls, position: EVector, velocity: EVector, time: JulianDate = None,
+                          body: Body = EARTH_BODY) -> dict:
         """Logic for computing elements from a known state."""
         angMom = cross(position, velocity)
         lineOfNodes = norm(cross(EVector(0, 0, 1), angMom))
@@ -129,7 +134,7 @@ class OrbitalElements:
         if dot(position, velocity) < 0:
             tAnom = 2 * pi - tAnom
         args['meanAnomaly'] = degrees(trueToMean(tAnom, args['ecc']))
-        args['sma'] = (angMom.mag() ** 2) / ((1 - (args['ecc'] * args['ecc'])) * EARTH_MU)
+        args['sma'] = (angMom.mag() ** 2) / ((1 - (args['ecc'] * args['ecc'])) * body.getMu())
         args['epoch'] = time
         return args
 
@@ -200,7 +205,7 @@ class OrbitalElements:
         r = elements['sma'] * (1 - elements['ecc'] * cos(eAnom))
         pOrbit = EVector(cos(tAnom), sin(tAnom), 0) * r
         vOrbit = EVector(-sin(eAnom), sqrt(1 - elements['ecc'] * elements['ecc']) * cos(eAnom), 0) * (
-                sqrt(EARTH_MU * elements['sma']) / r)
+                sqrt(self._body.getMu() * elements['sma']) / r)
         rot = getEulerMatrix(ZXZ, EulerAngles(elements['raan'], elements['inc'], elements['aop']))
         return rot @ pOrbit, rot @ vOrbit
 
@@ -385,24 +390,25 @@ def aopProcessionRate(tle: TwoLineElement) -> float:
     return radians(dAopSphere + dAopMoon + dAopSun)
 
 
-def computeEccentricVector(position: EVector, velocity: EVector) -> EVector:
+def computeEccentricVector(position: EVector, velocity: EVector, body: Body = EARTH_BODY) -> EVector:
     """
     Computes the eccentric vector of an orbit, which points in the positive x-axis of it's perifocal reference frame.
 
     Args:
         position: Position state vector of the satellite.
         velocity: Velocity state vector of the satellite.
+        body: Body of the orbiting satellite (Default = EARTH_BODY).
 
     Returns:
         The eccentric vector of the satellite's orbit.
     """
 
-    lhs = position * (velocity.mag2() / EARTH_MU - 1 / position.mag())
-    rhs = velocity * (dot(position, velocity) / EARTH_MU)
+    lhs = position * (velocity.mag2() / body.getMu() - 1 / position.mag())
+    rhs = velocity * (dot(position, velocity) / body.getMu())
     return lhs - rhs
 
 
-def computeVelocity(sma: float, ecc: float, trueAnom: float) -> float:
+def computeVelocity(sma: float, ecc: float, trueAnom: float, body: Body = EARTH_BODY) -> float:
     """
     Computes the velocity of a satellite at a given true anomaly.
 
@@ -410,13 +416,14 @@ def computeVelocity(sma: float, ecc: float, trueAnom: float) -> float:
         sma: Semi-major axis in kilometers.
         ecc: Eccentricity of the orbit.
         trueAnom: True anomaly in radians.
+        body: Body of the orbiting satellite (Default = EARTH_BODY).
 
     Returns:
         The magnitude of the velocity of the satellite in kilometers / second.
     """
 
     radius = computeRadius(sma, ecc, trueAnom)
-    return sqrt(EARTH_MU * ((2 / radius) - (1 / sma)))
+    return sqrt(body.getMu() * ((2 / radius) - (1 / sma)))
 
 
 def computeRadius(sma: float, ecc: float, trueAnom: float) -> float:

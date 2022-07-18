@@ -3,7 +3,8 @@
 from pyevspace import EVector, norm, vang, cross, dot
 
 from sattrack.spacetime.juliandate import JulianDate
-from sattrack.util.constants import TWOPI, EARTH_MU
+from sattrack.structures.body import Body, EARTH_BODY
+from sattrack.util.constants import TWOPI
 from sattrack.util.conversions import atan2
 
 
@@ -256,22 +257,22 @@ def trueAnomalyAt(meanMotion: float, ecc: float, t0: float, epoch0: JulianDate, 
     return meanToTrue(meanAnomalyAt(meanMotion, trueToMean(t0, ecc), epoch0, epoch), ecc)
 
 
-def computeTrueAnomaly(position: EVector, velocity: EVector) -> float:
+def computeTrueAnomaly(position: EVector, velocity: EVector, body: Body = EARTH_BODY) -> float:
     """
     Computes the true anomaly
 
     Args:
         position: Position vector of the satellite.
         velocity: Velocity vector of the satellite.
+        body: Body of the orbiting satellite (Default = EARTH_BODY).
 
     Returns:
         The true anomaly at the given position in radians.
     """
 
-    lhs = position * (velocity.mag2() / EARTH_MU - 1 / position.mag())
-    rhs = velocity * (dot(position, velocity) / EARTH_MU)
+    lhs = position * (velocity.mag2() / body.getMu() - 1 / position.mag())
+    rhs = velocity * (dot(position, velocity) / body.getMu())
     eccVec = lhs - rhs
-    # eccVec = computeEccentricVector(position, velocity)
     # todo: fix this in pyevspace module
     if norm(position) == eccVec:
         return 0

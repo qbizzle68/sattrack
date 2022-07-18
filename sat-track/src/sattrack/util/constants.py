@@ -2,7 +2,7 @@ from math import pi
 
 # Mass constants
 NEWTON_G = 6.67408e-11
-EARTH_MU = 3.986004418e14 * 1e-9  # converted to km
+EARTH_MU = 3.986004418e14 * 1e-9  # converted to km^3s^-2
 
 #   Earth constants
 EARTH_EQUITORIAL_RADIUS = 6378.135
