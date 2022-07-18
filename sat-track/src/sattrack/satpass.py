@@ -186,7 +186,7 @@ def nextPassMaxGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Juli
 
     # rough estimate to next maximum height moving forward
     state = sat.getState(t0)
-    pVec = getPVector(geo, state, t0)
+    pVec = getPVector(geo, *state, t0)
     ma0 = trueToMean(computeTrueAnomaly(state[0], state[1]), sat.getTle().getEcc())
     eccVec = computeEccentricVector(state[0], state[1])
     ta1 = radians(vang(eccVec, pVec))
@@ -203,9 +203,9 @@ def nextPassMaxGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Juli
 
     # iterate towards answer moving forward or backward
     state = sat.getState(tn)
-    pVec = getPVector(geo, state, tn)
+    pVec = getPVector(geo, *state, tn)
     while vang(state[0], pVec) > 2.78e-4:
-        pVec = getPVector(geo, state, tn)
+        pVec = getPVector(geo, *state, tn)
         eccVec = computeEccentricVector(state[0], state[1])
         tan = computeTrueAnomaly(state[0], state[1])
         man = trueToMean(tan, sat.getTle().getEcc())
@@ -230,7 +230,7 @@ def nextPassMaxGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Juli
                 # dma = radians(man1 - man)
         tn = tn.future(dma / (sat.getTle().getMeanMotion() * 2 * pi))
         state = sat.getState(tn)
-        pVec = getPVector(geo, state, tn)
+        pVec = getPVector(geo, *state, tn)
     if orbitAltitude(sat, geo, tn) < 0:
         return nextPassMax(sat, geo, tn.future(0.001))
     return tn
