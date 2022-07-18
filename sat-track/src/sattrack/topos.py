@@ -2,8 +2,8 @@ from math import degrees, asin, radians
 
 from pyevspace import EVector, cross, dot, norm
 
+from sattrack.rotation.order import ZYX
 from sattrack.structures.coordinates import GeoPosition, geoPositionVector, zenithVector
-from sattrack.rotation.order import Order
 from sattrack.rotation.rotation import getEulerMatrix, EulerAngles, rotateToThenOffset
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
@@ -15,9 +15,9 @@ from sattrack.util.conversions import atan2
 def toTopocentric(vec: EVector, jd: JulianDate, geo: GeoPosition) -> EVector:
     geoVector = geoPositionVector(geo, jd)
     mat = getEulerMatrix(
-        Order.ZYX,
+        ZYX,
         EulerAngles(
-            radians(geo.getLongitude() + earthOffsetAngle(jd)),
+            radians(geo.getLongitude()) + earthOffsetAngle(jd),
             radians(90 - geo.getLatitude()),
             0.0
         )
