@@ -1,29 +1,48 @@
-from math import atan2 as at2, pi, sqrt
+from math import atan2 as at2, sqrt
 
-from sattrack.util.constants import EARTH_MU
+from sattrack.util.constants import EARTH_MU, TWOPI
 
 
 def atan2(y: float, x: float) -> float:
-    """Computes atan2(y, x) but with the output shifted to (0, 2π).
-    Parameters:
-    x:  The x coordinate.
-    y:  The y coordinate."""
+    """
+    Computes atan2(y, x), but with the range shifted to (0, 2π].
+
+    Args:
+        y: The y coordinate.
+        x: The x coordinate.
+
+    Returns:
+        The arc-tangent of y/x, in the correct quadrant, in radians from (0, 2π].
+    """
+
     theta = at2(y, x)
-    return (theta + (2 * pi)) if theta < 0 else theta
+    return (theta + TWOPI) if theta < 0 else theta
 
 
 def meanMotionToSma(meanMotion: float) -> float:
-    """Converts mean motion from a two-line element to semi-major axis using
-    Kepler's 2nd law.
-    Parameters:
-    meanMotion: Mean motion measured in revolutions per day.
-    Returns the semi-major axis in km."""
-    mMotionRad = meanMotion * 2 * pi / 86400.0
-    return ((EARTH_MU ** (1.0 / 3.0)) / (mMotionRad ** (2.0 / 3.0)))
+    """
+    Converts a satellites mean motion from a two-line element set to the orbit's semi-major axis using Kepler's 2nd law.
+
+    Args:
+        meanMotion: Mean motion of the satellite measured in revolutions per day.
+
+    Returns:
+        The semi-major axis in kilometers.
+    """
+
+    mMotionRad = meanMotion * TWOPI / 86400.0
+    return (EARTH_MU ** (1.0 / 3.0)) / (mMotionRad ** (2.0 / 3.0))
+
 
 def smaToMeanMotion(sma: float) -> float:
-    """Converts semi-major axis to mean motion.
-    Parameters:
-    sma: Semi-major axis measured in km.
-    Returns the mean motion in radians per second."""
+    """
+    Converts a satellite's semi-major axis to mean motion.
+
+    Args:
+        sma: Semi-major axis measured in kilometers.
+
+    Returns:
+        The mean motion in radians per second.
+    """
+
     return sqrt(EARTH_MU / (sma ** 3))
