@@ -10,6 +10,17 @@ from sattrack.util.constants import AU
 
 @total_ordering
 class TwilightType(Enum):
+    """
+    Enumerated value to distinguish between the various sun angles relative to a horizon.
+    The classifications for sun angle to twilight type is:
+    Sun < -18 degrees --> Night time
+    Sun < -12 degrees --> Astronomical twilight
+    Sun < -6 degrees --> Nautical twilight
+    Sun < -50 arc-minutes --> Civil twilight
+    Otherwise --> Day time
+    Most object can't be seen until their position is in civil twilight.
+    """
+
     Day = 0
     Civil = 1
     Nautical = 2
@@ -23,11 +34,15 @@ class TwilightType(Enum):
 
 
 def getSunPosition(time: JulianDate) -> EVector:
-    """Computes the position of the Sun in an earth-centered reference frame,
-    from the algorithm found on Wikipedia.
-    Parameters:
-    time:   Time for finding the Sun's position.
-    returns: An earth centered position vector of the Sun in km."""
+    """
+    Very simple algorithm for computing the position of the Sun in a geocentric equitorial reference frame.
+
+    Args:
+        time: Time to find the Sun's position.
+
+    Returns:
+        The Sun's position vector in kilometers.
+    """
 
     #   time since noon TT on Jan 1, 2000
     n = time.difference(J2000)
