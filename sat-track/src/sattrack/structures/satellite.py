@@ -9,7 +9,8 @@ from sattrack.spacetime.juliandate import JulianDate
 from sattrack.structures.body import Body, EARTH_BODY
 from sattrack.structures.elements import OrbitalElements
 from sattrack.structures.tle import TwoLineElement
-from sattrack.util.anomalies import trueToMean, timeToNextMeanAnomaly, timeToPrevMeanAnomaly, meanToTrue
+from sattrack.util.anomalies import trueToMean, timeToNextMeanAnomaly, timeToPrevMeanAnomaly, meanToTrue, \
+    timeToNextTrueAnomaly
 from sattrack.util.conversions import smaToMeanMotion
 
 
@@ -249,14 +250,13 @@ class Satellite:
             elements = OrbitalElements.fromTle(self._tle, time)
         else:
             elements = self._elements
-        mAnom = timeToNextMeanAnomaly(
+        return timeToNextMeanAnomaly(
             smaToMeanMotion(elements.getSma()),
             elements.getMeanAnomaly(),
             elements.getEpoch(),
             trueToMean(tAnom, elements.getEcc()),
             time
         )
-        return meanToTrue(mAnom, elements.getEcc())
 
     def timeToPrevTrueAnomaly(self, tAnom: float, time: JulianDate) -> JulianDate:
         """
@@ -274,11 +274,10 @@ class Satellite:
             elements = OrbitalElements.fromTle(self._tle, time)
         else:
             elements = self._elements
-        mAnom = timeToPrevMeanAnomaly(
+        return timeToPrevMeanAnomaly(
             smaToMeanMotion(elements.getSma()),
             elements.getMeanAnomaly(),
             elements.getEpoch(),
             trueToMean(tAnom, elements.getEcc()),
             time
         )
-        return meanToTrue(mAnom, elements.getEcc())
