@@ -1,6 +1,6 @@
 from math import degrees, asin, radians, sin, cos, tan, sqrt
 
-from pyevspace import EVector, cross, dot, norm, transpose
+from pyevspace import EVector, cross, dot, norm
 
 from sattrack.rotation.order import ZYX
 from sattrack.structures.coordinates import GeoPosition, geoPositionVector, zenithVector
