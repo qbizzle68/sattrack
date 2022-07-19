@@ -333,3 +333,22 @@ def rotateToThenOffset(rotation: EMatrix, offset: EVector, original: EVector) ->
     rotatedOriginal = transpose(rotation) @ original
     rotatedOffset = transpose(rotation) @ offset
     return rotatedOriginal - rotatedOffset
+
+
+def undoRotateToThenOffset(rotation: EMatrix, offset: EVector, rotated: EVector) -> EVector:
+    """
+    Un-offsets a vector and then rotates it back into its original reference frame. This effectively undoes what the
+    rotateToThenOffset method does to its 'original' parameter.
+
+    Args:
+        rotation: Rotation matrix of offset reference frame.
+        offset: Offset vector between reference frame origins.
+        rotated: Rotated and offset vector to be returned to original reference frame.
+
+    Returns:
+        The original vector.
+    """
+
+    rotatedOffset = transpose(rotation) @ offset
+    rotatedOriginal = rotated + rotatedOffset
+    return rotation @ rotatedOriginal
