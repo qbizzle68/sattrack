@@ -1,4 +1,4 @@
-from math import degrees, asin, radians
+from math import degrees, asin, radians, sin, cos, tan, sqrt
 
 from pyevspace import EVector, cross, dot, norm, transpose
 
@@ -210,3 +210,36 @@ def getTwilightType(time: JulianDate, geo: GeoPosition) -> TwilightType:
         return TwilightType.Civil
     else:
         return TwilightType.Day
+
+
+def altAzToPosition(altitude: float, azimuth: float, distance: float) -> EVector:
+    """
+    Converts a pair of altitude and azimuth angles into a position vector in the topocentric reference frame.
+
+    Args:
+        altitude: Altitude of the position in degrees.
+        azimuth: Azimuth of the object position in degrees.
+        distance: Distance of the object to the viewing position.
+
+    Returns:
+        Returns the topocentric position vector of the object in the same units that the distance parameter is in.
+    """
+
+    alt = radians(altitude)
+    az = radians(azimuth)
+    zComp = distance * sin(alt)
+
+    cosAlt = distance * distance * (cos(alt) ** 2)
+    xComp = sqrt(cosAlt / (1 + (tan(az) ** 2)))
+    if azimuth < 90 or azimuth > 270:
+        xComp = -abs(xComp)
+    else:
+        xComp = abs(xComp)
+
+    yComp = -xComp * tan(az)
+    if azimuth < 180:
+        yComp = abs(yComp)
+    else:
+        yComp = -abs(yComp)
+
+    return EVector(xComp, yComp, zComp)
