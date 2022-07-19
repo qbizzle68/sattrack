@@ -5,7 +5,7 @@ from pyevspace import EVector, norm, vang, cross, dot
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.structures.body import Body, EARTH_BODY
 from sattrack.util.constants import TWOPI
-from sattrack.util.conversions import atan2
+from sattrack.util.conversions import atan3
 
 
 def meanToTrue(meanAnomaly: float, ecc: float) -> float:
@@ -22,7 +22,7 @@ def meanToTrue(meanAnomaly: float, ecc: float) -> float:
 
     eAnom = __m2ENewtonRaphson(meanAnomaly, ecc) % TWOPI
     y = sqrt(1 - (ecc * ecc)) * sin(eAnom)
-    return atan2(y, cos(eAnom) - ecc)
+    return atan3(y, cos(eAnom) - ecc)
 
 
 def meanToEccentric(meanAnomaly: float, eccentricity: float) -> float:
@@ -53,7 +53,7 @@ def eccentricToTrue(eccAnom: float, ecc: float) -> float:
     """
 
     y = sqrt(1 - (ecc * ecc)) * sin(eccAnom)
-    return atan2(y, cos(eccAnom) - ecc)
+    return atan3(y, cos(eccAnom) - ecc)
 
 
 def trueToMean(trueAnom: float, ecc: float) -> float:
@@ -69,7 +69,7 @@ def trueToMean(trueAnom: float, ecc: float) -> float:
     """
 
     y = sqrt(1 - (ecc * ecc)) * sin(trueAnom)
-    eAnom = atan2(y, cos(trueAnom) + ecc)
+    eAnom = atan3(y, cos(trueAnom) + ecc)
     return eAnom - ecc * sin(eAnom) % TWOPI
 
 
@@ -86,7 +86,7 @@ def trueToEccentric(trueAnom: float, ecc: float) -> float:
     """
 
     y = sqrt(1 - (ecc * ecc)) * sin(trueAnom)
-    return atan2(y, cos(trueAnom) + ecc)
+    return atan3(y, cos(trueAnom) + ecc)
 
 
 def eccentricToMean(eccAnom: float, ecc: float) -> float:

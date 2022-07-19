@@ -4,7 +4,7 @@ from sattrack.structures.body import Body, EARTH_BODY
 from sattrack.util.constants import TWOPI
 
 
-def atan2(y: float, x: float) -> float:
+def atan3(y: float, x: float) -> float:
     """
     Computes atan2(y, x), but with the range shifted to (0, 2π].
 

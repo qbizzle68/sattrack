@@ -9,7 +9,7 @@ from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.structures.satellite import Satellite
 from sattrack.sun import TwilightType, getSunPosition
-from sattrack.util.conversions import atan2
+from sattrack.util.conversions import atan3
 
 
 def toTopocentric(vec: EVector, time: JulianDate, geo: GeoPosition) -> EVector:
@@ -138,7 +138,7 @@ def getAzimuth(satellite: Satellite, time: JulianDate, geo: GeoPosition) -> floa
     """
 
     sez = toTopocentric(satellite.getState(time)[0], time, geo)
-    return degrees(atan2(sez[1], -sez[0]))
+    return degrees(atan3(sez[1], -sez[0]))
 
 
 def azimuthAngleString(azimuth: float) -> str:

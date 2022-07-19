@@ -6,7 +6,7 @@ from sattrack.rotation.rotation import rotateOrderFrom, EulerAngles
 from sattrack.rotation.order import ZYX
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
-from sattrack.util.conversions import atan2
+from sattrack.util.conversions import atan3
 
 
 class Coordinates(ABC):
@@ -268,7 +268,7 @@ def getSubPoint(position: EVector, time: JulianDate) -> GeoPosition:
     """
 
     dec = degrees(asin(position[2] / position.mag()))
-    lng = (degrees(atan2(position[1], position[0]) - earthOffsetAngle(time))) % 360.0
+    lng = (degrees(atan3(position[1], position[0]) - earthOffsetAngle(time))) % 360.0
     if lng > 180.0:
         lng = lng - 360.0
     return GeoPosition(geocentricToGeodetic(dec), lng)

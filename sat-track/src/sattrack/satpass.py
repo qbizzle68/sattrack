@@ -11,7 +11,7 @@ from sattrack.sun import getSunPosition, TwilightType
 from sattrack.topos import getPVector, toTopocentric, getTwilightType, getAltitude, azimuthAngleString
 from sattrack.util.anomalies import trueToMean, timeToNearestTrueAnomaly, computeTrueAnomaly
 from sattrack.util.constants import SUN_RADIUS, TWOPI
-from sattrack.util.conversions import atan2
+from sattrack.util.conversions import atan3
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.structures.coordinates import GeoPosition, zenithVector, geoPositionVector
 from sattrack.structures.elements import computeEccentricVector, raanProcessionRate
@@ -208,18 +208,18 @@ def nextPass(sat: Satellite, geo: GeoPosition, time: JulianDate,
                 return nextPass(sat, geo, nextPassTime.future(0.001), constraints)
 
     riseInfo = PositionInfo(degrees(asin(risePosSez[2] / risePosSez.mag())),
-                            degrees(atan2(risePosSez[1], -risePosSez[0])),
+                            degrees(atan3(risePosSez[1], -risePosSez[0])),
                             riseTime,
                             riseIlluminated and getTwilightType(riseTime, geo) > TwilightType.Day)
 
     setInfo = PositionInfo(degrees(asin(setPosSez[2] / setPosSez.mag())),
-                           degrees(atan2(setPosSez[1], -setPosSez[0])),
+                           degrees(atan3(setPosSez[1], -setPosSez[0])),
                            setTime,
                            setIlluminated and getTwilightType(setTime, geo) > TwilightType.Day)
 
     maxIlluminated = not isEclipsed(maxPos, getSunPosition(nextPassTime))
     maxInfo = PositionInfo(degrees(asin(maxPosSez[2] / maxPosSez.mag())),
-                           degrees(atan2(maxPosSez[1], -maxPosSez[0])),
+                           degrees(atan3(maxPosSez[1], -maxPosSez[0])),
                            nextPassTime,
                            maxIlluminated and getTwilightType(nextPassTime, geo) > TwilightType.Day)
 
@@ -419,14 +419,14 @@ def riseSetGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> tuple[Ju
         beta = acos(dot(zeta, gamma - ce) / R)
     except ValueError:
         raise NoPassException(f'No pass during this time: {time}.')
-    alpha = atan2(dot(zeta, v), dot(zeta, u))
+    alpha = atan3(dot(zeta, v), dot(zeta, u))
     w1 = alpha + beta
     w2 = alpha - beta
 
     rho1 = (u * cos(w1) + v * sin(w1)).mag()
-    ta1 = atan2(rho1 * sin(w1), rho1 * cos(w1) - a * sat.getTle().getEcc())
+    ta1 = atan3(rho1 * sin(w1), rho1 * cos(w1) - a * sat.getTle().getEcc())
     rho2 = (u * cos(w2) + v * sin(w2)).mag()
-    ta2 = atan2(rho2 * sin(w2), rho2 * cos(w2) - a * sat.getTle().getEcc())
+    ta2 = atan3(rho2 * sin(w2), rho2 * cos(w2) - a * sat.getTle().getEcc())
     ta10 = computeTrueAnomaly(*sat.getState(time))
     ta20 = computeTrueAnomaly(*sat.getState(time))
     n = sat.getTle().getMeanMotion() * TWOPI / 86400.0
