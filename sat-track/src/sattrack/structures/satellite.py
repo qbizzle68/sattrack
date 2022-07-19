@@ -9,8 +9,7 @@ from sattrack.spacetime.juliandate import JulianDate
 from sattrack.structures.body import Body, EARTH_BODY
 from sattrack.structures.elements import OrbitalElements
 from sattrack.structures.tle import TwoLineElement
-from sattrack.util.anomalies import trueToMean, timeToNextMeanAnomaly, timeToPrevMeanAnomaly, meanToTrue, \
-    timeToNextTrueAnomaly
+from sattrack.util.anomalies import trueToMean, timeToNextMeanAnomaly, timeToPrevMeanAnomaly
 from sattrack.util.conversions import smaToMeanMotion
 
 
