@@ -168,7 +168,7 @@ class Satellite:
             The eccentric vector for the satellite.
         """
 
-        # todo: figure out why we cant compute this from the state.
+        # todo: figure out why we can't compute this from the state.
         if time is None:
             rot = ReferenceFrame(ZXZ, EulerAngles(
                     radians(self._tle.getRaan()),
