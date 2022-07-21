@@ -98,8 +98,6 @@ def getSunPosition2(time: JulianDate):
     lmbda = theta + dPsi + dTau
     alpha = atan3(sin(lmbda) * cos(epsilon) - tan(beta) * sin(epsilon), cos(lmbda))
     delta = asin(sin(beta) * cos(epsilon) + cos(beta) * sin(epsilon) * sin(lmbda))
-    print('alpha:', degrees(alpha))
-    print('delta:', degrees(delta))
 
     zComp = sin(delta)
     xComp = sqrt((cos(delta) ** 2) / (1 + (tan(alpha) ** 2)))
