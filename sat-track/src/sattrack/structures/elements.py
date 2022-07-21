@@ -7,7 +7,8 @@ from sattrack.rotation.rotation import getEulerMatrix, EulerAngles, ReferenceFra
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.structures.body import Body, EARTH_BODY
 from sattrack.structures.tle import TwoLineElement
-from sattrack.util.anomalies import meanToTrue, trueToMean, trueToEccentric
+from sattrack.util.anomalies import meanToTrue, trueToMean, trueToEccentric, timeToNextMeanAnomaly, \
+    timeToPrevMeanAnomaly
 from sattrack.util.constants import TWOPI
 from sattrack.util.conversions import meanMotionToSma, smaToMeanMotion
 
@@ -279,6 +280,51 @@ class OrbitalElements:
         """
 
         return meanToTrue(self.meanAnomalyAt(time), self._ecc)
+
+    # todo: document these
+    def timeToNextMeanAnomaly(self, mAnom: float, time: JulianDate) -> JulianDate:
+        if self._epoch is None:
+            raise ValueError('Epoch was not set for this instance.')
+        return timeToNextMeanAnomaly(
+            smaToMeanMotion(self._sma),
+            self._meanAnomaly,
+            self._epoch,
+            mAnom,
+            time
+        )
+
+    def timeToPrevMeanAnomaly(self, mAnom: float, time: JulianDate) -> JulianDate:
+        if self._epoch is None:
+            raise ValueError('Epoch was not set for this instance.')
+        return timeToPrevMeanAnomaly(
+            smaToMeanMotion(self._sma),
+            self._meanAnomaly,
+            self._epoch,
+            mAnom,
+            time
+        )
+
+    def timeToNextTrueAnomaly(self, tAnom: float, time: JulianDate) -> JulianDate:
+        if self._epoch is None:
+            raise ValueError('Epoch was not set for this instance.')
+        return timeToNextMeanAnomaly(
+            smaToMeanMotion(self._sma),
+            self._meanAnomaly,
+            self._epoch,
+            trueToMean(tAnom, self._ecc),
+            time
+        )
+
+    def timeToPrevTrueAnomaly(self, tAnom: float, time: JulianDate) -> JulianDate:
+        if self._epoch is None:
+            raise ValueError('Epoch was not set for this instance.')
+        return timeToPrevMeanAnomaly(
+            smaToMeanMotion(self._sma),
+            self._meanAnomaly,
+            self._epoch,
+            trueToMean(tAnom, self._ecc),
+            time
+        )
 
     def getEccentricVector(self) -> EVector:
         """
