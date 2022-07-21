@@ -1,6 +1,6 @@
 from enum import Enum
 from functools import total_ordering
-from math import sin, cos, pi, radians, tan, asin, degrees, sqrt
+from math import sin, cos, pi, radians, tan, asin, sqrt
 
 from pyevspace import EVector
 
