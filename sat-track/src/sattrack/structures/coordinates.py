@@ -145,7 +145,6 @@ def radiusAtLatitude(lat: float) -> float:
     return (EARTH_POLAR_RADIUS * EARTH_EQUITORIAL_RADIUS) / sqrt(bcos2 + asin2)
 
 
-# todo: use the elevation of the geo-position in this
 def geoPositionVector(geo: GeoPosition, jd: JulianDate = None) -> EVector:
     """
     Computes the position vector in the geocentric equitorial reference frame, of a GeoPosition at a given time.
