@@ -1,20 +1,21 @@
-from math import cos, radians, pi, sqrt, acos, sin, degrees, asin
+from math import cos, radians, pi, sqrt, acos, sin, degrees, asin, atan
 
 from pyevspace import EVector, cross, dot, norm, vang
 
 from sattrack.exceptions import NoPassException
-from sattrack.rotation.order import Axis, ZYX
+from sattrack.rotation.order import Axis, ZYX, ZXZ
 from sattrack.rotation.rotation import getMatrix, rotateOrderTo, EulerAngles
+from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
+from sattrack.structures.coordinates import GeoPosition, zenithVector, geoPositionVector
+from sattrack.structures.elements import computeEccentricVector, raanProcessionRate, OrbitalElements
 from sattrack.structures.satellite import Satellite
-from sattrack.sun import getSunPosition, TwilightType
+from sattrack.structures.tle import TwoLineElement
+from sattrack.sun import getSunPosition, TwilightType, getSunPosition2
 from sattrack.topos import getPVector, toTopocentric, getTwilightType, getAltitude, azimuthAngleString
 from sattrack.util.anomalies import trueToMean, timeToNearestTrueAnomaly, computeTrueAnomaly
-from sattrack.util.constants import SUN_RADIUS, TWOPI
+from sattrack.util.constants import SUN_RADIUS, TWOPI, EARTH_FLATTENING, EARTH_EQUITORIAL_RADIUS
 from sattrack.util.conversions import atan3
-from sattrack.spacetime.juliandate import JulianDate
-from sattrack.structures.coordinates import GeoPosition, zenithVector, geoPositionVector
-from sattrack.structures.elements import computeEccentricVector, raanProcessionRate
 
 
 class PositionInfo:
@@ -118,12 +119,23 @@ class Pass:
 
     def __str__(self):
         """Returns a string containing all the pass's information."""
-        rtn = f'Rise:\n{self._riseInfo}\nMax:\n{self._maxInfo}\nSet:\n{self._setInfo}'
+        riseStr = f'Rise:\n{self._riseInfo}'
+        setStr = f'Set:\n{self._setInfo}'
+        maxStr = f'Max:\n{self._maxInfo}'
+        strDict = {info.getTime().value(): string for info, string in
+                   zip((self._riseInfo, self._setInfo, self._maxInfo), (riseStr, setStr, maxStr))}
         if self._firstVisible is not None:
-            rtn += f'First Visible:\n{self._firstVisible}'
+            firstStr = f'First:\n{self._firstVisible}'
+            strDict[self._firstVisible.getTime().value()] = firstStr
         if self._lastVisible is not None:
-            rtn += f'Last Visible:\n{self._lastVisible}'
-        return rtn
+            lastStr = f'Last:\n{self._lastVisible}'
+            strDict[self._lastVisible.getTime().value()] = lastStr
+        rtn = ""
+        for i in range(len(strDict)):
+            minTm = min(strDict.keys())
+            rtn += strDict[minTm] + '\n'
+            strDict.pop(minTm)
+        return rtn.rstrip()
 
     def getRiseInfo(self) -> PositionInfo:
         """Returns the rise time information."""
@@ -145,6 +157,10 @@ class Pass:
         """Returns the last visible time information if set."""
         return self._lastVisible
 
+    def getVisibility(self) -> bool:
+        """Returns the visibility of the pass."""
+        return self._visible
+
 
 class PassConstraints:
     """
@@ -163,6 +179,7 @@ class PassConstraints:
         self.illuminated = illuminated
 
 
+# todo: check the ordering of this method, see if checks can be made sooner without in order to gain efficiency
 def nextPass(sat: Satellite, geo: GeoPosition, time: JulianDate,
              constraints: PassConstraints = None) -> Pass:
     """
@@ -185,25 +202,58 @@ def nextPass(sat: Satellite, geo: GeoPosition, time: JulianDate,
     maxPosSez = toTopocentric(maxPos, nextPassTime, geo)
     maxAlt = degrees(asin(maxPosSez[2] / maxPosSez.mag()))
 
+    # todo: issue with this, if lastTime < maxTime, then should lastTime be the max time?
     if constraints is not None and constraints.minAltitude is not None:
+        #   if minimum altitude isn't attained
         if constraints.minAltitude > maxAlt:
             return nextPass(sat, geo, nextPassTime.future(0.001), constraints)
 
+    sc = ShadowController(sat.getTle())
+    sc.computeValues(nextPassTime)
+    enterTime, exitTime = sc.getTimes()
+    firstInfo, lastInfo = None, None
+
     riseTime, setTime = riseSetTimes(sat, geo, nextPassTime)
+    if riseTime.value() < enterTime.value() < setTime.value():
+        riseIlluminated = True
+        firstTime = riseTime
+        setIlluminated = False
+        lastTime = enterTime
+    elif riseTime.future(1 / sat.getTle().getMeanMotion()).value() < exitTime.value() and \
+            riseTime.value() < exitTime.value() < setTime.value():
+        riseIlluminated = False
+        firstTime = exitTime
+        setIlluminated = True
+        lastTime = setTime
+    elif enterTime.value() < riseTime.value() < exitTime.value() \
+            and enterTime.value() < setTime.value() < exitTime.value():
+        riseIlluminated = False
+        firstTime = riseTime  # avoids setting the firstInfo object
+        setIlluminated = False
+        lastTime = setTime  # avoids setting the lastInfo object
+    else:
+        riseIlluminated = True
+        firstTime = riseTime
+        setIlluminated = True
+        lastTime = setTime
+
     risePos = sat.getState(riseTime)[0]
     risePosSez = toTopocentric(risePos, riseTime, geo)
-    riseIlluminated = not isEclipsed(risePos, getSunPosition(riseTime))
     setPos = sat.getState(setTime)[0]
     setPosSez = toTopocentric(setPos, setTime, geo)
-    setIlluminated = not isEclipsed(setPos, getSunPosition(setTime))
 
     if constraints is not None:
         if constraints.illuminated is not None:
+            #   when constraints is illuminated and sat is not illuminated at rise and set times
             if constraints.illuminated and not riseIlluminated and not setIlluminated:
                 return nextPass(sat, geo, nextPassTime.future(0.001), constraints)
-            if not constraints.illuminated and riseIlluminated and setIlluminated:
+            #   when constraints is not illuminated and it is illuminated at some point
+            #   todo: can this be constrained using relations of enter and exit times with rise and set?
+            if not constraints.illuminated and (riseIlluminated or firstTime != riseTime) \
+                    or (setIlluminated or lastTime != setTime):
                 return nextPass(sat, geo, nextPassTime.future(0.001), constraints)
         if constraints.minDuration is not None:
+            #   when minimum duration is not met
             if constraints.minDuration > setTime.difference(riseTime) * 1440:
                 return nextPass(sat, geo, nextPassTime.future(0.001), constraints)
 
@@ -223,7 +273,23 @@ def nextPass(sat: Satellite, geo: GeoPosition, time: JulianDate,
                            nextPassTime,
                            maxIlluminated and getTwilightType(nextPassTime, geo) > TwilightType.Day)
 
-    return Pass(riseInfo, setInfo, maxInfo)
+    if riseTime != firstTime:
+        firstPos = sat.getState(exitTime)[0]
+        firstPosSez = toTopocentric(firstPos, firstTime, geo)
+        firstInfo = PositionInfo(degrees(asin(firstPosSez[2] / firstPosSez.mag())),
+                                 degrees(atan3(firstPosSez[1], -firstPosSez[0])),
+                                 firstTime,
+                                 getTwilightType(firstTime, geo) > TwilightType.Day)
+
+    if setTime != lastTime:
+        lastPos = sat.getState(enterTime)[0]
+        lastPosSez = toTopocentric(lastPos, lastTime, geo)
+        lastInfo = PositionInfo(degrees(asin(lastPosSez[2] / lastPosSez.mag())),
+                                degrees(atan3(lastPosSez[1], -lastPosSez[0])),
+                                lastTime,
+                                getTwilightType(lastTime, geo) > TwilightType.Day)
+
+    return Pass(riseInfo, setInfo, maxInfo, firstInfo=firstInfo, lastInfo=lastInfo)
 
 
 def getPassList(sat: Satellite, geo: GeoPosition, start: JulianDate, duration: float,
@@ -566,7 +632,7 @@ def isEclipsed(satPos: EVector, sunPos: EVector) -> bool:
     sunPos = -satPos + sunPos
     #   semi-diameters of earth and sun
     # todo: calculate real Earth radius from perspective here
-    thetaE = asin(6371 / earthPos.mag())    # average earth radius
+    thetaE = asin(6371 / earthPos.mag())  # average earth radius
     thetaS = asin(SUN_RADIUS / sunPos.mag())
     #   angle between earth and sun centers relative to the satellite
     theta = radians(vang(earthPos, sunPos))
@@ -578,3 +644,237 @@ def isEclipsed(satPos: EVector, sunPos: EVector) -> bool:
     if abs(thetaE - thetaS) < theta < (thetaE + thetaS):
         return True
     return thetaS > thetaE and theta < (thetaS - thetaE)
+
+
+# noinspection PyUnresolvedReferences
+class ShadowController:
+    """
+    Controller class for computing Earth shadow entrance and exit times. The class can be initialized with a TLE or
+    a set of orbital elements, and then the computeValues() method can be called with any time to compute the shadow
+    times. The class always computes the next shadow exit time, if the time parameter is between the entrance and exit
+    times, the previous entrance time is computed, otherwise the next entrance time is computed.
+    """
+
+    # todo:
+    '''
+    when finding zeros, check if the phi's are not None (they've been calculated at least once). If they 
+    aren't, then we don't need to do our complicated zero 'finder' method, since using the previous phi's will be very
+    close and make a very good first guess. This doesn't just not waste time looking for unneeded zeros, but actually
+    decreases the number of Newton iterations by a lot.
+    '''
+
+    def __init__(self, orbitData: TwoLineElement | OrbitalElements):
+        """Initialize the controller with the object for computing element values, either a TLE or an element object.
+        A TLE will yield much more accurate results as the elements can be updated with time."""
+
+        if type(orbitData) == TwoLineElement:
+            self._tle = orbitData
+            self._elements = [None, None]
+        elif type(orbitData) == OrbitalElements:
+            self._tle = None
+            self._elements = [orbitData, orbitData]
+        else:
+            raise TypeError('orbitData parameter must be of type TwoLineElement or OrbitalElements')
+        self._s = [None, None]
+        self._phi = [None, None]
+        self._Re = [6371, 6371]
+        self._jd = [None, None]
+        self._phi0 = None
+
+    def getAnomalies(self) -> tuple[float]:
+        """Returns the most recently computed anomalies for the entrance and exit points of Earth's shadow."""
+        return tuple(self._phi)
+
+    def getTimes(self) -> tuple[JulianDate]:
+        """Returns the most recently computed times the anomalies occur for the entrance and exit points of Earth's
+        shadow."""
+        return tuple(self._jd)
+
+    def computeValues(self, time: JulianDate):
+        """
+        Computes/updates the anomalies and times of shadow entrance/exit. If the time is during transit of the shadow,
+        the previous entrance anomaly and time will be computed, otherwise the next entrance and exit points will always
+        be computed.
+
+        Args:
+            time: Time to compute the next(previous) anomalies.
+        """
+
+        self.__firstPass(time)
+        self.__loop(time)
+
+    def __loop(self, time: JulianDate):
+        """
+        Main loop which updates time dependent variables between iterations for a more precise answer.
+
+        Args:
+            time: Time to compute the next(previous) anomalies.
+
+        Will set/update the elements, s-vectors, Res values and the phi and jd values.
+        """
+
+        for i in range(2):
+            while True:
+                self._elements[i].update(self._jd[i])
+                self._s[i] = self.__computes(i)
+                self._Re[i] = self.__computeRe(i)
+                self._phi[i] = self.__computePhi(i)
+                jd = self.__computeTimes(i, time)
+                if abs(jd.difference(self._jd[i])) < (0.1 / 86400.0):  # 0.1 of a second
+                    self._jd[i] = jd
+                    break
+                else:
+                    self._jd[i] = jd
+
+    def __firstPass(self, time: JulianDate):
+        """
+        Does the necessary 'first pass' initializations before an 'official' anomaly or time is computed.
+
+        Args:
+            time: Time to compute the next(previous) anomalies.
+
+        Will set the jds, elements, s-vectors, and phis
+        """
+
+        self._jd = [time, time]
+        if self._tle:
+            elements = OrbitalElements.fromTle(self._tle, time)
+            self._elements = [elements, elements]
+        s = self.__computes(0)
+        self._s = [s, s]
+        self._phi[0] = self.__computePhi(0)
+        self._phi[1] = self.__computePhi(1)
+        self._phi0 = self._elements[0].trueAnomalyAt(time)
+        self._jd[0] = self.__computeTimes(0, time)
+        self._jd[1] = self.__computeTimes(1, time)
+
+    def __computeTimes(self, index: int, time: JulianDate):
+        """Computes the time to the specified anomaly signaled by the index value."""
+        if index == 0 and self._phi[0] < self._phi0 <= self._phi[1]:
+            return self._elements[0].timeToPrevTrueAnomaly(self._phi[0], time)
+        else:
+            return self._elements[index].timeToNextTrueAnomaly(self._phi[index], time)
+
+    def __computePhi(self, index: int):
+        """Computes the true anomaly by finding the zeros of Escobal's G function."""
+        zeros = self.__getZeros(index)
+        checks = [self._s[index][0] * cos(z) + self._s[index][1] * sin(z) for z in zeros]
+        phis = [zeros[i] for i in range(4) if checks[i] > 0]
+        gamma = self.__getGamma(self._s[index])
+        if index == 0:
+            if phis[0] + gamma < pi:
+                return phis[0]
+            else:
+                return phis[1]
+        else:
+            if phis[0] + gamma < pi:
+                return phis[1]
+            else:
+                return phis[0]
+
+    def __getZeros(self, index: int):
+        """Finds the zeros of Escobal's G function."""
+        frac = 0.5
+        ls = [self.__escobalNewtonMethod(pi * i * frac, index) for i in range(int(2 / frac))]
+        for i in range(len(ls)):
+            if ls[i] >= TWOPI:
+                ls[i] %= TWOPI
+        frac /= 2.0
+        while len(ls) < 4:
+            tmp = [self.__escobalNewtonMethod(pi * i * frac, index) for i in range(int(2 / frac))]
+            for i in range(len(tmp)):
+                if tmp[i] >= TWOPI:
+                    tmp[i] %= TWOPI
+            for i in tmp:
+                for j in ls:
+                    if abs(i - j) > 1e-5:
+                        ls.append(i)
+        return tuple(ls)
+
+    def __escobalGFunction(self, phi: float, index: int) -> float:
+        """Escobal's G function whose zeros represent the true anomalies of shadow entrance/exit."""
+        ecc = self._elements[index].getEcc()
+        c = (self._elements[index].getSma() * (1 - ecc * ecc)) ** 2
+        term1 = self._Re[index] * self._Re[index] * ((1 + ecc * cos(phi)) ** 2)
+        term2 = (-self._s[index][0] * cos(phi) - self._s[index][1] * sin(phi)) ** 2
+        return term1 + c * term2 - c
+
+    def __gPrime(self, phi: float, index: int) -> float:
+        """Derivative of Escobal's G function, used while iterating Newton's method."""
+        ecc = self._elements[index].getEcc()
+        term1 = 2 * (1 + ecc * cos(phi)) * (-ecc * sin(phi))
+        term2 = 2 * (-self._s[index][0] * cos(phi) - self._s[index][1] * sin(phi)) * (
+                self._s[index][0] * sin(phi) - self._s[index][1] * cos(phi))
+        return self._Re[index] * self._Re[index] * term1 + ((self._elements[index].getSma() * (
+                1 - ecc * ecc)) ** 2) * term2
+
+    def __escobalNewtonMethod(self, guess, index) -> float:
+        """Solves Escobal's G function by iterating with the Newton-raphson method."""
+        phi = guess
+        gi = self.__escobalGFunction(phi, index)
+        while abs(gi) > 1e-5:
+            phi = phi - gi / self.__gPrime(phi, index)
+            gi = self.__escobalGFunction(phi, index)
+
+        '''gi = self.__escobalGFunction(guess, index)
+        phi = phi - gi / self.__gPrime(phi, index)
+        while abs(gi) > 1e-5:
+            gi = self.__escobalGFunction(phi, index)
+            phi = phi - gi / self.__gPrime(phi, index)'''
+        return phi
+
+    def __computeRe(self, index: float):
+        """Computes the radius of the earth that the sun (dis)appears from."""
+        a = self._elements[index].getSma()
+        ecc = self._elements[index].getEcc()
+        inc = self._elements[index].getInc()
+        aop = self._elements[index].getAop()
+        f = EARTH_FLATTENING
+        ae = EARTH_EQUITORIAL_RADIUS
+        phi = self._phi[index]
+
+        Rz = (a * (1 - ecc * ecc) / (1 + ecc * cos(phi))) * (
+                sin(aop) * sin(inc) * cos(phi) + cos(aop) * sin(inc) * sin(phi) - self._s[index][2] * (
+                    self._s[index][0] * cos(phi) + self._s[index][1] * sin(phi)))
+        fTerm = 2 * f - f * f
+        mainTerm = ae * ae * (1 - fTerm)
+        cosTerm = (mainTerm - Rz * Rz) / (mainTerm - Rz * Rz * fTerm)
+        nextR = ae * sqrt(1 - fTerm) / sqrt(1 - fTerm * cosTerm)
+        while abs(nextR - self._Re[index]) > 1e-7:
+            self._Re[index] = nextR
+            phi = self.__computePhi(index)
+            Rz = (a * (1 - ecc * ecc) / (1 + ecc * cos(phi))) * (
+                    sin(aop) * sin(inc) * cos(phi) + cos(aop) * sin(inc) * sin(phi) - self._s[index][2] * (
+                        self._s[index][0] * cos(phi) + self._s[index][1] * sin(phi)))
+            fTerm = 2 * f - f * f
+            mainTerm = ae * ae * (1 - fTerm)
+            cosTerm = (mainTerm - Rz * Rz) / (mainTerm - Rz * Rz * fTerm)
+            nextR = ae * sqrt(1 - fTerm) / sqrt(1 - fTerm * cosTerm)
+        return nextR
+
+    @staticmethod
+    def __getGamma(s):
+        """Computes the gamma angle used in the algorithm, the angle between the Sun projection unit vector and the
+        eccentric vector."""
+        if s[0] < 0:
+            if s[1] == 0:
+                return 0
+            elif s[1] > 0:
+                return atan(-s[1] / s[0])
+            else:
+                return atan(s[1] / s[0])
+        elif s[0] == 0:
+            return pi / 2.0
+        elif s[0] > 0:
+            if s[1] > 0:
+                return pi - atan(s[1] / s[0])
+            elif s[1] == 0:
+                return pi
+            else:
+                return pi - atan(-s[1] / s[0])
+
+    def __computes(self, index: int):
+        """Computes s, the unit projection vector of the Sun's position on the orbital plane."""
+        S = -norm(getSunPosition2(self._jd[index]))
+        return rotateOrderTo(ZXZ, EulerAngles(self._elements[index].getRaan(), self._elements[index].getInc(),
+                                              self._elements[index].getAop()), S)
