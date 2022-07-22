@@ -23,8 +23,8 @@ class Satellite:
             body: Parent body of the satellite (Default = EARTH_BODY).
         """
 
-        # todo: add name to the sat (need a name from elements)
         self._tle = None
+        self._name = obj.getName()
         self._propagator = None
         self._epoch = None
         self._elements = None
@@ -33,8 +33,14 @@ class Satellite:
         self._body = body
 
     def __str__(self) -> str:
-        # todo: create a string with name and either tle or elements, plus periapsis passage and body
-        pass
+        """Returns a string representation of the satellite."""
+        rtn = ''
+        if self._tle:
+            rtn += f'{self._tle}'
+        else:
+            rtn += f'{self._elements}'
+        rtn += f'\nPeriapsis passage: {self._periapsisPassage}\nBody: {self._body}'
+        return rtn
 
     # todo: add a stack to store states, with bool parameter that defaults to false
     def getState(self, jd: JulianDate) -> tuple[EVector]:

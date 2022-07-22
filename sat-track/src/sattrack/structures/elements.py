@@ -20,7 +20,7 @@ class OrbitalElements:
     of use, but the angles are converted and implemented as radians."""
 
     def __init__(self, *, sma: float, ecc: float, inc: float, raan: float, aop: float, meanAnomaly: float,
-                 epoch: JulianDate = None, body: Body = EARTH_BODY):
+                 name: str = "", epoch: JulianDate = None, body: Body = EARTH_BODY):
         """
         Constructs an instance with the given values. Not including an epoch will not allow future
         anomalies to be computed. For ease of user interface the angle parameters are measured in degrees,
@@ -34,7 +34,8 @@ class OrbitalElements:
             raan: Right-ascension of ascending node in degrees.
             aop: Argument of periapsis in degrees.
             meanAnomaly: Mean anomaly at epoch in degrees.
-            epoch: Epoch of meanAnomaly (Default = None)
+            name: Name of the object.
+            epoch: Epoch of meanAnomaly (Default = None).
             body: Body of the orbiting satellite (Default = EARTH_BODY).
         """
 
@@ -44,6 +45,7 @@ class OrbitalElements:
         self._raan = radians(raan)
         self._aop = radians(aop)
         self._meanAnomaly = radians(meanAnomaly)
+        self._name = name
         self._epoch = epoch
         self._tle = None
         self._body = body
@@ -60,6 +62,7 @@ class OrbitalElements:
 
         rtn = cls(**cls.__tleToElements(tle, time), body=EARTH_BODY)
         rtn._tle = tle
+        rtn._name = tle.getName()
         return rtn
 
     @classmethod
@@ -80,9 +83,9 @@ class OrbitalElements:
     def __str__(self) -> str:
         """Returns a string representation of the orbital elements."""
 
-        return (f'Semi-major axis: {self._sma}, Eccentricity: {self._ecc}, Inclination: {degrees(self._inc)}\n'
-                + f'RAAN: {degrees(self._raan)}, Argument of Perigee: {degrees(self._aop)}, '
-                  f'Mean Anomaly: {degrees(self._meanAnomaly)}\nEpoch: {str(self._epoch)}')
+        return f'Name: {self._name}\nSemi-major axis: {self._sma}, Eccentricity: {self._ecc}, Inclination: ' \
+            f'{degrees(self._inc)}\nRAAN: {degrees(self._raan)}, Argument of Perigee: {degrees(self._aop)}, ' \
+            f'Mean Anomaly: {degrees(self._meanAnomaly)}\nEpoch: {str(self._epoch)}'
 
     @classmethod
     def __tleToElements(cls, tle: TwoLineElement, time: JulianDate) -> dict:
@@ -385,6 +388,14 @@ class OrbitalElements:
     def getMeanAnomaly(self):
         """Returns the mean anomaly of the orbit in radians."""
         return self._meanAnomaly
+
+    def setName(self, name: str):
+        """Sets the name of the object whose elements these represent."""
+        self._name = name
+
+    def getName(self) -> str:
+        """Returns the name of the object whose elements these represent."""
+        return self._name
 
     def setEpoch(self, epoch: JulianDate):
         """Sets the epoch associated with the mean anomaly. For the positional methods to work properly, the mean
