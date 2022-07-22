@@ -2,7 +2,7 @@ from pyevspace import EVector
 
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.spacetime.juliandate import JulianDate
-from sattrack.util.constants import EARTH_MU, EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS
+from sattrack.util.constants import EARTH_MU, EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS, SUN_MU, SUN_RADIUS
 
 '''
 What does a Body need?
@@ -97,8 +97,9 @@ class Body:
     # other methods here
 
 
+SUN_BODY = Body("Sun", SUN_MU, SUN_RADIUS, None)
 '''_earth_elements = OrbitalElements(sma=149.598e9, ecc=0.0167, inc=0.0, raan=348.73936, aop=102.94719,
                                   meanAnomaly=100.46435, epoch=J2000)'''
 # todo: make a sun body and set as earth's parent
-EARTH_BODY = Body("Earth", EARTH_MU, EARTH_EQUITORIAL_RADIUS, 86164.090531, rp=EARTH_POLAR_RADIUS, parent=None)
+EARTH_BODY = Body("Earth", EARTH_MU, EARTH_EQUITORIAL_RADIUS, 86164.090531, rp=EARTH_POLAR_RADIUS, parent=SUN_BODY)
 EARTH_BODY.getOffsetAngle = earthOffsetAngle
