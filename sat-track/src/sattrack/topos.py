@@ -62,7 +62,6 @@ def fromTopocentric(vec: EVector, time: JulianDate, geo: GeoPosition) -> EVector
     return undoRotateToThenOffset(mat, geoVector, vec)
 
 
-# todo: think of a better name for this
 def getPVector(geo: GeoPosition, position: EVector, velocity: EVector, jd: JulianDate) -> EVector:
     """
     Computes the vector that lies in the orbital plane P, where for v on the horizontal plane of a geo-position whose
