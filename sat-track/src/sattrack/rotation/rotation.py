@@ -4,6 +4,7 @@ from math import cos, sin
 from pyevspace import EVector, EMatrix, transpose
 
 from sattrack.rotation.order import Axis, EulerOrder
+import copyreg
 
 
 # todo: change this when we can create matrices from lists
@@ -108,6 +109,13 @@ class EulerAngles:
             return temp
         else:
             raise StopIteration
+
+
+def pickle_EulerAngles(angs):
+    return EulerAngles, (angs[0], angs[1], angs[2])
+
+
+copyreg.pickle(EulerAngles, pickle_EulerAngles)
 
 
 # purposefully not documenting these since I intend to implement this in C.
@@ -242,7 +250,6 @@ class ReferenceFrame:
 
     def getAngles(self) -> EulerAngles:
         """Returns a copy of the EulerAngles for this rotation."""
-        # todo: figure out why we can't do this
         return deepcopy(self._angles)
 
     def getOrder(self) -> EulerOrder:
