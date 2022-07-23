@@ -7,41 +7,40 @@ from sattrack.rotation.order import Axis, EulerOrder
 import copyreg
 
 
-# todo: change this when we can create matrices from lists
 def _xRotation(angle: float) -> EMatrix:
-    rtn = EMatrix()
-    rtn.set(0, 0, 1.0)
     angleCos = cos(angle)
     angleSin = sin(angle)
-    rtn.set(1, 1, angleCos)
-    rtn.set(2, 2, angleCos)
-    rtn.set(1, 2, -angleSin)
-    rtn.set(2, 1, angleSin)
-    return rtn
+    return EMatrix(
+        [
+            [1.0, 0.0, 0.0],
+            [0.0, angleCos, angleSin],
+            [0.0, -angleSin, angleCos]
+        ]
+    )
 
 
 def _yRotation(angle: float) -> EMatrix:
-    rtn = EMatrix()
-    rtn.set(1, 1, 1.0)
     angleCos = cos(angle)
     angleSin = sin(angle)
-    rtn.set(0, 0, angleCos)
-    rtn.set(2, 2, angleCos)
-    rtn.set(2, 0, -angleSin)
-    rtn.set(0, 2, angleSin)
-    return rtn
+    return EMatrix(
+        [
+            [angleCos, 0.0, -angleSin],
+            [0.0, 1.0, 0.0],
+            [angleSin, 0.0, angleCos]
+        ]
+    )
 
 
 def _zRotation(angle: float) -> EMatrix:
-    rtn = EMatrix()
-    rtn.set(2, 2, 1.0)
     angleCos = cos(angle)
     angleSin = sin(angle)
-    rtn.set(0, 0, angleCos)
-    rtn.set(1, 1, angleCos)
-    rtn.set(0, 1, -angleSin)
-    rtn.set(1, 0, angleSin)
-    return rtn
+    return EMatrix(
+        [
+            [angleCos, angleSin, 0.0],
+            [-angleSin, angleCos, 0.0],
+            [0.0, 0.0, 1.0]
+        ]
+    )
 
 
 class EulerAngles:
