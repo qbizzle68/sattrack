@@ -8,7 +8,7 @@ from sattrack.spacetime.juliandate import JulianDate
 from sattrack.structures.body import Body, EARTH_BODY
 from sattrack.structures.tle import TwoLineElement
 from sattrack.util.anomalies import meanToTrue, trueToMean, trueToEccentric, timeToNextMeanAnomaly, \
-    timeToPrevMeanAnomaly
+    timeToPrevMeanAnomaly, meanAnomalyAt
 from sattrack.util.constants import TWOPI
 from sattrack.util.conversions import meanMotionToSma, smaToMeanMotion
 
@@ -97,7 +97,7 @@ class OrbitalElements:
         dM = (dt * (n0 + dt * (tle.getMeanMotionDot() + dt * tle.getMeanMotionDDot()))) * 360.0
         args['meanAnomaly'] = (tle.getMeanAnomaly() + dM) % 360.0
         ecc0 = tle.getEcc()
-        n0dot = tle.getMeanMotionDot() * 2  # todo: ensure this is multiplied by 2 (if not move it up before dM)
+        n0dot = tle.getMeanMotionDot() * 2
         a0 = tle.getSma()
         aDot = -2 * a0 * n0dot / (3 * n0)
         args['sma'] = a0 + aDot * dt
@@ -125,14 +125,13 @@ class OrbitalElements:
                           body: Body = EARTH_BODY) -> dict:
         """Logic for computing elements from a known state."""
         angMom = cross(position, velocity)
-        lineOfNodes = norm(cross(EVector(0, 0, 1), angMom))
+        lineOfNodes = norm(cross(EVector(0, 0, 1), angMom))  # lineOfNodes.mag() not used because it's normalized
         eccVec = computeEccentricVector(position, velocity)
 
-        # todo: test if removing the lineOfNodes.mag() messes anything up (value should be 1)
         args = {'ecc': eccVec.mag(), 'inc': degrees(acos(angMom[2] / angMom.mag()))}
-        raan = degrees(acos(lineOfNodes[0] / lineOfNodes.mag()))
+        raan = degrees(acos(lineOfNodes[0]))
         args['raan'] = 360.0 - raan if lineOfNodes[1] < 0 else raan
-        aop = degrees(acos(dot(lineOfNodes, eccVec) / (lineOfNodes.mag() * eccVec.mag())))
+        aop = degrees(acos(dot(lineOfNodes, eccVec) / eccVec.mag()))
         args['aop'] = 360.0 - aop if eccVec[2] < 0 else aop
         tAnom = acos(dot(eccVec, position) / (eccVec.mag() * position.mag()))
         if dot(position, velocity) < 0:
@@ -166,8 +165,9 @@ class OrbitalElements:
             elements = self.__tleToElements(self._tle, time)
             self.__setFromDict(elements)
         else:
-            # todo: adjust mean anomaly
-            pass  # cannot recompute elements, so adjust mean anomaly
+            if self._epoch is None:
+                raise ValueError('Epoch was not set for this instance.')
+            self._meanAnomaly = meanAnomalyAt(smaToMeanMotion(self._sma), self._meanAnomaly, self._epoch, time)
 
     def updateFromState(self, position: EVector, velocity: EVector, time: JulianDate = None):
         """
@@ -284,8 +284,20 @@ class OrbitalElements:
 
         return meanToTrue(self.meanAnomalyAt(time), self._ecc)
 
-    # todo: document these
     def timeToNextMeanAnomaly(self, mAnom: float, time: JulianDate) -> JulianDate:
+        """
+        Computes the next time a satellite passes through the mean anomaly after the given time.
+
+        Args:
+            mAnom: Mean anomaly in radians
+            time: Relative time to find the next anomaly.
+
+        Returns:
+            The next time the satellite's position is mAnom.
+
+        Raises ValueError: If an epoch was not set.
+        """
+
         if self._epoch is None:
             raise ValueError('Epoch was not set for this instance.')
         return timeToNextMeanAnomaly(
@@ -297,6 +309,19 @@ class OrbitalElements:
         )
 
     def timeToPrevMeanAnomaly(self, mAnom: float, time: JulianDate) -> JulianDate:
+        """
+        Computes the previous time the satellite passed through the mean anomaly before the given time.
+
+        Args:
+            mAnom: Mean anomaly in radians.
+            time: Relative time to find the previous anomaly.
+
+        Returns:
+            The previous time the satellite's position was mAnom.
+
+        Raises ValueError: If an epoch was not set.
+        """
+
         if self._epoch is None:
             raise ValueError('Epoch was not set for this instance.')
         return timeToPrevMeanAnomaly(
@@ -308,6 +333,19 @@ class OrbitalElements:
         )
 
     def timeToNextTrueAnomaly(self, tAnom: float, time: JulianDate) -> JulianDate:
+        """
+        Computes the next time the satellite passes through the true anomaly after the time given.
+
+        Args:
+            tAnom: True anomaly in radians.
+            time: Relative time to find the next anomaly
+
+        Returns:
+            The next time the satellite's position is tAnom.
+
+        Raises ValueError: If an epoch was not set.
+        """
+
         if self._epoch is None:
             raise ValueError('Epoch was not set for this instance.')
         return timeToNextMeanAnomaly(
@@ -319,6 +357,19 @@ class OrbitalElements:
         )
 
     def timeToPrevTrueAnomaly(self, tAnom: float, time: JulianDate) -> JulianDate:
+        """
+        Computes the previous time the satellite passes through the true anomaly before the time given.
+
+        Args:
+            tAnom: True anomaly in radians.
+            time: Relative time to find the previous anomaly.
+
+        Returns:
+            The previous time the satellite position is tAnom.
+
+        Raises ValueError: If an epoch was not set.
+        """
+
         if self._epoch is None:
             raise ValueError('Epoch was not set for this instance.')
         return timeToPrevMeanAnomaly(
