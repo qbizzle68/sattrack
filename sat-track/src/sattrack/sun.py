@@ -133,7 +133,11 @@ def getSunPosition2(time: JulianDate):
     zenith = pi/2 - e
     azimuth = (atan2(sin(HP), cos(HP)*sin(phi) - tan(deltaP)*cos(phi)) + pi) % TWOPI
     return azimuth, zenith'''
-    return EVector(xComp, yComp, zComp)
+    # todo: find correct way to compute R
+    n = time.difference(J2000)
+    g = 6.240040768 + 0.0172019703 * n
+    R = 1.00014 - 0.01671 * cos(g) - 0.00014 * cos(2 * g)
+    return EVector(xComp, yComp, zComp) * R * AU
 
 
 def expandTableValues(table, JME):
