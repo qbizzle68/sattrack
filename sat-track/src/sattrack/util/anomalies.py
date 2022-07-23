@@ -293,12 +293,7 @@ def __computeAnomalyLogic(position: EVector, velocity: EVector, body: Body, mean
     lhs = position * (velocity.mag2() / body.getMu() - 1 / position.mag())
     rhs = velocity * (dot(position, velocity) / body.getMu())
     eccVec = lhs - rhs
-    # todo: fix this in pyevspace module
-    if norm(position) == eccVec:
-        return 0
-    elif norm(-position) == eccVec:
-        return pi
-    ang = radians(vang(position, eccVec))
+    ang = vang(position, eccVec)
     tAnom = TWOPI - ang if norm(cross(position, eccVec)) == norm(cross(position, velocity)) else ang
     if meanOrTrue == 'mean':
         return trueToMean(tAnom, eccVec.mag())

@@ -205,6 +205,7 @@ def nextPass(sat: Satellite, geo: GeoPosition, time: JulianDate,
     if constraints is not None and constraints.minAltitude is not None:
         #   if minimum altitude isn't attained
         if constraints.minAltitude > maxAlt:
+            print(nextPassTime, maxAlt)
             return nextPass(sat, geo, nextPassTime.future(0.001), constraints)
 
     sc = ShadowController(sat.getTle())
@@ -240,14 +241,16 @@ def nextPass(sat: Satellite, geo: GeoPosition, time: JulianDate,
         setIlluminated = True
         lastTime = setTime
 
+    # todo: find the time of sunrise/sunset, then compute when the sat is first visible including this knowledge
+
     if constraints is not None:
         if constraints.illuminated is not None:
             #   when constraints is illuminated and sat is not illuminated at rise and set times
             if constraints.illuminated and not riseIlluminated and not setIlluminated:
                 return nextPass(sat, geo, nextPassTime.future(0.001), constraints)
-            #   when constraints is not illuminated and it is illuminated at some point
-            if not constraints.illuminated and (riseIlluminated or firstTime != riseTime) \
-                    or (setIlluminated or lastTime != setTime):
+            #   when constraints is not illuminated and sat is illuminated at some point
+            if not constraints.illuminated and ((riseIlluminated or firstTime != riseTime)
+                                                or (setIlluminated or lastTime != setTime)):
                 return nextPass(sat, geo, nextPassTime.future(0.001), constraints)
         if constraints.minDuration is not None:
             #   when minimum duration is not met
@@ -360,7 +363,7 @@ def nextPassMaxGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Juli
     pVec = getPVector(geo, *state, t0)
     ma0 = trueToMean(computeTrueAnomaly(state[0], state[1]), sat.getTle().getEcc())
     eccVec = computeEccentricVector(state[0], state[1])
-    ta1 = radians(vang(eccVec, pVec))
+    ta1 = vang(eccVec, pVec)
     if norm(cross(eccVec, pVec)) != norm(cross(state[0], state[1])):
         ta1 = TWOPI - ta1
     ma1 = trueToMean(ta1, sat.getTle().getEcc())
@@ -373,12 +376,12 @@ def nextPassMaxGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Juli
     # iterate towards answer moving forward or backward
     state = sat.getState(tn)
     pVec = getPVector(geo, *state, tn)
-    while vang(state[0], pVec) > 2.78e-4:
+    while vang(state[0], pVec) > 4.85e-06:  # 1 arc second
         pVec = getPVector(geo, *state, tn)
         eccVec = computeEccentricVector(state[0], state[1])
         tan = computeTrueAnomaly(state[0], state[1])
         man = trueToMean(tan, sat.getTle().getEcc())
-        tan1 = radians(vang(eccVec, pVec))
+        tan1 = vang(eccVec, pVec)
         if norm(cross(eccVec, pVec)) != norm(cross(state[0], state[1])):
             tan1 = TWOPI - tan1
         man1 = trueToMean(tan1, sat.getTle().getEcc())
@@ -612,10 +615,10 @@ def orbitAltitude(sat: Satellite, geo: GeoPosition, time: JulianDate) -> float:
     p = v * t + r
 
     # find the true anomaly of this vector if it were a position vector
-    trueAnom = radians(vang(computeEccentricVector(state[0], state[1]), p))
+    trueAnom = vang(computeEccentricVector(state[0], state[1]), p)
     pSat = norm(p) * ((sma * (1 - ecc * ecc)) / (1 + ecc * cos(trueAnom)))
 
-    ang = vang(p - gamma, pSat - gamma)
+    ang = degrees(vang(p - gamma, pSat - gamma))
     return ang if pSat.mag2() > p.mag2() else -ang
 
 
@@ -641,7 +644,7 @@ def isEclipsed(sat: Satellite, time: JulianDate) -> bool:
     thetaE = asin(__getPerspectiveRadius(sat, time, sunPos) / earthPos.mag())
     thetaS = asin(SUN_RADIUS / relSunPos.mag())
     #   angle between earth and sun centers relative to the satellite
-    theta = radians(vang(earthPos, relSunPos))
+    theta = vang(earthPos, relSunPos)
 
     #   umbral eclipse
     if thetaE > thetaS and theta < (thetaE - thetaS):
