@@ -259,7 +259,7 @@ def trueAnomalyAt(meanMotion: float, ecc: float, t0: float, epoch0: JulianDate, 
 
 def computeTrueAnomaly(position: EVector, velocity: EVector, body: Body = EARTH_BODY) -> float:
     """
-    Computes the true anomaly
+    Computes the true anomaly at a given state.
 
     Args:
         position: Position vector of the satellite.
@@ -270,6 +270,26 @@ def computeTrueAnomaly(position: EVector, velocity: EVector, body: Body = EARTH_
         The true anomaly at the given position in radians.
     """
 
+    return __computeAnomalyLogic(position, velocity, body, 'true')
+
+
+def computeMeanAnomaly(position: EVector, velocity: EVector, body: Body = EARTH_BODY) -> float:
+    """
+    Computes the mean anomaly at a given state.
+
+    Args:
+        position: Position vector of the satellite.
+        velocity: Velocity vector of the satellite.
+        body: Body of the orbiting satellite (Default = EARTH_BODY).
+
+    Returns:
+        The mean anomaly at the given position in radians.
+    """
+
+    return __computeAnomalyLogic(position, velocity, body, 'mean')
+
+def __computeAnomalyLogic(position: EVector, velocity: EVector, body: Body, meanOrTrue: str) -> float:
+    """Logic for computing anomalies, meanOrTrue should be 'mean', or 'true'."""
     lhs = position * (velocity.mag2() / body.getMu() - 1 / position.mag())
     rhs = velocity * (dot(position, velocity) / body.getMu())
     eccVec = lhs - rhs
@@ -279,10 +299,12 @@ def computeTrueAnomaly(position: EVector, velocity: EVector, body: Body = EARTH_
     elif norm(-position) == eccVec:
         return pi
     ang = radians(vang(position, eccVec))
-    return TWOPI - ang if norm(cross(position, eccVec)) == norm(cross(position, velocity)) else ang
+    tAnom = TWOPI - ang if norm(cross(position, eccVec)) == norm(cross(position, velocity)) else ang
+    if meanOrTrue == 'mean':
+        return trueToMean(tAnom, eccVec.mag())
+    elif meanOrTrue == 'true':
+        return tAnom
 
-
-# todo: make a computeMeanAnomaly method from a state
 
 def timeToNearestTrueAnomaly(meanMotion: float, ecc: float, t0: float, time0: JulianDate, t1: float) -> JulianDate:
     """
@@ -299,8 +321,23 @@ def timeToNearestTrueAnomaly(meanMotion: float, ecc: float, t0: float, time0: Ju
         The nearest time the satellite's position is the true anomaly.
     """
 
-    m0 = trueToMean(t0, ecc)
-    m1 = trueToMean(t1, ecc)
+    return timeToNearestMeanAnomaly(meanMotion, trueToMean(t0, ecc), time0, trueToMean(t1, ecc))
+
+
+def timeToNearestMeanAnomaly(meanMotion: float, m0: float, time0: JulianDate, m1: float) -> JulianDate:
+    """
+    Computes the nearest mean anomaly of a position.
+
+    Args:
+        meanMotion: Mean motion of the satellite in radians per second.
+        m0: A known mean anomaly at time0 in radians.
+        time0: Time the satellite's mean anomaly is m0.
+        m1: Mean anomaly to find the time of.
+
+    Returns:
+        The nearest time the satellite's position is the mean anomaly.
+    """
+
     if m1 < m0:
         if m0 - m1 < pi:
             dma = m1 - m0
@@ -312,6 +349,3 @@ def timeToNearestTrueAnomaly(meanMotion: float, ecc: float, t0: float, time0: Ju
         else:
             dma = m1 - m0
     return time0.future(dma / (meanMotion * 86400.0))
-
-
-# todo: make a timeToNearestMeanAnomaly method
