@@ -19,5 +19,3 @@ AU = 1.495978707e8  # km
 
 #   Math constants
 TWOPI = 2.0 * pi
-
-# todo: add other conversion values like rev/day to rad/s and the like to remove magic numbers
