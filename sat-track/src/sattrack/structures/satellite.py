@@ -1,4 +1,4 @@
-from math import radians, pi
+from math import radians
 
 from pyevspace import EVector
 
@@ -28,7 +28,6 @@ class Satellite:
         self._propagator = None
         self._epoch = None
         self._elements = None
-        self._periapsisPassage = None
         self.update(obj)
         self._body = body
         self._states = {}
@@ -40,7 +39,7 @@ class Satellite:
             rtn += f'{self._tle}'
         else:
             rtn += f'{self._elements}'
-        rtn += f'\nPeriapsis passage: {self._periapsisPassage}\nBody: {self._body}'
+        rtn += f'\nBody: {self._body}'
         return rtn
 
     def getState(self, jd: JulianDate, cache: bool = False) -> tuple[EVector]:
@@ -61,8 +60,8 @@ class Satellite:
             return self._states[jd.value()]
         if self._tle:
             rawState = self._propagator.getState(self._tle, jd)
-            state = EVector(rawState[0][0], rawState[0][1], rawState[0][2]), EVector(rawState[1][0], rawState[1][1],
-                                                                                    rawState[1][2])
+            state = (EVector(rawState[0][0], rawState[0][1], rawState[0][2]),
+                     EVector(rawState[1][0], rawState[1][1], rawState[1][2]))
             if cache:
                 self._states[jd.value()] = state
             return state
@@ -80,24 +79,16 @@ class Satellite:
             obj: TwoLineElement or OrbitalElements that describe the satellite.
         """
 
-        # todo: is computing periapsis passage still ideal?
         if type(obj) == TwoLineElement:
             self._tle = obj
             self._propagator = SGP4_Propagator(obj)
             self._epoch = obj.getEpoch()
             self._elements = None
-            dt = -radians(obj.getMeanAnomaly()) / (2 * pi * obj.getMeanMotion())
-            self._periapsisPassage = self._epoch.future(dt)
         elif type(obj) == OrbitalElements:
             self._tle = None
             self._propagator = None
             self._epoch = obj.getEpoch()
             self._elements = obj
-            if obj.getEpoch() is not None:
-                dt = -radians(obj.getMeanAnomaly()) / smaToMeanMotion(obj.getSma())
-                self._periapsisPassage = self._epoch.future(dt)
-            else:
-                self._periapsisPassage = None
 
     def getTle(self) -> TwoLineElement:
         """
@@ -145,11 +136,6 @@ class Satellite:
     def getBody(self) -> Body:
         """Returns the parent body of the satellite."""
         return self._body
-
-    # todo: do we need to include this?
-    def getPeriapsisPassage(self) -> float:
-        """Returns the time of periapsis passage for the satellite."""
-        return self._periapsisPassage
 
     def getReferenceFrame(self, time: JulianDate = None) -> ReferenceFrame:
         """Computes the rotation object for the perifocal reference frame."""
