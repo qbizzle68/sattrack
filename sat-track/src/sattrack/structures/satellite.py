@@ -31,6 +31,7 @@ class Satellite:
         self._periapsisPassage = None
         self.update(obj)
         self._body = body
+        self._states = {}
 
     def __str__(self) -> str:
         """Returns a string representation of the satellite."""
@@ -42,25 +43,34 @@ class Satellite:
         rtn += f'\nPeriapsis passage: {self._periapsisPassage}\nBody: {self._body}'
         return rtn
 
-    # todo: add a stack to store states, with bool parameter that defaults to false
-    def getState(self, jd: JulianDate) -> tuple[EVector]:
+    def getState(self, jd: JulianDate, cache: bool = False) -> tuple[EVector]:
         """
         Computes a set of state vectors for the satellite at a given time.
 
         Args:
             jd: Time to compute the state.
+            cache: Boolean for determining whether to cache the state to retrieve it without recomputing the state in
+                another method (Default = False).
 
         Returns:
             A tuple of EVectors that contain the position and velocity in kilometers and kilometers / second
             respectively.
         """
 
+        if jd.value() in self._states:
+            return self._states[jd.value()]
         if self._tle:
             rawState = self._propagator.getState(self._tle, jd)
-            return EVector(rawState[0][0], rawState[0][1], rawState[0][2]), EVector(rawState[1][0], rawState[1][1],
+            state = EVector(rawState[0][0], rawState[0][1], rawState[0][2]), EVector(rawState[1][0], rawState[1][1],
                                                                                     rawState[1][2])
+            if cache:
+                self._states[jd.value()] = state
+            return state
         else:
-            return self._elements.getState(jd)
+            state = self._elements.getState(jd)
+            if cache:
+                self._states[jd.value()] = state
+            return state
 
     def update(self, obj: TwoLineElement | OrbitalElements):
         """
