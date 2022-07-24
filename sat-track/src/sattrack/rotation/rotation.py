@@ -257,8 +257,7 @@ class ReferenceFrame:
 
     def getMatrix(self) -> EMatrix:
         """Returns the rotation matrix that corresponds to this rotation."""
-        # todo: make this a deepcopy (error is EMatrix can't be pickled)
-        return self._matrix
+        return self._matrix.copy()
 
     def RotateTo(self, vector: EVector) -> EVector:
         """
