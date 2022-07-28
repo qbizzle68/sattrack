@@ -1,4 +1,4 @@
-﻿from math import sqrt, sin, cos, floor, pi, radians
+﻿from math import sqrt, sin, cos, floor, pi, atan2
 
 from pyevspace import EVector, norm, vang, cross, dot
 
@@ -21,8 +21,10 @@ def meanToTrue(meanAnomaly: float, ecc: float) -> float:
     """
 
     eAnom = __m2ENewtonRaphson(meanAnomaly, ecc) % TWOPI
-    y = sqrt(1 - (ecc * ecc)) * sin(eAnom)
-    return atan3(y, cos(eAnom) - ecc)
+    '''y = sqrt(1 - (ecc * ecc)) * sin(eAnom)
+    return atan3(y, cos(eAnom) - ecc)'''
+    beta = ecc / (1 + sqrt(1 - ecc * ecc))
+    return eAnom + 2 * atan2(beta * sin(eAnom), 1 - beta * cos(eAnom))
 
 
 def meanToEccentric(meanAnomaly: float, eccentricity: float) -> float:
@@ -52,8 +54,10 @@ def eccentricToTrue(eccAnom: float, ecc: float) -> float:
         The true anomaly in radians.
     """
 
-    y = sqrt(1 - (ecc * ecc)) * sin(eccAnom)
-    return atan3(y, cos(eccAnom) - ecc)
+    '''y = sqrt(1 - (ecc * ecc)) * sin(eccAnom)
+    return atan3(y, cos(eccAnom) - ecc)'''
+    beta = ecc / (1 + sqrt(1 - ecc*ecc))
+    return eccAnom + 2 * atan2(beta * sin(eccAnom), 1 - beta * cos(eccAnom))
 
 
 def trueToMean(trueAnom: float, ecc: float) -> float:
@@ -70,7 +74,7 @@ def trueToMean(trueAnom: float, ecc: float) -> float:
 
     y = sqrt(1 - (ecc * ecc)) * sin(trueAnom)
     eAnom = atan3(y, cos(trueAnom) + ecc)
-    return eAnom - ecc * sin(eAnom) % TWOPI
+    return (eAnom - ecc * sin(eAnom)) % TWOPI
 
 
 def trueToEccentric(trueAnom: float, ecc: float) -> float:
