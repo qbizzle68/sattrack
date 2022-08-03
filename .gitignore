@@ -675,4 +675,4 @@ fabric.properties
 .idea/codestream.xml
 
 # expect this to be removed when combining project for distribution
-!sat-track/src/sattrack/structures/sgp4.pyd
+!src/sattrack/structures/sgp4.pyd
