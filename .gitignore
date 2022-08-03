@@ -3,7 +3,6 @@ test/
 *csv/
 *.xlsx
 graph1.py
-test.py
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
