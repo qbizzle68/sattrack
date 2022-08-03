@@ -1,3 +1,4 @@
+import json
 from math import cos, radians, pi, sqrt, acos, sin, degrees, asin, atan
 
 from pyevspace import EVector, cross, dot, norm, vang
@@ -52,6 +53,9 @@ class PositionInfo:
         """Generates a string of the data in this class."""
         return f'Altitude: {"%.2f" % self._altitude}\nAzimuth: {"%.2f" % self._azimuth} ({self._direction})\nTime: ' \
                f'{self._time}\nVisibility: {self._visible}'
+
+    def toJson(self):
+        return json.dumps(self, indent=4, default=lambda o: o.__dict__)
 
     def getAltitude(self) -> float:
         """Returns the altitude measured in degrees.."""
@@ -136,6 +140,9 @@ class Pass:
             rtn += strDict[minTm] + '\n'
             strDict.pop(minTm)
         return rtn.rstrip()
+
+    def toJson(self):
+        return json.dumps(self, indent=4, default=lambda o: o.__dict__)
 
     def getRiseInfo(self) -> PositionInfo:
         """Returns the rise time information."""
