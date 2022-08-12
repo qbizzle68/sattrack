@@ -1,3 +1,4 @@
+import json
 from abc import ABC, abstractmethod
 from math import sin, cos, tan, atan, radians, degrees, sqrt, asin
 from sattrack.util.constants import EARTH_FLATTENING, EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS
@@ -20,6 +21,9 @@ class Coordinates(ABC):
     def __str__(self) -> str:
         """Returns a string representation of the object."""
         return f'Latitude: {self._lat}, Longitude: {self._lng}'
+
+    def toJSON(self):
+        return json.dumps(self, indent=4, default=lambda o: o.__dict__)
 
     def getLatitude(self) -> float:
         """Returns the latitude in degrees."""
@@ -66,6 +70,10 @@ class GeoPosition(Coordinates):
         """
         super().__init__(lat, lng)
         self._elevation = elevation
+
+    @classmethod
+    def fromJSON(cls, json):
+        return cls(json['_lat'], json['_lng'], json['_elevation'])
 
     def getElevation(self) -> float:
         """Returns the elevation in meters."""

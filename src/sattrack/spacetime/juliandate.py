@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 
 
@@ -27,9 +28,26 @@ class JulianDate:
         self._day_fraction = 0
         self.setTime(month, day, year, hour, minute, second, timeZone)
 
+    @classmethod
+    def fromNumber(cls, day: float, fraction: float = None):
+        rtn = cls(0, 0, 0, 0, 0, 0)
+        rtn._day_number = int(day)
+        if fraction is not None:
+            rtn._day_fraction = fraction
+        else:
+            rtn._day_fraction = 0.0
+        return rtn
+
     def __str__(self) -> str:
         """Returns the value and Gregorian date of the JulianDate as a string."""
         return str(round(self.value(), 6)) + ' --- ' + self.date()
+
+    def toJSON(self):
+        return json.dumps(self, indent=4, default=lambda o: o.__dict__)
+
+    @classmethod
+    def fromJSON(cls, json):
+        return cls.fromNumber(json['_day_number'], json['_day_fraction'])
 
     def setTime(self, month: int, day: int, year: int, hour: int, minute: int, sec: float, timeZone: int = 0):
         """
