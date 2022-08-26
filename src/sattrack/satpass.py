@@ -17,7 +17,6 @@ from sattrack.topos import getPVector, toTopocentric, getTwilightType, getAltitu
 from sattrack.util.anomalies import trueToMean, timeToNearestTrueAnomaly, computeTrueAnomaly
 from sattrack.util.constants import SUN_RADIUS, TWOPI, EARTH_FLATTENING, EARTH_EQUITORIAL_RADIUS
 from sattrack.util.conversions import atan3
-from sattrack.util.jsoncustom import default
 
 
 class PositionInfo:
