@@ -38,16 +38,26 @@ class JulianDate:
             rtn._day_fraction = 0.0
         return rtn
 
+    def __iter__(self):
+        yield from {
+            'day_number': self._day_number,
+            'day_fraction': self._day_fraction
+        }.items()
+
     def __str__(self) -> str:
         """Returns the value and Gregorian date of the JulianDate as a string."""
         return str(round(self.value(), 6)) + ' --- ' + self.date()
 
-    def toJSON(self):
-        return json.dumps(self, indent=4, default=lambda o: o.__dict__)
+    def __repr__(self) -> str:
+        """Returns a JSON like representation of the attribute values."""
+        return json.dumps(dict(self))
+
+    def toJson(self):
+        return dict(self)
 
     @classmethod
     def fromJSON(cls, json):
-        return cls.fromNumber(json['_day_number'], json['_day_fraction'])
+        return cls.fromNumber(json['day_number'], json['day_fraction'])
 
     def setTime(self, month: int, day: int, year: int, hour: int, minute: int, sec: float, timeZone: int = 0):
         """

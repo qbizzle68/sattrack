@@ -17,6 +17,7 @@ from sattrack.topos import getPVector, toTopocentric, getTwilightType, getAltitu
 from sattrack.util.anomalies import trueToMean, timeToNearestTrueAnomaly, computeTrueAnomaly
 from sattrack.util.constants import SUN_RADIUS, TWOPI, EARTH_FLATTENING, EARTH_EQUITORIAL_RADIUS
 from sattrack.util.conversions import atan3
+from sattrack.util.jsoncustom import default
 
 
 class PositionInfo:
@@ -49,13 +50,32 @@ class PositionInfo:
         self._time = time
         self._visible = visible
 
+    def __iter__(self):
+        yield from {
+            "altitude": self._altitude,
+            "azimuth": self._azimuth,
+            "direction": self._direction,
+            "time": self._time,
+            "visible": self._visible
+        }.items()
+
     def __str__(self):
         """Generates a string of the data in this class."""
         return f'Altitude: {"%.2f" % self._altitude}\nAzimuth: {"%.2f" % self._azimuth} ({self._direction})\nTime: ' \
                f'{self._time}\nVisibility: {self._visible}'
 
+    def __repr__(self):
+        """Generages a JSON like representation."""
+        #return json.dumps(dict(self), default=default)
+        return json.dumps(self.toJson())
+
     def toJson(self):
-        return json.dumps(self, indent=4, default=lambda o: o.__dict__)
+        #return json.dumps(self, indent=4, default=lambda o: o.__dict__)
+        #return self.__repr__()
+        rtn = dict(self)
+        del rtn['time']
+        rtn['time'] = dict(self._time)
+        return rtn
 
     def getAltitude(self) -> float:
         """Returns the altitude measured in degrees.."""
@@ -121,6 +141,16 @@ class Pass:
         else:
             self._visible = False
 
+    def __iter__(self):
+        yield from {
+            'riseInfo': self._riseInfo,
+            'setInfo': self._setInfo,
+            'maxInfo': self._maxInfo,
+            'firstVisible': self._firstVisible,
+            'lastVisible': self._lastVisible,
+            'visible': self._visible
+        }.items()
+
     def __str__(self):
         """Returns a string containing all the pass's information."""
         riseStr = f'Rise:\n{self._riseInfo}'
@@ -141,8 +171,18 @@ class Pass:
             strDict.pop(minTm)
         return rtn.rstrip()
 
+    def __repr__(self):
+        return json.dumps(self.toJson())
+
     def toJson(self):
-        return json.dumps(self, indent=4, default=lambda o: o.__dict__)
+        # return json.dumps(self, indent=4, default=lambda o: o.__dict__)
+        rtn = {'visible': self._visible}
+        rtn['riseInfo'] = dict(self._riseInfo)
+        rtn['setInfo'] = dict(self._setInfo)
+        rtn['maxInfo'] = dict(self._maxInfo)
+        rtn['firstVisible'] = dict(self._firstVisible) if self._firstVisible is not None else None
+        rtn['lastVisible'] = dict(self._lastVisible) if self._lastVisible is not None else None
+        return rtn
 
     def getRiseInfo(self) -> PositionInfo:
         """Returns the rise time information."""
@@ -212,7 +252,7 @@ def nextPass(sat: Satellite, geo: GeoPosition, time: JulianDate,
     if constraints is not None and constraints.minAltitude is not None:
         #   if minimum altitude isn't attained
         if constraints.minAltitude > maxAlt:
-            print(nextPassTime, maxAlt)
+            # print(nextPassTime, maxAlt)
             return nextPass(sat, geo, nextPassTime.future(0.001), constraints)
 
     sc = ShadowController(sat.getTle())
