@@ -76,3 +76,29 @@ class NoPassException(Exception):
     def __init__(self, message):
         self.message = message
         super().__init__(self.message)
+
+
+class ShadowException(Exception):
+    """
+    Exception raised for when an error occurred computing shadow anomalies.
+
+    Attributes
+        message: Explanation of the error.
+    """
+
+    def __init__(self, message):
+        self.message = message
+        super().__init__(self.message)
+
+
+class PositiveZeroException(ShadowException):
+    """
+    Exception raised for when there are not two values that satisfy the zero equation but not the 'check' equation.
+
+    Attributes
+        message: Explanation of the error.
+    """
+
+    def __init__(self, message):
+        self.message = message
+        super().__init__(self.message)
