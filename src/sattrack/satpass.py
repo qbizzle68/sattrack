@@ -834,6 +834,8 @@ class ShadowController:
         zeros = self.__getZeros(index)
         checks = [self._s[index][0] * cos(z) + self._s[index][1] * sin(z) for z in zeros]
         phis = [zeros[i] for i in range(4) if checks[i] > 0]
+        if len(phis) != 2:
+            raise PositiveZeroException(f'Number of positive zeros, which is {len(phis)}, should be 2')
         gamma = self.__getGamma(self._s[index])
         if index == 0:
             if phis[0] + gamma < pi:
