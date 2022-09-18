@@ -90,6 +90,10 @@ class Satellite:
             self._epoch = obj.getEpoch()
             self._elements = obj
 
+    def hasTle(self):
+        """Returns whether the satellite object was instantiated with a TLE object."""
+        return True if self._tle is not None else False
+
     def getTle(self) -> TwoLineElement:
         """
         Returns the TLE of the satellite.
