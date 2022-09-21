@@ -33,13 +33,14 @@ class PositionInfo:
         visible: Visibility of the satellite, defaults to false.
     """
 
-    def __init__(self, altitude: float, azimuth: float, time: JulianDate, visible: bool = False):
+    def __init__(self, altitude: float, azimuth: float, time: JulianDate, illuminated: bool = False, visible: bool = False):
         """
         Initializes the values to the parameters.
         Args:
             altitude: Altitude of the satellite in degrees.
             azimuth: Azimuth of the satellite in degrees.
             time: Time of this instance in the pass.
+            illuminated: Boolean signifying if the satellite is illuminated (i.e. not in Earth's shadow).
             visible: Visibility of the satellite (Default = False).
         """
 
@@ -47,6 +48,7 @@ class PositionInfo:
         self._azimuth = azimuth
         self._direction = azimuthAngleString(azimuth)
         self._time = time
+        self._illuminated = illuminated
         self._visible = visible
 
     def __iter__(self):
@@ -55,13 +57,14 @@ class PositionInfo:
             "azimuth": self._azimuth,
             "direction": self._direction,
             "time": self._time,
+            "illuminatd": self._illuminated,
             "visible": self._visible
         }.items()
 
     def __str__(self):
         """Generates a string of the data in this class."""
         return f'Altitude: {"%.2f" % self._altitude}\nAzimuth: {"%.2f" % self._azimuth} ({self._direction})\nTime: ' \
-               f'{self._time}\nVisibility: {self._visible}'
+               f'{self._time}\nIlluminated: {self._illuminated}\nVisibility: {self._visible}'
 
     def __repr__(self):
         """Generages a JSON like representation."""
@@ -92,6 +95,10 @@ class PositionInfo:
         """Returns a JulianDate representing the time of this instance."""
         return self._time
 
+    def getIlluminated(self) -> bool:
+        """Returns whether the satellite is illuminated."""
+        return self._illuminated
+
     def getVisibility(self) -> bool:
         """Returns the visibility of the satellite."""
         return self._visible
@@ -117,8 +124,10 @@ class Pass:
                  firstInfo: PositionInfo = None, lastInfo: PositionInfo = None):
         """
         Initializes a pass with the given values. firstInfo and lastInfo should only be set if the satellite enters or
-        leaves the Earth's shadow during the transit. If the riseInfo visibility attribute is true or a firstInfo value
-        is set, the visibility of the pass is set to true, otherwise it is set to false.
+        leaves the Earth's shadow during the transit. If the riseInfo illuminated attribute is true or a firstInfo value
+        is set, the illuminated status of the pass is set to true, otherwise it is set to false. Visibility is
+        determined on illumination status and sun angle at all points of the pass (i.e. at some point of the pass the
+        satellite must be illuminated and the sun below the horizon to be considered visible).
 
         Args:
             riseInfo: Information for the rise time of the satellite pass.
@@ -135,9 +144,15 @@ class Pass:
         self._maxInfo = maxInfo
         self._firstVisible = firstInfo
         self._lastVisible = lastInfo
-        if firstInfo is not None or riseInfo.getVisibility():
-            self._visible = True
+        if firstInfo is not None or riseInfo.getIlluminated():
+            self._illuminated = True
+            if riseInfo.getVisibility() or maxInfo.getVisibility() or setInfo.getVisibility() or (firstInfo is not None
+            and firstInfo.getVisibility()) or (lastInfo is not None and lastInfo.getVisibility()):
+                self._visible = True
+            else:
+                self._visible = False
         else:
+            self._illuminated = False
             self._visible = False
 
     def __iter__(self):
@@ -147,6 +162,7 @@ class Pass:
             'maxInfo': self._maxInfo,
             'firstVisible': self._firstVisible,
             'lastVisible': self._lastVisible,
+            'illuminated': self._illuminated,
             'visible': self._visible
         }.items()
 
@@ -168,14 +184,16 @@ class Pass:
             minTm = min(strDict.keys())
             rtn += strDict[minTm] + '\n'
             strDict.pop(minTm)
-        return rtn.rstrip()
+        rtn.rstrip()
+        rtn += f'---------------------------------\nIlluminated: {self._illuminated}\nVisible: {self._visible}'
+        return rtn
 
     def __repr__(self):
         return json.dumps(self.toJson())
 
     def toJson(self):
         # return json.dumps(self, indent=4, default=lambda o: o.__dict__)
-        rtn = {'visible': self._visible}
+        rtn = {'illuminated': self._illuminated, 'visible': self._visible}
         rtn['riseInfo'] = dict(self._riseInfo)
         rtn['setInfo'] = dict(self._setInfo)
         rtn['maxInfo'] = dict(self._maxInfo)
@@ -202,6 +220,10 @@ class Pass:
     def getLastVisibleInfo(self) -> PositionInfo:
         """Returns the last visible time information if set."""
         return self._lastVisible
+
+    def getIlluminated(self) -> bool:
+        """Returns the illumination status of the pass."""
+        return self._illuminated
 
     def getVisibility(self) -> bool:
         """Returns the visibility of the pass."""
@@ -371,9 +393,11 @@ class PassController:
 
         risePos = self._sat.getState(riseTime)[0]
         risePosSez = toTopocentric(risePos, riseTime, self._geo)
+        # riseTwilightType = getTwilightType(riseTime, self._geo)
         riseInfo = PositionInfo(degrees(asin(risePosSez[2] / risePosSez.mag())),
                                 degrees(atan3(risePosSez[1], -risePosSez[0])),
                                 riseTime,
+                                riseIlluminated,
                                 riseIlluminated and getTwilightType(riseTime, self._geo) > TwilightType.Day)
                                 # not isEclipsed(self._sat, riseTime) and getTwilightType(riseTime, self._geo) > TwilightType.Day)
 
@@ -382,13 +406,17 @@ class PassController:
         setInfo = PositionInfo(degrees(asin(setPosSez[2] / setPosSez.mag())),
                                degrees(atan3(setPosSez[1], -setPosSez[0])),
                                setTime,
+                               setIlluminated,
                                setIlluminated and getTwilightType(setTime, self._geo) > TwilightType.Day)
                                # not isEclipsed(self._sat, setTime) and getTwilightType(setTime, self._geo) > TwilightType.Day)
 
-        maxIlluminated = not isEclipsed(self._sat, nextPassTime)
+        # maxIlluminated = not isEclipsed(self._sat, nextPassTime)
+
+        maxIlluminated = not (enterTime.value() <= nextPassTime.value() <= exitTime.value())
         maxInfo = PositionInfo(degrees(asin(maxPosSez[2] / maxPosSez.mag())),
                                degrees(atan3(maxPosSez[1], -maxPosSez[0])),
                                nextPassTime,
+                               maxIlluminated,
                                maxIlluminated and getTwilightType(nextPassTime, self._geo) > TwilightType.Day)
 
         if riseTime != firstTime:
@@ -397,6 +425,7 @@ class PassController:
             firstInfo = PositionInfo(degrees(asin(firstPosSez[2] / firstPosSez.mag())),
                                      degrees(atan3(firstPosSez[1], -firstPosSez[0])),
                                      firstTime,
+                                     True,
                                      getTwilightType(firstTime, self._geo) > TwilightType.Day)
 
         if setTime != lastTime:
@@ -405,6 +434,7 @@ class PassController:
             lastInfo = PositionInfo(degrees(asin(lastPosSez[2] / lastPosSez.mag())),
                                     degrees(atan3(lastPosSez[1], -lastPosSez[0])),
                                     lastTime,
+                                    True,
                                     getTwilightType(lastTime, self._geo) > TwilightType.Day)
 
         # return Pass(riseInfo, setInfo, maxInfo, firstInfo=firstInfo, lastInfo=lastInfo)
