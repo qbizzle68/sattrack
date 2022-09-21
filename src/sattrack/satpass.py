@@ -284,6 +284,7 @@ class PassController:
             if self._time.difference(self._initTime) > self._timeout:
                 return None
         # the future pass time to be called if this pass is invalid
+        # todo: computing this if we dont use it is going to slow this down (possibly by a lot)
         futurePassTime = nextPassTime.future(0.001)
 
         # this does not treat a last time before max time as the max time
@@ -297,31 +298,37 @@ class PassController:
                 else:
                     return None
 
-        self._shadowController.computeValues(nextPassTime)
+        riseTime, setTime = riseSetTimes(self._sat, self._geo, nextPassTime)
+        print(f'riseTime: {riseTime.date(-5)} maxTime: {nextPassTime.date(-5)} setTime: {setTime.date(-5)}')
+        self._shadowController.computeValues(riseTime)
         shadowTimes = self._shadowController.getTimes()
-        if shadowTimes[0].value() < shadowTimes[1].value():
-            enterTime = shadowTimes[0]
-            exitTime = shadowTimes[1]
-        else:
-            enterTime = shadowTimes[1]
-            exitTime = shadowTimes[0]
+        # todo: dont need this check, its guaranteed by the shadow controller to be in order
+        # if shadowTimes[0].value() < shadowTimes[1].value():
+        #     enterTime = shadowTimes[0]
+        #     exitTime = shadowTimes[1]
+        # else:
+        #     enterTime = shadowTimes[1]
+        #     exitTime = shadowTimes[0]
+        enterTime = shadowTimes[0]
+        exitTime = shadowTimes[1]
+        print(f'enterTime: {enterTime.date(-5)} exitTime: {exitTime.date(-5)}')
         firstInfo, lastInfo = None, None
         # sc = ShadowController(sat.getTle())
         # sc.computeValues(nextPassTime)
         # enterTime, exitTime = sc.getTimes()
         # firstInfo, lastInfo = None, None
 
-        riseTime, setTime = riseSetTimes(self._sat, self._geo, nextPassTime)
-        print(f'riseTime: {riseTime.date(-5)} maxTime: {nextPassTime.date(-5)} setTime: {setTime.date(-5)}')
-        print(f'enterTime: {enterTime.date(-5)} exitTime: {exitTime.date(-5)}')
-        # rise and set sandwich shadow entrance
+        # riseTime, setTime = riseSetTimes(self._sat, self._geo, nextPassTime)
+        # print(f'riseTime: {riseTime.date(-5)} maxTime: {nextPassTime.date(-5)} setTime: {setTime.date(-5)}')
+        # print(f'enterTime: {enterTime.date(-5)} exitTime: {exitTime.date(-5)}')
+        #   rise and set sandwich shadow entrance
         if riseTime.value() < enterTime.value() < setTime.value():
             print('rise and set sandwich shadow entrance')
             riseIlluminated = True
             firstTime = riseTime
             setIlluminated = False
             lastTime = enterTime
-        # # rise and set sandwich shadow exit
+        #   rise and set sandwich shadow exit
         # elif riseTime.future(1 / self._sat.getTle().getMeanMotion()).value() < exitTime.value() and \
         #         riseTime.value() < exitTime.value() < setTime.value():
         elif riseTime.value() < exitTime.value() < setTime.value():
@@ -330,7 +337,7 @@ class PassController:
             firstTime = exitTime
             setIlluminated = True
             lastTime = setTime
-        # # rise and set are in shadow
+        #   rise and set are in shadow
         elif enterTime.value() < riseTime.value() < exitTime.value() \
                 and enterTime.value() < setTime.value() < exitTime.value():
             print('rise and set are in shadow')
@@ -338,7 +345,7 @@ class PassController:
             firstTime = riseTime  # avoids setting the firstInfo object
             setIlluminated = False
             lastTime = setTime  # avoids setting the lastInfo object
-        # # rise and set are in sunlight
+        #   rise and set are in sunlight
         else:
             print('rise and set are in sunlight')
             riseIlluminated = True
@@ -414,7 +421,8 @@ class PassController:
         passList = []
         nTime = self._initTime.future(-0.001)
         while nTime.difference(self._initTime) < duration:
-            nPass = nextPass(self._sat, self._geo, nTime.future(0.001), self._constraints)
+            # nPass = nextPass(self._sat, self._geo, nTime.future(0.001), self._constraints)
+            nPass = self.nextPass()
             if nPass is None:
                 self._time = tmp
                 return tuple(passList)
@@ -768,10 +776,18 @@ def horizonTimeRefine(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Jul
         The corrected rise or set time.
     """
 
+    # needed to add a sort of proportional governor because there was a case of oscillating around the zero altitude
+    p = 1.0
+    iterCount = 0
+
     state = sat.getState(time)
     sezPos = toTopocentric(state[0], time, geo)
     alt = asin(sezPos[2] / sezPos.mag())
     while abs(alt) > radians(1 / 3600):
+        iterCount += 1
+        if iterCount % 10 == 0:
+            p /= 2.0
+
         sezVel = rotateOrderTo(
             ZYX,
             EulerAngles(
@@ -784,7 +800,7 @@ def horizonTimeRefine(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Jul
 
         dz = sezPos.mag() * alt
         dt = (-dz / sezVel[2]) / 86400.0
-        time = time.future(dt)
+        time = time.future(dt * p) # p term is linear, so we can put it in the dz or dt term too
 
         state = sat.getState(time)
         sezPos = toTopocentric(state[0], time, geo)
