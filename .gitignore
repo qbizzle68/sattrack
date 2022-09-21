@@ -4,6 +4,7 @@ test/
 *.xlsx
 graph1.py
 data/
+src/test2.py
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
