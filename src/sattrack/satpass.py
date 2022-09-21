@@ -1044,10 +1044,8 @@ class ShadowController:
         phis = [zeros[i] for i in range(4) if checks[i] > 0]
         if len(phis) != 2:
             raise PositiveZeroException(f'Number of positive zeros, which is {len(phis)}, should be 2')
-        # print(f'phi1: {phis[0]} phi2: {phis[1]}')
+
         gamma = self.__getGamma(self._s[index])
-        # want to add gamma to the phis mod TWOPI, then sort then return the original phi from the sorted index
-        # need to check the gamma value, should depend on which side of perigee vector it is
         if index == 0:
             if (phis[0] + gamma) % TWOPI < pi:
                 return phis[0]
@@ -1062,22 +1060,14 @@ class ShadowController:
     def __getZeros(self, index: int):
         """Finds the zeros of Escobal's G function."""
         frac = 0.5
-        ls = [self.__escobalNewtonMethod(pi * i * frac, index) for i in range(int(2 / frac))]
-        for i in range(len(ls)):
-            if ls[i] >= TWOPI or ls[i] < 0:
-                ls[i] %= TWOPI
-        ls = ShadowController.__removeDuplicates(ls, 1e-4)
-        frac /= 2.0
-        while len(ls) < 4:
+        ls = []
+        while len(ls) != 4:
             tmp = [self.__escobalNewtonMethod(pi * i * frac, index) for i in range(int(2 / frac))]
             for i in range(len(tmp)):
-                if tmp[i] >= TWOPI or tmp[i] < 0:
+                if tmp[i] < 0 or tmp[i] >= TWOPI:
                     tmp[i] %= TWOPI
-            # for i in tmp:
-            #     for j in ls:
-            #         if abs(i - j) > 1e-5:
-            #             ls.append(i)
             ls = ShadowController.__removeDuplicates(tmp, 1e-4)
+            frac /= 2.0
         return tuple(ls)
 
     @staticmethod
