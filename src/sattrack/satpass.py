@@ -376,6 +376,11 @@ class PassController:
             lastTime = setTime
 
         # todo: find the time of sunrise/sunset, then compute when the sat is first visible including this knowledge
+        # FRINGE CASE: sat is illuminated but not visible (due to sun angle) and becomes visible during the pass.
+        #   the first visible will not be set (as its technically already visible), so should check if rise time or
+        #   first time is not visible, but set time or last time is visible.
+        #   this could be handled similarly to shadow angles, by finding the rise and set times (not actually, should
+        #   find the times the sun becomes -6.8333 degrees) and compare other known times to them.
 
         # if constraints is not None:
         #     if constraints.illuminated is not None:
