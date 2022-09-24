@@ -21,8 +21,8 @@ from sattrack.structures.tle import getTle
 
 tle = getTle('zarya')
 # tle = TwoLineElement("""ISS (ZARYA)
-# 1 25544U 98067A   22209.54422316  .00005213  00000+0  98742-4 0  9996
-# 2 25544  51.6439 131.7347 0005154  58.2040 113.7462 15.50152435351598""")
+# 1 25544U 98067A   22266.84431519  .00008111  00000+0  14870-3 0  9996
+# 2 25544  51.6423 207.8056 0002412 286.8120 181.5821 15.50238875360488""")
 iss = Satellite(tle)
 #tle = getTLE('ixpe')
 #ixpe = Satellite(tle)
