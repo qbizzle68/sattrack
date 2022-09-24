@@ -102,3 +102,16 @@ class PositiveZeroException(ShadowException):
     def __init__(self, message):
         self.message = message
         super().__init__(self.message)
+
+
+class PassConstraintException(Exception):
+    """
+    Exception raised when an error occurred instantiating a PassConstraint object.
+
+    Attributes
+        message: Explanation of the error.
+    """
+
+    def __init__(self, message):
+        self.message = message
+        super().__init__(self.message)
