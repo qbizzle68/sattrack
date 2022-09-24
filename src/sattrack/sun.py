@@ -1,10 +1,14 @@
 from enum import Enum
 from functools import total_ordering
-from math import sin, cos, pi, radians, tan, asin, sqrt
+from math import sin, cos, pi, radians, tan, asin, sqrt, degrees
 
 from pyevspace import EVector
 
+from sattrack.rotation.order import ZYX
+from sattrack.rotation.rotation import getEulerMatrix, EulerAngles, rotateToThenOffset
 from sattrack.spacetime.juliandate import JulianDate, J2000
+from sattrack.spacetime.sidereal import earthOffsetAngle
+from sattrack.structures.coordinates import GeoPosition, geoPositionVector
 from sattrack.util.constants import AU, TWOPI
 from sattrack.util.conversions import atan3
 
@@ -138,6 +142,92 @@ def getSunPosition2(time: JulianDate):
     g = 6.240040768 + 0.0172019703 * n
     R = 1.00014 - 0.01671 * cos(g) - 0.00014 * cos(2 * g)
     return EVector(xComp, yComp, zComp) * R * AU
+
+
+def getSunAngles(time: JulianDate):
+    JDE = time.future(DELTAT / 86400)
+    # JC = time.difference(J2000) / 36525.0
+    JCE = JDE.difference(J2000) / 36525.0
+    JME = JCE / 10.0
+
+    L = expandTableValues(LTable, JME) % TWOPI
+    B = expandTableValues(BTable, JME) % TWOPI
+    R = expandTableValues(RTable, JME)
+
+    theta = (L + pi) % TWOPI
+    beta = -B
+    dPsi, dEpsilon = getNutationDeltas(JCE)
+    epsilon0 = 0.0
+    for i in range(11):
+        epsilon0 += UTable[i] * ((JME / 10.0) ** i)
+    epsilon = radians(epsilon0 / 3600.0) + dEpsilon
+    dTau = -radians(20.4898 / (3600 * R))
+    lmbda = theta + dPsi + dTau
+    alpha = atan3(sin(lmbda) * cos(epsilon) - tan(beta) * sin(epsilon), cos(lmbda))
+    delta = asin(sin(beta) * cos(epsilon) + cos(beta) * sin(epsilon) * sin(lmbda))
+    return (alpha, delta)
+
+
+def __totopos(vec, time, geo):
+    geoVector = geoPositionVector(geo, time)
+    mat = getEulerMatrix(
+        ZYX,
+        EulerAngles(
+            radians(geo.getLongitude()) + earthOffsetAngle(time),
+            radians(90 - geo.getLatitude()),
+            0.0
+        )
+    )
+    return rotateToThenOffset(mat, geoVector, vec)
+
+
+def getSunRiseSetTimes(time: JulianDate, geo: GeoPosition):
+    desiredAngle = -0.8333
+    sunPos = getSunPosition2(time)
+    sunPosSez = __totopos(sunPos, time, geo)
+    sunAlt = degrees(asin(sunPosSez[2] / sunPosSez.mag()))
+
+    # if sun alt < -0.83333 then find NEXT sunrise moving forward and
+        # skip ahead based on the angle value (try and hit 12 the next day) and find next sunset moving forward
+    # else find previous sunrise moving backward and the next sunset moving forward
+    sunSetTime = time
+    sunRiseTime = time
+    if sunAlt < desiredAngle:
+        sunAz = degrees(atan3(sunPosSez[1], -sunPosSez[0]))
+        if sunAz > 180:
+            sunSetTime = sunSetTime.future(0.66)
+            sunRiseTime = sunRiseTime.future(0.66)
+        else:
+            sunSetTime = sunSetTime.future(0.33)
+            sunRiseTime = sunRiseTime.future(0.33)
+
+    # to sunset
+    while True:
+        sunPos = getSunPosition2(sunSetTime)
+        sunPosSez = __totopos(sunPos, sunSetTime, geo)
+        sunAlt = degrees(asin(sunPosSez[2] / sunPosSez.mag()))
+
+        if abs(sunAlt - desiredAngle) < 1e-5:
+            break
+
+        dAngle = sunAlt - desiredAngle
+        dt = dAngle / 360
+        sunSetTime = sunSetTime.future(dt)
+
+    # to sunrise
+    while True:
+        sunPos = getSunPosition2(sunRiseTime)
+        sunPosSez = __totopos(sunPos, sunRiseTime, geo)
+        sunAlt = degrees(asin(sunPosSez[2] / sunPosSez.mag()))
+
+        if abs(sunAlt - desiredAngle) < 1e-5:
+            break
+
+        dAngle = sunAlt - desiredAngle
+        dt = dAngle / 360
+        sunRiseTime = sunRiseTime.future(-dt)
+
+    return sunRiseTime, sunSetTime
 
 
 def expandTableValues(table, JME):
