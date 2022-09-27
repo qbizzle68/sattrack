@@ -3,7 +3,7 @@ from math import cos, radians, pi, sqrt, acos, sin, degrees, asin, atan2
 
 from pyevspace import EVector, cross, dot, norm, vang
 
-from sattrack.exceptions import NoPassException, TLEException, PositiveZeroException
+from sattrack.exceptions import NoPassException, TLEException, PositiveZeroException, PassConstraintException
 from sattrack.rotation.order import Axis, ZYX, ZXZ
 from sattrack.rotation.rotation import getMatrix, rotateOrderTo, EulerAngles
 from sattrack.spacetime.juliandate import JulianDate
@@ -12,7 +12,7 @@ from sattrack.structures.coordinates import GeoPosition, zenithVector, geoPositi
 from sattrack.structures.elements import computeEccentricVector, raanProcessionRate, OrbitalElements
 from sattrack.structures.satellite import Satellite
 from sattrack.structures.tle import TwoLineElement
-from sattrack.sun import TwilightType, getSunPosition2
+from sattrack.sun import TwilightType, getSunPosition2, getSunRiseSetTimes
 from sattrack.topos import getPVector, toTopocentric, getTwilightType, getAltitude, azimuthAngleString
 from sattrack.util.anomalies import trueToMean, timeToNearestTrueAnomaly, computeTrueAnomaly
 from sattrack.util.constants import SUN_RADIUS, TWOPI, EARTH_FLATTENING, EARTH_EQUITORIAL_RADIUS
@@ -33,7 +33,8 @@ class PositionInfo:
         visible: Visibility of the satellite, defaults to false.
     """
 
-    def __init__(self, altitude: float, azimuth: float, time: JulianDate, illuminated: bool = False, visible: bool = False):
+    def __init__(self, altitude: float, azimuth: float, time: JulianDate, illuminated: bool = False,
+                 unobscured: bool = False):
         """
         Initializes the values to the parameters.
         Args:
@@ -41,7 +42,7 @@ class PositionInfo:
             azimuth: Azimuth of the satellite in degrees.
             time: Time of this instance in the pass.
             illuminated: Boolean signifying if the satellite is illuminated (i.e. not in Earth's shadow).
-            visible: Visibility of the satellite (Default = False).
+            unobscured: Boolean signifying if the satellite is obscured by sunlight.
         """
 
         self._altitude = altitude
@@ -49,7 +50,8 @@ class PositionInfo:
         self._direction = azimuthAngleString(azimuth)
         self._time = time
         self._illuminated = illuminated
-        self._visible = visible
+        self._unobscured = unobscured
+        self._visible = illuminated and unobscured
 
     def __iter__(self):
         yield from {
@@ -57,23 +59,25 @@ class PositionInfo:
             "azimuth": self._azimuth,
             "direction": self._direction,
             "time": self._time,
-            "illuminatd": self._illuminated,
+            "illuminated": self._illuminated,
+            "unobscured": self._unobscured,
             "visible": self._visible
         }.items()
 
     def __str__(self):
         """Generates a string of the data in this class."""
         return f'Altitude: {"%.2f" % self._altitude}\nAzimuth: {"%.2f" % self._azimuth} ({self._direction})\nTime: ' \
-               f'{self._time}\nIlluminated: {self._illuminated}\nVisibility: {self._visible}'
+               f'{self._time}\nIlluminated: {self._illuminated}\nUnobscured: {self._unobscured}\nVisibility: ' \
+               f'{self._visible}'
 
     def __repr__(self):
-        """Generages a JSON like representation."""
-        #return json.dumps(dict(self), default=default)
+        """Generates a JSON like representation."""
+        # return json.dumps(dict(self), default=default)
         return json.dumps(self.toJson())
 
     def toJson(self):
-        #return json.dumps(self, indent=4, default=lambda o: o.__dict__)
-        #return self.__repr__()
+        # return json.dumps(self, indent=4, default=lambda o: o.__dict__)
+        # return self.__repr__()
         rtn = dict(self)
         del rtn['time']
         rtn['time'] = dict(self._time)
@@ -99,6 +103,10 @@ class PositionInfo:
         """Returns whether the satellite is illuminated."""
         return self._illuminated
 
+    def getUnobscured(self) -> bool:
+        """Returns whether the satellite is unobscured."""
+        return self._unobscured
+
     def getVisibility(self) -> bool:
         """Returns the visibility of the satellite."""
         return self._visible
@@ -120,8 +128,11 @@ class Pass:
         visible: Boolean value for if the pass is visible at any point during the transit.
     """
 
+    # def __init__(self, riseInfo: PositionInfo, setInfo: PositionInfo, maxInfo: PositionInfo, *,
+    #              firstInfo: PositionInfo = None, lastInfo: PositionInfo = None):
     def __init__(self, riseInfo: PositionInfo, setInfo: PositionInfo, maxInfo: PositionInfo, *,
-                 firstInfo: PositionInfo = None, lastInfo: PositionInfo = None):
+                 firstUnobscuredInfo: PositionInfo = None, lastUnobscuredInfo: PositionInfo = None,
+                 firstIlluminatedInfo: PositionInfo = None, lastIlluminatedInfo: PositionInfo = None):
         """
         Initializes a pass with the given values. firstInfo and lastInfo should only be set if the satellite enters or
         leaves the Earth's shadow during the transit. If the riseInfo illuminated attribute is true or a firstInfo value
@@ -133,26 +144,32 @@ class Pass:
             riseInfo: Information for the rise time of the satellite pass.
             setInfo: Information for the set time of the satellite pass.
             maxInfo: Information for the maximum time of the satellite pass.
-            firstInfo: Information for the first time the satellite is illuminated if it's not the same as the rise time
-                (Default = None).
-            lastInfo: Information for the last time the satellite is illuminated if it's not the same as the set time
-                (Default = None).
+            firstUnobscuredInfo: Information for the first time the satellite is unobscured by sunlight (Default = None)
+            lastUnobscuredInfo: Information for the last time the satellite is unobscured by sunlight (Default = None)
+            firstIlluminatedInfo: Information for the first time the satellite is illuminated (Default = None)
+            lastIlluminatedInfo: Information for the last time the satellite is illuminated (Default = None)
         """
 
         self._riseInfo = riseInfo
         self._setInfo = setInfo
         self._maxInfo = maxInfo
-        self._firstVisible = firstInfo
-        self._lastVisible = lastInfo
-        if firstInfo is not None or riseInfo.getIlluminated():
+        self._firstUnobscured = firstUnobscuredInfo
+        self._lastUnobscured = lastUnobscuredInfo
+        self._firstIlluminated = firstIlluminatedInfo
+        self._lastIlluminated = lastIlluminatedInfo
+        if firstIlluminatedInfo is not None or riseInfo.getIlluminated():
             self._illuminated = True
-            if riseInfo.getVisibility() or maxInfo.getVisibility() or setInfo.getVisibility() or (firstInfo is not None
-            and firstInfo.getVisibility()) or (lastInfo is not None and lastInfo.getVisibility()):
-                self._visible = True
-            else:
-                self._visible = False
         else:
             self._illuminated = False
+        if firstUnobscuredInfo is not None or riseInfo.getUnobscured():
+            self._unobscured = True
+        else:
+            self._unobscured = False
+        if self._riseInfo.getVisibility() \
+                or (self._firstIlluminated is not None and self._firstIlluminated.getVisibility()) \
+                or (self._firstUnobscured is not None and self._firstUnobscured.getVisibility()):
+            self._visible = True
+        else:
             self._visible = False
 
     def __iter__(self):
@@ -160,9 +177,12 @@ class Pass:
             'riseInfo': self._riseInfo,
             'setInfo': self._setInfo,
             'maxInfo': self._maxInfo,
-            'firstVisible': self._firstVisible,
-            'lastVisible': self._lastVisible,
+            'firstUnobscured': self._firstUnobscured,
+            'lastUnobscured': self._lastUnobscured,
+            'firstIlluminated': self._firstIlluminated,
+            'lastIlluminated': self._lastIlluminated,
             'illuminated': self._illuminated,
+            'unobscured': self._unobscured,
             'visible': self._visible
         }.items()
 
@@ -173,32 +193,41 @@ class Pass:
         maxStr = f'Max:\n{self._maxInfo}'
         strDict = {info.getTime().value(): string for info, string in
                    zip((self._riseInfo, self._setInfo, self._maxInfo), (riseStr, setStr, maxStr))}
-        if self._firstVisible is not None:
-            firstStr = f'First:\n{self._firstVisible}'
-            strDict[self._firstVisible.getTime().value()] = firstStr
-        if self._lastVisible is not None:
-            lastStr = f'Last:\n{self._lastVisible}'
-            strDict[self._lastVisible.getTime().value()] = lastStr
+        if self._firstIlluminated is not None:
+            firstIllStr = f'First Illuminated:\n{self._firstIlluminated}'
+            strDict[self._firstIlluminated.getTime().value()] = firstIllStr
+        if self._lastIlluminated is not None:
+            lastIllStr = f'Last Illuminated:\n{self._lastIlluminated}'
+            strDict[self._lastIlluminated.getTime().value()] = lastIllStr
+        if self._firstUnobscured is not None:
+            firstStr = f'First Unobscured:\n{self._firstUnobscured}'
+            strDict[self._firstUnobscured.getTime().value()] = firstStr
+        if self._lastUnobscured is not None:
+            lastStr = f'Last Unobscured:\n{self._lastUnobscured}'
+            strDict[self._lastUnobscured.getTime().value()] = lastStr
         rtn = ""
         for i in range(len(strDict)):
             minTm = min(strDict.keys())
             rtn += strDict[minTm] + '\n'
             strDict.pop(minTm)
         rtn.rstrip()
-        rtn += f'---------------------------------\nIlluminated: {self._illuminated}\nVisible: {self._visible}'
+        rtn += f'---------------------------------\nIlluminated: {self._illuminated}\nUnobscured: {self._unobscured}' \
+               f'\nVisible: {self._visible}'
         return rtn
 
     def __repr__(self):
         return json.dumps(self.toJson())
 
     def toJson(self):
+        # todo: add to this
         # return json.dumps(self, indent=4, default=lambda o: o.__dict__)
-        rtn = {'illuminated': self._illuminated, 'visible': self._visible}
-        rtn['riseInfo'] = dict(self._riseInfo)
-        rtn['setInfo'] = dict(self._setInfo)
-        rtn['maxInfo'] = dict(self._maxInfo)
-        rtn['firstVisible'] = dict(self._firstVisible) if self._firstVisible is not None else None
-        rtn['lastVisible'] = dict(self._lastVisible) if self._lastVisible is not None else None
+        rtn = {'illuminated': self._illuminated, 'unobscured': self._unobscured, 'visible': self._visible,
+               'riseInfo': dict(self._riseInfo), 'setInfo': dict(self._setInfo), 'maxInfo': dict(self._maxInfo),
+               'firstUnobscured': dict(self._firstUnobscured) if self._firstUnobscured is not None else None,
+               'lastUnobscured': dict(self._lastUnobscured) if self._lastUnobscured is not None else None,
+               'firstIlluminated': dict(self._firstIlluminated) if self._firstIlluminated is not None else None,
+               'lastIlluminated': dict(self._lastIlluminated) if self._lastIlluminated is not None else None}
+
         return rtn
 
     def getRiseInfo(self) -> PositionInfo:
@@ -213,24 +242,35 @@ class Pass:
         """Returns the max time information."""
         return self._maxInfo
 
-    def getFirstVisibleInfo(self) -> PositionInfo:
-        """Returns the first visible time information if set."""
-        return self._firstVisible
+    def getFirstUnobscuredInfo(self) -> PositionInfo:
+        """Returns the first unobscured time information if set."""
+        return self._firstUnobscured
 
-    def getLastVisibleInfo(self) -> PositionInfo:
-        """Returns the last visible time information if set."""
-        return self._lastVisible
+    def getLastUnobscuredInfo(self) -> PositionInfo:
+        """Returns the last unobscured time information if set."""
+        return self._lastUnobscured
+
+    def getFirstIlluminatedInfo(self) -> PositionInfo:
+        """Returns the first illuminated time information if set."""
+        return self._firstIlluminated
+
+    def getLastIlluminatedInfo(self) -> PositionInfo:
+        """Returns the last illuminated time information if set."""
+        return self._lastIlluminated
 
     def getIlluminated(self) -> bool:
         """Returns the illumination status of the pass."""
         return self._illuminated
+
+    def getUnobscured(self) -> bool:
+        """Returns the obscured status of the pass."""
+        return self._unobscured
 
     def getVisibility(self) -> bool:
         """Returns the visibility of the pass."""
         return self._visible
 
 
-# todo: add max constraints?
 class PassConstraints:
     """
     Container class to hold values to constrain satellite passes.
@@ -241,17 +281,31 @@ class PassConstraints:
         illuminated: Whether the satellite is illuminated at any point of the pass.
     """
 
-    def __init__(self, *, minAltitude: float = None, minDuration: float = None, illuminated: bool = None):
+    def __init__(self, *, minAltitude: float = None, maxAltitude: float = None, minDuration: float = None,
+                 maxDuration: float = None, illuminated: bool = None, unobscured: bool = None, visible: bool = None):
         """Initializes the values to the argument values."""
-        self.minAltitude = minAltitude
-        self.minDuration = minDuration
+        if minAltitude is not None and maxAltitude is not None:
+            if minAltitude > maxAltitude:
+                raise PassConstraintException('Cannot set a minimum altitude constraint less than a maximum altitude '
+                                              'constraint.')
+        else:
+            self.minAltitude = minAltitude
+            self.maxAltitude = maxAltitude
+        if minDuration is not None and maxDuration is not None:
+            if minDuration > maxDuration:
+                raise PassConstraintException('Cannot set a minimum duration constraint longer than a maximum duration'
+                                              'constraint.')
+        else:
+            self.minDuration = minDuration
+            self.maxDuration = maxDuration
         self.illuminated = illuminated
+        self.visible = visible
 
 
 class PassController:
 
     def __init__(self, satellite: Satellite, geoPosition: GeoPosition, start: JulianDate, *,
-                 constraints: PassConstraints = None, timeout = 7, tle: TwoLineElement = None):
+                 constraints: PassConstraints = None, timeout=7, tle: TwoLineElement = None):
         self._sat = satellite
         self._geo = geoPosition
         self._initTime = start
@@ -266,7 +320,7 @@ class PassController:
             raise TLEException('No TLE given to instantiate shadow controller')
 
     def reset(self):
-        self._nextTime = self._initTime
+        self._time = self._initTime
 
     def getInitialTime(self):
         return self._initTime
@@ -292,159 +346,208 @@ class PassController:
     def setTimeout(self, timeout):
         self._timeout = timeout
 
-    def nextPass(self) -> Pass | None:
-        # max duration, maximum time before 'time-out' in solar days
+    def getNextPass(self) -> Pass | None:
+        """Computes the next pass based on the time attribute of the PassController."""
         nextPassTime = nextPassMax(self._sat, self._geo, self._time)
         if nextPassTime is None:
             return None
-        maxPos = self._sat.getState(nextPassTime)[0]
-        maxPosSez = toTopocentric(maxPos, nextPassTime, self._geo)
-        maxAlt = degrees(asin(maxPosSez[2] / maxPosSez.mag()))
-
-        # stop searching for a pass after a certain amount of time
-        if self._timeout is not None:
-            if self._time.difference(self._initTime) > self._timeout:
+        # stop searching for a pass after a time-out period
+        if self._time is not None:
+            if nextPassTime.difference(self._initTime) > self._timeout:
                 return None
-        # the future pass time to be called if this pass is invalid
-        # todo: computing this if we dont use it is going to slow this down (possibly by a lot)
         futurePassTime = nextPassTime.future(0.001)
 
-        # this does not treat a last time before max time as the max time
-        if self._constraints is not None and self._constraints.minAltitude is not None:
-            #   if minimum altitude isn't attained
-            if self._constraints.minAltitude > maxAlt:
-                # print(nextPassTime, maxAlt)
-                if self._time.difference(futurePassTime) < self._timeout:
-                    self._time = futurePassTime
-                    return self.nextPass()
-                else:
-                    return None
-
         riseTime, setTime = riseSetTimes(self._sat, self._geo, nextPassTime)
-        print(f'riseTime: {riseTime.date(-5)} maxTime: {nextPassTime.date(-5)} setTime: {setTime.date(-5)}')
         self._shadowController.computeValues(riseTime)
-        shadowTimes = self._shadowController.getTimes()
-        # todo: dont need this check, its guaranteed by the shadow controller to be in order
-        # if shadowTimes[0].value() < shadowTimes[1].value():
-        #     enterTime = shadowTimes[0]
-        #     exitTime = shadowTimes[1]
-        # else:
-        #     enterTime = shadowTimes[1]
-        #     exitTime = shadowTimes[0]
-        enterTime = shadowTimes[0]
-        exitTime = shadowTimes[1]
-        print(f'enterTime: {enterTime.date(-5)} exitTime: {exitTime.date(-5)}')
-        firstInfo, lastInfo = None, None
-        # sc = ShadowController(sat.getTle())
-        # sc.computeValues(nextPassTime)
-        # enterTime, exitTime = sc.getTimes()
-        # firstInfo, lastInfo = None, None
+        enterTime, exitTime = self._shadowController.getTimes()
+        sunRiseTime, sunSetTime = getSunRiseSetTimes(riseTime, self._geo)
 
-        # riseTime, setTime = riseSetTimes(self._sat, self._geo, nextPassTime)
-        # print(f'riseTime: {riseTime.date(-5)} maxTime: {nextPassTime.date(-5)} setTime: {setTime.date(-5)}')
-        # print(f'enterTime: {enterTime.date(-5)} exitTime: {exitTime.date(-5)}')
+        firstIlluminatedTime = riseTime
+        lastIlluminatedTime = setTime
         #   rise and set sandwich shadow entrance
         if riseTime.value() < enterTime.value() < setTime.value():
-            print('rise and set sandwich shadow entrance')
             riseIlluminated = True
-            firstTime = riseTime
             setIlluminated = False
-            lastTime = enterTime
+            lastIlluminatedTime = enterTime
         #   rise and set sandwich shadow exit
-        # elif riseTime.future(1 / self._sat.getTle().getMeanMotion()).value() < exitTime.value() and \
-        #         riseTime.value() < exitTime.value() < setTime.value():
         elif riseTime.value() < exitTime.value() < setTime.value():
-            print('rise and set sandwich shadow exit')
             riseIlluminated = False
-            firstTime = exitTime
+            firstIlluminatedTime = exitTime
             setIlluminated = True
-            lastTime = setTime
         #   rise and set are in shadow
         elif enterTime.value() < riseTime.value() < exitTime.value() \
                 and enterTime.value() < setTime.value() < exitTime.value():
-            print('rise and set are in shadow')
             riseIlluminated = False
-            firstTime = riseTime  # avoids setting the firstInfo object
+            firstIlluminatedTime = None
             setIlluminated = False
-            lastTime = setTime  # avoids setting the lastInfo object
+            lastIlluminatedTime = None
         #   rise and set are in sunlight
         else:
-            print('rise and set are in sunlight')
             riseIlluminated = True
-            firstTime = riseTime
             setIlluminated = True
-            lastTime = setTime
+        if self._constraints is not None:
+            if self._constraints.illuminated is True and not (riseIlluminated or setIlluminated):
+                self._time = futurePassTime
+                return self.getNextPass()
+            elif self._constraints.illuminated is False and (riseIlluminated or setIlluminated):
+                self._time = futurePassTime
+                return self.getNextPass()
 
-        # todo: find the time of sunrise/sunset, then compute when the sat is first visible including this knowledge
-        # FRINGE CASE: sat is illuminated but not visible (due to sun angle) and becomes visible during the pass.
-        #   the first visible will not be set (as its technically already visible), so should check if rise time or
-        #   first time is not visible, but set time or last time is visible.
-        #   this could be handled similarly to shadow angles, by finding the rise and set times (not actually, should
-        #   find the times the sun becomes -6.8333 degrees) and compare other known times to them.
-
-        # if constraints is not None:
-        #     if constraints.illuminated is not None:
-        #         #   when constraints is illuminated and sat is not illuminated at rise and set times
-        #         if constraints.illuminated and not riseIlluminated and not setIlluminated:
-        #             return nextPass(sat, geo, nextPassTime.future(0.001), constraints)
-        #         #   when constraints is not illuminated and sat is illuminated at some point
-        #         if not constraints.illuminated and ((riseIlluminated or firstTime != riseTime)
-        #                                             or (setIlluminated or lastTime != setTime)):
-        #             return nextPass(sat, geo, nextPassTime.future(0.001), constraints)
-        #     if constraints.minDuration is not None:
-        #         #   when minimum duration is not met
-        #         if constraints.minDuration > setTime.difference(riseTime) * 1440:
-        #             return nextPass(sat, geo, nextPassTime.future(0.001), constraints)
+        firstUnobscuredTime = riseTime
+        lastUnobscuredTime = setTime
+        #   rise and set sandwich sunrise
+        if riseTime.value() < sunRiseTime.value() < setTime.value():
+            riseUnobscured = True
+            setUnobscured = False
+            lastUnobscuredTime = sunRiseTime
+        #   rise and set sandwich sunset
+        elif riseTime.value() < sunSetTime.value() < setTime.value():
+            riseUnobscured = False
+            firstUnobscuredTime = sunSetTime
+            setUnobscured = True
+        #   rise and set are during the day
+        elif sunRiseTime.value() < riseTime.value() < sunSetTime.value() \
+                and sunRiseTime.value() < setTime.value() < sunSetTime.value():
+            riseUnobscured = False
+            firstUnobscuredTime = None
+            setUnobscured = False
+            lastUnobscuredTime = None
+        #   rise and set are during the night
+        else:
+            riseUnobscured = True
+            setUnobscured = True
+        if self._constraints is not None:
+            if self._constraints.visible is True and not (riseUnobscured or setUnobscured):
+                self._time = futurePassTime
+                return self.getNextPass()
+            elif self._constraints.visible is False and (riseIlluminated or setIlluminated):
+                self._time = futurePassTime
+                return self.getNextPass()
 
         risePos = self._sat.getState(riseTime)[0]
         risePosSez = toTopocentric(risePos, riseTime, self._geo)
-        # riseTwilightType = getTwilightType(riseTime, self._geo)
         riseInfo = PositionInfo(degrees(asin(risePosSez[2] / risePosSez.mag())),
                                 degrees(atan3(risePosSez[1], -risePosSez[0])),
                                 riseTime,
                                 riseIlluminated,
-                                riseIlluminated and getTwilightType(riseTime, self._geo) > TwilightType.Day)
-                                # not isEclipsed(self._sat, riseTime) and getTwilightType(riseTime, self._geo) > TwilightType.Day)
-
+                                riseUnobscured)
         setPos = self._sat.getState(setTime)[0]
         setPosSez = toTopocentric(setPos, setTime, self._geo)
         setInfo = PositionInfo(degrees(asin(setPosSez[2] / setPosSez.mag())),
                                degrees(atan3(setPosSez[1], -setPosSez[0])),
                                setTime,
                                setIlluminated,
-                               setIlluminated and getTwilightType(setTime, self._geo) > TwilightType.Day)
-                               # not isEclipsed(self._sat, setTime) and getTwilightType(setTime, self._geo) > TwilightType.Day)
-
-        # maxIlluminated = not isEclipsed(self._sat, nextPassTime)
-
+                               setUnobscured)
+        maxPos = self._sat.getState(nextPassTime)[0]
+        maxPosSez = toTopocentric(maxPos, nextPassTime, self._geo)
+        maxAlt = degrees(asin(maxPosSez[2] / maxPosSez.mag()))
         maxIlluminated = not (enterTime.value() <= nextPassTime.value() <= exitTime.value())
-        maxInfo = PositionInfo(degrees(asin(maxPosSez[2] / maxPosSez.mag())),
-                               degrees(atan3(maxPosSez[1], -maxPosSez[0])),
+        maxUnobscured = nextPassTime.value() < sunRiseTime.value() or nextPassTime.value() >= sunSetTime.value()
+        maxInfo = PositionInfo(maxAlt,
+                               degrees(atan3(maxPosSez[1], -maxPosSez.mag())),
                                nextPassTime,
                                maxIlluminated,
-                               maxIlluminated and getTwilightType(nextPassTime, self._geo) > TwilightType.Day)
+                               maxUnobscured)
 
-        if riseTime != firstTime:
-            firstPos = self._sat.getState(exitTime)[0]
-            firstPosSez = toTopocentric(firstPos, firstTime, self._geo)
-            firstInfo = PositionInfo(degrees(asin(firstPosSez[2] / firstPosSez.mag())),
-                                     degrees(atan3(firstPosSez[1], -firstPosSez[0])),
-                                     firstTime,
-                                     True,
-                                     getTwilightType(firstTime, self._geo) > TwilightType.Day)
+        firstIlluminatedInfo, lastIlluminatedInfo = None, None
+        firstIllAlt, lastIllAlt = 0, 0
+        if firstIlluminatedTime is not None and firstIlluminatedTime != riseTime:
+            firstIllPos = self._sat.getState(firstIlluminatedTime)[0]
+            firstIllPosSez = toTopocentric(firstIllPos, firstIlluminatedTime, self._geo)
+            firstIllAlt = degrees(asin(firstIllPosSez[2] / firstIllPosSez.mag()))
+            firstIlluminatedInfo = PositionInfo(firstIllAlt,
+                                                degrees(atan3(firstIllPosSez[1], -firstIllPosSez[0])),
+                                                firstIlluminatedTime,
+                                                True,
+                                                firstIlluminatedTime.value() < sunRiseTime.value()
+                                                or firstIlluminatedTime.value() >= sunSetTime.value())
+        if lastIlluminatedTime is not None and lastIlluminatedTime != setTime:
+            lastIllPos = self._sat.getState(lastIlluminatedTime)[0]
+            lastIllPosSez = toTopocentric(lastIllPos, lastIlluminatedTime, self._geo)
+            lastIllAlt = degrees(asin(lastIllPosSez[2] / lastIllPosSez.mag()))
+            lastIlluminatedInfo = PositionInfo(lastIllAlt,
+                                               degrees(atan3(lastIllPosSez[1], -lastIllPosSez[0])),
+                                               lastIlluminatedTime,
+                                               False,
+                                               lastIlluminatedTime.value() < sunRiseTime.value()
+                                               or lastIlluminatedTime.value() >= sunSetTime.value())
+        firstUnobscuredInfo, lastUnobscuredInfo = None, None
+        firstUnobAlt, lastUnobAlt = 0, 0
+        if firstUnobscuredTime is not None and firstUnobscuredTime == sunSetTime:
+            firstUnobPos = self._sat.getState(firstUnobscuredTime)[0]
+            firstUnobPosSez = toTopocentric(firstUnobPos, firstUnobscuredTime, self._geo)
+            firstUnobAlt = degrees(asin(firstUnobPosSez[2] / firstUnobPosSez.mag()))
+            firstUnobscuredInfo = PositionInfo(firstUnobAlt,
+                                               degrees(atan3(firstUnobPosSez[1], -firstUnobPosSez[0])),
+                                               firstUnobscuredTime,
+                                               firstUnobscuredTime.value() < enterTime.value()
+                                               or firstUnobscuredTime.value >= exitTime.value(),
+                                               True)
+        if lastUnobscuredTime is not None and lastUnobscuredTime == sunRiseTime:
+            lastUnobPos = self._sat.getState(lastUnobscuredTime)[0]
+            lastUnobPosSez = toTopocentric(lastUnobPos, lastUnobscuredTime, self._geo)
+            lastUnobAlt = degrees(asin(lastUnobPosSez[2] / lastUnobPosSez.mag()))
+            lastUnobscuredInfo = PositionInfo(lastUnobAlt,
+                                              degrees(atan3(lastUnobPosSez[1], -lastUnobPosSez[0])),
+                                              lastUnobscuredTime,
+                                              lastUnobscuredTime.value() < enterTime.value()
+                                              or lastUnobscuredTime.value() >= exitTime.value(),
+                                              False)
 
-        if setTime != lastTime:
-            lastPos = self._sat.getState(enterTime)[0]
-            lastPosSez = toTopocentric(lastPos, lastTime, self._geo)
-            lastInfo = PositionInfo(degrees(asin(lastPosSez[2] / lastPosSez.mag())),
-                                    degrees(atan3(lastPosSez[1], -lastPosSez[0])),
-                                    lastTime,
-                                    True,
-                                    getTwilightType(lastTime, self._geo) > TwilightType.Day)
+        if self._constraints is not None:
+            if self._constraints.visible is True:
+                maxAltList = [firstUnobAlt, lastUnobAlt]
+                if maxInfo.getVisibility():
+                    maxAltList.append(maxAlt)
+                if firstUnobscuredInfo is not None:
+                    earliestTime = firstUnobscuredTime
+                elif self._constraints.illuminated is True and firstIlluminatedInfo is not None:
+                    earliestTime = firstIlluminatedTime
+                else:
+                    earliestTime = riseTime
+                if lastUnobscuredInfo is not None:
+                    latestTime = lastUnobscuredTime
+                elif self._constraints.illuminated is True and lastIlluminatedInfo is not None:
+                    latestTime = lastIlluminatedTime
+                else:
+                    latestTime = setTime
+            elif self._constraints.illuminated is True:
+                maxAltList = [firstIllAlt, lastIllAlt]
+                if maxIlluminated:
+                    maxAltList.append(maxAlt)
+                if firstIlluminatedInfo is not None:
+                    earliestTime = firstIlluminatedTime
+                else:
+                    earliestTime = riseTime
+                if lastIlluminatedInfo is not None:
+                    latestTime = lastIlluminatedTime
+                else:
+                    latestTime = setTime
+            else:
+                maxAltList = [maxAlt]
+                earliestTime = riseTime
+                latestTime = setTime
 
-        # return Pass(riseInfo, setInfo, maxInfo, firstInfo=firstInfo, lastInfo=lastInfo)
+            if self._constraints.minAltitude is not None:
+                if self._constraints.minAltitude > max(maxAltList):
+                    self._time = futurePassTime
+                    return self.getNextPass()
+            if self._constraints.maxAltitude is not None:
+                if self._constraints.maxAltitude < max(maxAltList):
+                    self._time = futurePassTime
+                    return self.getNextPass()
+            if self._constraints.minDuration is not None:
+                if self._constraints.minDuration < latestTime.difference(earliestTime) * 1440:
+                    self._time = futurePassTime
+                    return self.getNextPass()
+                if self._constraints.maxDuration > latestTime.difference(earliestTime) * 1440:
+                    self._time = futurePassTime
+                    return self.getNextPass()
+
         self._time = futurePassTime
-        return Pass(riseInfo, setInfo, maxInfo, firstInfo=firstInfo, lastInfo=lastInfo)
+        return Pass(riseInfo, setInfo, maxInfo, firstUnobscuredInfo=firstUnobscuredInfo,
+                    lastUnobscuredInfo=lastUnobscuredInfo,
+                    firstIlluminatedInfo=firstIlluminatedInfo, lastIlluminatedInfo=lastIlluminatedInfo)
 
     def getPassList(self, duration: float, start: JulianDate = None):
         tmp = self._time
@@ -456,8 +559,7 @@ class PassController:
         passList = []
         nTime = self._initTime.future(-0.001)
         while nTime.difference(self._initTime) < duration:
-            # nPass = nextPass(self._sat, self._geo, nTime.future(0.001), self._constraints)
-            nPass = self.nextPass()
+            nPass = self.getNextPass()
             if nPass is None:
                 self._time = tmp
                 return tuple(passList)
@@ -835,7 +937,7 @@ def horizonTimeRefine(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Jul
 
         dz = sezPos.mag() * alt
         dt = (-dz / sezVel[2]) / 86400.0
-        time = time.future(dt * p) # p term is linear, so we can put it in the dz or dt term too
+        time = time.future(dt * p)  # p term is linear, so we can put it in the dz or dt term too
 
         state = sat.getState(time)
         sezPos = toTopocentric(state[0], time, geo)
@@ -1000,6 +1102,7 @@ class ShadowController:
         self._Re = [6371, 6371]
         self._jd = [None, None]
         self._phi0 = None
+        self._originalTime = None
 
     def getAnomalies(self) -> tuple[float]:
         """Returns the most recently computed anomalies for the entrance and exit points of Earth's shadow."""
@@ -1020,6 +1123,8 @@ class ShadowController:
             time: Time to compute the next(previous) anomalies.
         """
 
+        if self._originalTime is None:
+            self._originalTime = time
         self.__firstPass(time)
         self.__loop(time)
 
@@ -1039,12 +1144,22 @@ class ShadowController:
                 self._s[i] = self.__computes(i)
                 self._Re[i] = self.__computeRe(i)
                 self._phi[i] = self.__computePhi(i)
-                jd = self.__computeTimes(i, time)
+                jd = self.__computeTimes(i)
                 if abs(jd.difference(self._jd[i])) < (0.1 / 86400.0):  # 0.1 of a second
                     self._jd[i] = jd
                     break
                 else:
                     self._jd[i] = jd
+
+        if self._originalTime.future(1 / self._tle.getMeanMotion()).value() <= self._jd[1].value():
+            middleTime = self._jd[0].future(self._jd[1].difference(self._jd[0]) / 2.0)
+            self.computeValues(middleTime.future(-2.0 / self._tle.getMeanMotion()))
+        else:
+            self._originalTime = None
+        if self._jd[1].value() < time.value():
+            self.computeValues(time.future((1 / self._tle.getMeanMotion()) * 0.5))
+        else:
+            self._originalTime = None
 
     def __firstPass(self, time: JulianDate):
         """
@@ -1065,22 +1180,23 @@ class ShadowController:
         self._phi[0] = self.__computePhi(0)
         self._phi[1] = self.__computePhi(1)
         self._phi0 = self._elements[0].trueAnomalyAt(time)
-        self._jd[0] = self.__computeTimes(0, time)
-        self._jd[1] = self.__computeTimes(1, time)
+        '''self._jd[0] = self.__computeTimes(0, time)
+        self._jd[1] = self.__computeTimes(1, time)'''
+        self._jd[0] = self._elements[0].timeToNextTrueAnomaly(self._phi[0], time)
+        self._jd[1] = self._elements[1].timeToNextTrueAnomaly(self._phi[1], self._jd[0])
 
-    def __computeTimes(self, index: int, time: JulianDate):
+    def __computeTimes(self, index: int):
         """Computes the time to the specified anomaly signaled by the index value."""
-        # if index == 0 and self._phi[0] < self._phi0 <= self._phi[1]:
-        if index == 0 and self.__inShadow():
-            return self._elements[0].timeToPrevTrueAnomaly(self._phi[0], time)
-        else:
-            return self._elements[index].timeToNextTrueAnomaly(self._phi[index], time)
+        if index == 0:
+            return self._elements[0].timeToPrevTrueAnomaly(self._phi[0], self._jd[1])
+        elif index == 1:
+            return self._elements[1].timeToNextTrueAnomaly(self._phi[1], self._jd[0])
 
     def __inShadow(self):
         if self._phi[0] < self._phi[1]:
-            return (self._phi[0] < self._phi0 <= self._phi[1])
+            return self._phi[0] < self._phi0 <= self._phi[1]
         else:
-            return ((self._phi[1] < self._phi[0] < self._phi0) or (self._phi0 <= self._phi[1] < self._phi[0]))
+            return (self._phi[1] < self._phi[0] < self._phi0) or (self._phi0 <= self._phi[1] < self._phi[0])
 
     def __computePhi(self, index: int):
         """Computes the true anomaly by finding the zeros of Escobal's G function."""
@@ -1133,7 +1249,6 @@ class ShadowController:
             if addToList:
                 rtn.append(l)
         return rtn
-
 
     def __escobalGFunction(self, phi: float, index: int) -> float:
         """Escobal's G function whose zeros represent the true anomalies of shadow entrance/exit."""
