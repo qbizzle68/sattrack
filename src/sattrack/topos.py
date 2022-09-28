@@ -8,7 +8,6 @@ from sattrack.rotation.rotation import getEulerMatrix, EulerAngles, rotateToThen
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.structures.satellite import Satellite
-from sattrack.sun import TwilightType, getSunPosition
 from sattrack.util.conversions import atan3
 
 
@@ -183,32 +182,6 @@ def azimuthAngleString(azimuth: float) -> str:
         return 'NW'
     else:
         return 'NNW'
-
-
-def getTwilightType(time: JulianDate, geo: GeoPosition) -> TwilightType:
-    """
-    Computes the twilight-type from the angle of the sun.
-
-    Args:
-        time: Time to find the twilight-type.
-        geo: GeoPosition whose twilight-type is to be computed.
-
-    Returns:
-        One of the TwilightType enumerations.
-    """
-
-    sunSEZPos = toTopocentric(getSunPosition(time), time, geo)
-    sunAngle = degrees(asin(sunSEZPos[2] / sunSEZPos.mag()))
-    if sunAngle < -18:
-        return TwilightType.Night
-    elif sunAngle < -12:
-        return TwilightType.Astronomical
-    elif sunAngle < -6:
-        return TwilightType.Nautical
-    elif sunAngle < -(5.0 / 6.0):
-        return TwilightType.Civil
-    else:
-        return TwilightType.Day
 
 
 def altAzToPosition(altitude: float, azimuth: float, distance: float) -> EVector:

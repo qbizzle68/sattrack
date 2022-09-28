@@ -12,8 +12,8 @@ from sattrack.structures.coordinates import GeoPosition, zenithVector, geoPositi
 from sattrack.structures.elements import computeEccentricVector, raanProcessionRate, OrbitalElements
 from sattrack.structures.satellite import Satellite
 from sattrack.structures.tle import TwoLineElement
-from sattrack.sun import TwilightType, getSunPosition2, getSunRiseSetTimes
-from sattrack.topos import getPVector, toTopocentric, getTwilightType, getAltitude, azimuthAngleString
+from sattrack.sun import TwilightType, getSunPosition2, getSunRiseSetTimes, getTwilightType
+from sattrack.topos import getPVector, toTopocentric, getAltitude, azimuthAngleString
 from sattrack.util.anomalies import trueToMean, timeToNearestTrueAnomaly, computeTrueAnomaly
 from sattrack.util.constants import SUN_RADIUS, TWOPI, EARTH_FLATTENING, EARTH_EQUITORIAL_RADIUS
 from sattrack.util.conversions import atan3

@@ -9,6 +9,7 @@ from sattrack.rotation.rotation import getEulerMatrix, EulerAngles, rotateToThen
 from sattrack.spacetime.juliandate import JulianDate, J2000
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.structures.coordinates import GeoPosition, geoPositionVector
+from sattrack.topos import toTopocentric
 from sattrack.util.constants import AU, TWOPI
 from sattrack.util.conversions import atan3
 
@@ -142,6 +143,42 @@ def getSunPosition2(time: JulianDate):
     g = 6.240040768 + 0.0172019703 * n
     R = 1.00014 - 0.01671 * cos(g) - 0.00014 * cos(2 * g)
     return EVector(xComp, yComp, zComp) * R * AU
+
+
+def getTwilightType(time: JulianDate, geo: GeoPosition) -> TwilightType:
+    """
+    Computes the twilight-type from the angle of the sun.
+
+    Args:
+        time: Time to find the twilight-type.
+        geo: GeoPosition whose twilight-type is to be computed.
+
+    Returns:
+        One of the TwilightType enumerations.
+    """
+
+    sunSEZPos = toTopocentric(getSunPosition2(time), time, geo)
+    sunAngle = degrees(asin(sunSEZPos[2] / sunSEZPos.mag()))
+    if sunAngle < -18:
+        return TwilightType.Night
+    elif sunAngle < -12:
+        return TwilightType.Astronomical
+    elif sunAngle < -6:
+        return TwilightType.Nautical
+    elif sunAngle < -(5.0 / 6.0):
+        return TwilightType.Civil
+    else:
+        return TwilightType.Day
+
+
+
+    def __expandTableValues(self, table):
+        """Returns the result of the table computations in section 3.2 of the SPA in radians."""
+        arr = [tableSum(ti, self._JME) for ti in table]
+        sums = 0.0
+        for i in range(len(table)):
+            sums += arr[i] * (self._JME ** i)
+        return sums / 1e8
 
 
 def getSunAngles(time: JulianDate):
