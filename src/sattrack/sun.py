@@ -12,7 +12,7 @@ from sattrack.structures.coordinates import GeoPosition, geoPositionVector
 from sattrack.util.constants import AU, TWOPI
 from sattrack.util.conversions import atan3
 
-DELTAT = 157.2  # seconds from https://webspace.science.uu.nl/~gent0113/deltat/deltat.htm
+DELTAT = 72.6 #142.8 #157.2  # seconds from https://webspace.science.uu.nl/~gent0113/deltat/deltat.htm
 
 
 @total_ordering
@@ -183,6 +183,7 @@ def __totopos(vec, time, geo):
 
 def getSunRiseSetTimes(time: JulianDate, geo: GeoPosition):
     desiredAngle = -0.8333
+    epsilon = 5e-7
     sunPos = getSunPosition2(time)
     sunPosSez = __totopos(sunPos, time, geo)
     sunAlt = degrees(asin(sunPosSez[2] / sunPosSez.mag()))
@@ -207,10 +208,10 @@ def getSunRiseSetTimes(time: JulianDate, geo: GeoPosition):
         sunPosSez = __totopos(sunPos, sunSetTime, geo)
         sunAlt = degrees(asin(sunPosSez[2] / sunPosSez.mag()))
 
-        if abs(sunAlt - desiredAngle) < 1e-5:
+        dAngle = sunAlt - desiredAngle
+        if abs(dAngle) < epsilon:
             break
 
-        dAngle = sunAlt - desiredAngle
         dt = dAngle / 360
         sunSetTime = sunSetTime.future(dt)
 
@@ -220,10 +221,10 @@ def getSunRiseSetTimes(time: JulianDate, geo: GeoPosition):
         sunPosSez = __totopos(sunPos, sunRiseTime, geo)
         sunAlt = degrees(asin(sunPosSez[2] / sunPosSez.mag()))
 
-        if abs(sunAlt - desiredAngle) < 1e-5:
+        dAngle = sunAlt - desiredAngle
+        if abs(dAngle) < epsilon:
             break
 
-        dAngle = sunAlt - desiredAngle
         dt = dAngle / 360
         sunRiseTime = sunRiseTime.future(-dt)
 
