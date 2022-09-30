@@ -31,9 +31,10 @@ class JulianDate:
         self.setTime(month, day, year, hour, minute, second, timeZone)
 
     @classmethod
-    def fromNumber(cls, day: float, fraction: float = None):
+    def fromNumber(cls, day: float, fraction: float, timezone: float = 0.0):
         rtn = cls(0, 0, 0, 0, 0, 0)
         rtn._day_number = int(day)
+        rtn._timezone = timezone
         if fraction is not None:
             rtn._day_fraction = fraction
         else:
@@ -119,6 +120,7 @@ class JulianDate:
         if rtn._day_fraction >= 1.0:
             rtn._day_number += 1
             rtn._day_fraction -= 1.0
+        rtn._timezone = self._timezone
         return rtn
 
     def difference(self, jd) -> float:
