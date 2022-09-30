@@ -1,9 +1,11 @@
+import json
 from enum import Enum
 from functools import total_ordering
 from math import sin, cos, pi, radians, tan, asin, sqrt, degrees, atan2, acos, atan
 
 from pyevspace import EVector
 
+from sattrack.exceptions import SunRiseSetException
 from sattrack.spacetime.juliandate import JulianDate, J2000
 from sattrack.structures.coordinates import GeoPosition
 from sattrack.topos import toTopocentric
@@ -79,9 +81,147 @@ def getSunCoordinates(time: JulianDate) -> EVector:
 
 def getSunRiseSetTimes(time: JulianDate, geo: GeoPosition):
     spc = SunPositionController2(time, geo)
-    vals = spc.getSunTimes()
+    vals = spc.getAngleTimes()
     return vals[0], vals[1]
 
+
+def getSunTransitTime(time: JulianDate, geo: GeoPosition):
+    spc = SunPositionController2(time, geo)
+    vals = spc.getAngleTimes()
+    return vals[2]
+
+
+def getSunAltAz(time: JulianDate, geo: GeoPosition):
+    spc = SunPositionController2(time, geo)
+    sunPos = spc.getSunPosition()
+    sunPosSez = toTopocentric(sunPos, time, geo)
+    return degrees(asin(sunPosSez[2] / sunPosSez.mag())), degrees(atan3(sunPosSez[1], -sunPosSez[0]))
+
+
+class SunInfo:
+
+    def __init__(self, day: JulianDate, geo: GeoPosition):
+        spc = SunPositionController2(day, geo)
+        self._riseTime, self._setTime, self._transitTime = spc.getAngleTimes()
+        self._dayLength = self._setTime.value() - self._riseTime.value()
+        self._distance = spc.getSunDistance()
+        self._transitAlt = spc.getTransitAltitude()
+        self._civilTwilightStart, self._civilTwilightEnd, UNUSED = spc.getAngleTimes(-6.0)
+        self._nauticalTwilightStart, self._nauticalTwilightEnd, UNUSED = spc.getAngleTimes(-12.0)
+        self._astronomicalTwilightStart, self._astronomicalTwilightEnd, UNUSED = spc.getAngleTimes(-18.0)
+        UNUSED, self._riseAzimuth = getSunAltAz(self._riseTime, geo)
+        UNUSED, self._setAzimuth = getSunAltAz(self._setTime, geo)
+
+    def __iter__(self):
+        yield from {
+            'riseTime': self._riseTime,
+            'riseAzimuth': self._riseAzimuth,
+            'setTime': self._setTime,
+            'setAzimuth': self._setAzimuth,
+            'transitTime': self._transitTime,
+            'transitAltitude': self._transitAlt,
+            'dayLength': self._dayLength,
+            'distance': self._distance,
+            'civilTwilightStart': self._civilTwilightStart,
+            'civilTwilightEnd': self._civilTwilightEnd,
+            'nauticalTwilightStart': self._nauticalTwilightStart,
+            'nauticalTwilightEnd': self._nauticalTwilightEnd,
+            'astronomicalTwilightStart': self._astronomicalTwilightStart,
+            'astronomicalTwilightEnd': self._astronomicalTwilightEnd
+        }
+
+    def __str__(self):
+        return f'Rise Time:  {SunInfo.__truncateTime(self._riseTime)} -- {"%.0f" % self._riseAzimuth}°\n' \
+               f'Set Time:  {SunInfo.__truncateTime(self._setTime)} -- {"%.0f" % self._setAzimuth}°\n' \
+               f'Day Length: {SunInfo.__convertDayLength(self._dayLength)}\n' \
+               f'Dawn:\n' \
+               f'Astronomical Twilight Start:  {SunInfo.__truncateTime(self._astronomicalTwilightStart)}\n' \
+               f'Nautical Twilight Start:  {SunInfo.__truncateTime(self._nauticalTwilightStart)}\n' \
+               f'Civil Twilight Start:  {SunInfo.__truncateTime(self._civilTwilightStart)}\n' \
+               f'Dusk:\n' \
+               f'Civil Twilight End:  {SunInfo.__truncateTime(self._civilTwilightEnd)}\n' \
+               f'Nautical Twilight End:  {SunInfo.__truncateTime(self._nauticalTwilightEnd)}\n' \
+               f'Astronomical Twilight End:  {SunInfo.__truncateTime(self._astronomicalTwilightEnd)}\n' \
+               f'Transit Time:  {SunInfo.__truncateTime(self._transitTime)} -- {"%.0f" % self._transitAlt}°\n' \
+               f'Distance:  {round(self._distance):,} km'
+
+    def __repr__(self):
+        return json.dumps(self.toJson(), default=lambda o: o.toJson())
+
+    def toJson(self):
+        rtn = {'riseAzimuth': self._riseAzimuth, 'setAzimuth': self._setAzimuth, 'transitAltitude': self._transitAlt,
+               'dayLength': self._dayLength, 'distance': self._distance}
+        rtn['riseTime'] = dict(self._riseTime)
+        rtn['setTime'] = dict(self._setTime)
+        rtn['transitTime'] = dict(self._transitTime)
+        rtn['civilTwilightStart'] = dict(self._civilTwilightStart)
+        rtn['civilTwilightEnd'] = dict(self._civilTwilightEnd)
+        rtn['nauticalTwilightStart'] = dict(self._nauticalTwilightStart)
+        rtn['nauticalTwilightEnd'] = dict(self._nauticalTwilightEnd)
+        rtn['astronomicalTwilightStart'] = dict(self._astronomicalTwilightStart)
+        rtn['astronomicalTwilightEnd'] = dict(self._astronomicalTwilightEnd)
+        return rtn
+
+    @classmethod
+    def __convertDayLength(cls, length: float) -> str:
+        """Convert a solar day fraction into a time based string."""
+        seconds = round(length * 86400)
+        hours = int(seconds / 3600.0)
+        seconds -= hours * 3600.0
+        minutes = int(seconds / 60.0)
+        seconds = int(seconds - minutes * 60.0) # to remove trailing zeros in the string
+
+        # hours = int(length * 24.0)
+        # minutes = int((length - hours / 24.0) * 60.0)
+        # seconds = int((length - (hours / 24.0) - (minutes / 60.0)) * 3500.0)
+        hrStr = str(hours) if hours >= 10 else f'0{hours}'
+        minStr = str(minutes) if minutes >= 10 else f'0{minutes}'
+        secStr = str(seconds) if seconds >= 10 else f'0{seconds}'
+        return f'{hrStr}:{minStr}:{secStr}'
+
+    @classmethod
+    def __truncateTime(cls, time: JulianDate) -> str:
+        """Convert a julian date time to a string with the seconds rounded to an integer"""
+        timeStr = time.time()
+        sec = round(float(timeStr[6:]))
+        secStr = str(sec) if sec >= 10 else f'0{sec}'
+        return f'{timeStr[:6]}{secStr}'
+
+    def getRiseTime(self):
+        return self._riseTime
+
+    def getSetTime(self):
+        return self._setTime
+
+    def getDayLength(self):
+        return self._dayLength
+
+    def getTransitTime(self):
+        return self._transitTime
+
+    def getTransitAltitude(self):
+        return self._transitAlt
+
+    def getDistance(self):
+        return self._distance
+
+    def getCivilTwilightStart(self):
+        return self._civilTwilightStart
+
+    def getCivilTwilightEnd(self):
+        return self._civilTwilightEnd
+
+    def getNauticalTwilightStart(self):
+        return self._nauticalTwilightStart
+
+    def getNauticalTwilightEnd(self):
+        return self._nauticalTwilightEnd
+
+    def getAstronomicalTwilightStart(self):
+        return self._astronomicalTwilightStart
+
+    def getAstronomicalTwilightEnd(self):
+        return self._astronomicalTwilightEnd
 
 # def getSunPosition2(time: JulianDate):
 #     """
@@ -555,7 +695,7 @@ class SunPositionController2:
             dec = self._internal['delta']
         return ra * 12 / pi, degrees(dec)
 
-    def getSunTimes(self, target=None):
+    def getAngleTimes(self, target=None):
         """target in degrees"""
         tzOffset = self._JD.getTimeZone() / 24.0
         localVal = self._JD.value() + tzOffset
@@ -589,7 +729,10 @@ class SunPositionController2:
         phi = self._internal['phi']
         m0 = (alpha_0 - sigma - v) / TWOPI
         hp0 = radians(target)
-        H0 = acos((sin(hp0) - sin(phi) * sin(delta_0)) / (cos(phi) * cos(delta_0))) % pi
+        try:
+            H0 = acos((sin(hp0) - sin(phi) * sin(delta_0)) / (cos(phi) * cos(delta_0))) % pi
+        except ValueError:
+            raise SunRiseSetException('Sun does not rise or set during this time.')
         m1 = (m0 - (H0 / TWOPI)) % 1.0
         m2 = (m0 + (H0 / TWOPI)) % 1.0
 
@@ -636,6 +779,7 @@ class SunPositionController2:
             Hp2 -= TWOPI
 
         h0 = asin(sin(phi) * sin(deltaP0) + cos(phi) * cos(deltaP0) * cos(Hp0))  # sun altitude at transit time
+        self._internal['h0'] = h0
         h1 = asin(sin(phi) * sin(deltaP1) + cos(phi) * cos(deltaP1) * cos(Hp1))
         h2 = asin(sin(phi) * sin(deltaP2) + cos(phi) * cos(deltaP2) * cos(Hp2))
 
@@ -677,6 +821,22 @@ class SunPositionController2:
         except KeyError:
             self.__computeTopoLocalHA()
             HP = self._internal['HP']
+
+    def getTransitAltitude(self):
+        try:
+            h0 = self._internal['h0']
+        except KeyError:
+            self.getAngleTimes()
+            h0 = self._internal['h0']
+        return degrees(h0)
+
+    def getSunDistance(self):
+        try:
+            R = self._internal['R']
+        except KeyError:
+            self.__computeHelioRadius()
+            R = self._internal['R']
+        return R * AU
 
     def __expandTableValues(self, table):
         arr = [self.__tableSum(ti) for ti in table]
