@@ -115,3 +115,16 @@ class PassConstraintException(Exception):
     def __init__(self, message):
         self.message = message
         super().__init__(self.message)
+
+
+class SunRiseSetException(Exception):
+    """
+    Exception raised when the sun doesn't rise or set at a given time and location.
+
+    Attributes
+        message: Explanation of the error.
+    """
+
+    def __init__(self, message):
+        self.message = message
+        super().__init__(self.message)
