@@ -1,4 +1,5 @@
 import json
+import time
 from datetime import datetime
 
 
@@ -26,6 +27,7 @@ class JulianDate:
         """
         self._day_number = 0
         self._day_fraction = 0
+        self._timezone = timeZone
         self.setTime(month, day, year, hour, minute, second, timeZone)
 
     @classmethod
@@ -46,7 +48,7 @@ class JulianDate:
 
     def __str__(self) -> str:
         """Returns the value and Gregorian date of the JulianDate as a string."""
-        return str(round(self.value(), 6)) + ' --- ' + self.date()
+        return str(round(self.value(), 6)) + ' --- ' + self.date(self._timezone)
 
     def __repr__(self) -> str:
         """Returns a JSON like representation of the attribute values."""
@@ -84,6 +86,7 @@ class JulianDate:
         elif self._day_fraction < 0:
             self._day_number -= 1
             self._day_fraction += 1.0
+        self._timezone = timeZone
 
     def value(self):
         """Returns the value of the JulianDate."""
@@ -201,11 +204,16 @@ class JulianDate:
 
         return self.date(timezone).split(' ')[1]
 
+    def getTimeZone(self):
+        return self._timezone
+
 
 def now() -> JulianDate:
     """Returns a new JulianDate object equal to the current UTC time."""
-    tm = datetime.utcnow()
-    return JulianDate(tm.month, tm.day, tm.year, tm.hour, tm.minute, tm.second + (tm.microsecond / 1000000))
+    # tm = datetime.utcnow()
+    tm = datetime.now()
+    return JulianDate(tm.month, tm.day, tm.year, tm.hour, tm.minute, tm.second + (tm.microsecond / 1000000),
+                      time.localtime().tm_gmtoff / 3600.0)
 
 
 J2000 = JulianDate(1, 1, 2000, 12, 0, 0)
