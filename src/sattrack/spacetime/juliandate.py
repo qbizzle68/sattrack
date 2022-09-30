@@ -138,7 +138,7 @@ class JulianDate:
 
         return self.value() - jd.value()
 
-    def date(self, timezone: float = 0.0) -> str:
+    def date(self, timezone: float = None) -> str:
         """
         Generates a string with the Gregorian calendar date equivalent of the calling date. The timezone offset adjusts
         to the correct time. Printing this string allows the printed string to accommodate a timezone offset, something
@@ -150,6 +150,9 @@ class JulianDate:
         Returns:
             A string representing the date as a Gregorian calendar date.
         """
+
+        if timezone is None:
+            timezone = self._timezone
 
         val = self.value()
         Z = int(val + 0.5 + (timezone / 24.0))
@@ -180,7 +183,7 @@ class JulianDate:
                         str(timezone) if timezone < 0 else '+' + str(timezone)
                         ))
 
-    def day(self, timezone: float = 0.0) -> str:
+    def day(self, timezone: float = None) -> str:
         """
         Returns a string with the day portion of the Gregorian calendar date equivalent.
 
@@ -191,9 +194,12 @@ class JulianDate:
             A string of the day portion of the Gregorian calendar date equivalent.
         """
 
+        if timezone is None:
+            timezone = self._timezone
+
         return self.date(timezone).split(' ')[0]
 
-    def time(self, timezone: float = 0.0) -> str:
+    def time(self, timezone: float = None) -> str:
         """
         Returns a string with the time portion of the Gregorian calendar date equivalent.
 
@@ -203,6 +209,9 @@ class JulianDate:
         Returns:
 
         """
+
+        if timezone is None:
+            timezone = self._timezone
 
         return self.date(timezone).split(' ')[1]
 
