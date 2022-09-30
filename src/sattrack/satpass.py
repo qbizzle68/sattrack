@@ -12,7 +12,7 @@ from sattrack.structures.coordinates import GeoPosition, zenithVector, geoPositi
 from sattrack.structures.elements import computeEccentricVector, raanProcessionRate, OrbitalElements
 from sattrack.structures.satellite import Satellite
 from sattrack.structures.tle import TwoLineElement
-from sattrack.sun import TwilightType, getSunPosition2, getSunRiseSetTimes, getTwilightType
+from sattrack.sun import TwilightType, getSunRiseSetTimes, getTwilightType, getSunPosition
 from sattrack.topos import getPVector, toTopocentric, getAltitude, azimuthAngleString
 from sattrack.util.anomalies import trueToMean, timeToNearestTrueAnomaly, computeTrueAnomaly
 from sattrack.util.constants import SUN_RADIUS, TWOPI, EARTH_FLATTENING, EARTH_EQUITORIAL_RADIUS
@@ -1035,7 +1035,7 @@ def isEclipsed(sat: Satellite, time: JulianDate) -> bool:
     """
 
     satPos = sat.getState(time)[0]
-    sunPos = getSunPosition2(time)
+    sunPos = getSunPosition(time)
     #   vectors relative to the satellite
     earthPos = -satPos
     relSunPos = -satPos + sunPos
