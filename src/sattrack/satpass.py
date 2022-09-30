@@ -73,7 +73,7 @@ class PositionInfo:
     def __repr__(self):
         """Generates a JSON like representation."""
         # return json.dumps(dict(self), default=default)
-        return json.dumps(self.toJson())
+        return json.dumps(self.toJson(), default=lambda o: o.toJson())
 
     def toJson(self):
         # return json.dumps(self, indent=4, default=lambda o: o.__dict__)
@@ -216,7 +216,7 @@ class Pass:
         return rtn
 
     def __repr__(self):
-        return json.dumps(self.toJson())
+        return json.dumps(self.toJson(), default=lambda o: o.toJson())
 
     def toJson(self):
         # todo: add to this
