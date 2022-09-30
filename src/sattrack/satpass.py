@@ -1335,6 +1335,6 @@ class ShadowController:
 
     def __computes(self, index: int):
         """Computes s, the unit projection vector of the Sun's position on the orbital plane."""
-        S = -norm(getSunPosition2(self._jd[index]))
+        S = -norm(getSunPosition(self._jd[index]))
         return rotateOrderTo(ZXZ, EulerAngles(self._elements[index].getRaan(), self._elements[index].getInc(),
                                               self._elements[index].getAop()), S)
