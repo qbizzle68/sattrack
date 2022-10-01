@@ -58,7 +58,7 @@ class PositionInfo:
             "altitude": self._altitude,
             "azimuth": self._azimuth,
             "direction": self._direction,
-            "time": self._time,
+            "time": dict(self._time),
             "illuminated": self._illuminated,
             "unobscured": self._unobscured,
             "visible": self._visible
@@ -72,16 +72,16 @@ class PositionInfo:
 
     def __repr__(self):
         """Generates a JSON like representation."""
-        # return json.dumps(dict(self), default=default)
-        return json.dumps(self.toJson(), default=lambda o: o.toJson())
+        # return json.dumps(self.toJson(), default=lambda o: o.toJson())
+        return json.dumps(self, default=lambda o: dict(o))
 
-    def toJson(self):
-        # return json.dumps(self, indent=4, default=lambda o: o.__dict__)
-        # return self.__repr__()
-        rtn = dict(self)
-        del rtn['time']
-        rtn['time'] = dict(self._time)
-        return rtn
+    # def toJson(self):
+    #     # return json.dumps(self, indent=4, default=lambda o: o.__dict__)
+    #     # return self.__repr__()
+    #     rtn = dict(self)
+    #     del rtn['time']
+    #     rtn['time'] = dict(self._time)
+    #     return rtn
 
     def getAltitude(self) -> float:
         """Returns the altitude measured in degrees.."""
@@ -174,13 +174,13 @@ class Pass:
 
     def __iter__(self):
         yield from {
-            'riseInfo': self._riseInfo,
-            'setInfo': self._setInfo,
-            'maxInfo': self._maxInfo,
-            'firstUnobscured': self._firstUnobscured,
-            'lastUnobscured': self._lastUnobscured,
-            'firstIlluminated': self._firstIlluminated,
-            'lastIlluminated': self._lastIlluminated,
+            'riseInfo': dict(self._riseInfo),
+            'setInfo': dict(self._setInfo),
+            'maxInfo': dict(self._maxInfo),
+            'firstUnobscured': dict(self._firstUnobscured) if self._firstUnobscured is not None else None,
+            'lastUnobscured': dict(self._lastUnobscured) if self._lastUnobscured is not None else None,
+            'firstIlluminated': dict(self._firstIlluminated) if self._firstIlluminated is not None else None,
+            'lastIlluminated': dict(self._lastIlluminated) if self._lastIlluminated is not None else None,
             'illuminated': self._illuminated,
             'unobscured': self._unobscured,
             'visible': self._visible
@@ -216,19 +216,20 @@ class Pass:
         return rtn
 
     def __repr__(self):
-        return json.dumps(self.toJson(), default=lambda o: o.toJson())
+        # return json.dumps(self.toJson(), default=lambda o: o.toJson())
+        return json.dumps(self, default=lambda o: dict(o))
 
-    def toJson(self):
-        # todo: add to this
-        # return json.dumps(self, indent=4, default=lambda o: o.__dict__)
-        rtn = {'illuminated': self._illuminated, 'unobscured': self._unobscured, 'visible': self._visible,
-               'riseInfo': dict(self._riseInfo), 'setInfo': dict(self._setInfo), 'maxInfo': dict(self._maxInfo),
-               'firstUnobscured': dict(self._firstUnobscured) if self._firstUnobscured is not None else None,
-               'lastUnobscured': dict(self._lastUnobscured) if self._lastUnobscured is not None else None,
-               'firstIlluminated': dict(self._firstIlluminated) if self._firstIlluminated is not None else None,
-               'lastIlluminated': dict(self._lastIlluminated) if self._lastIlluminated is not None else None}
-
-        return rtn
+    # def toJson(self):
+    #     # todo: add to this
+    #     # return json.dumps(self, indent=4, default=lambda o: o.__dict__)
+    #     rtn = {'illuminated': self._illuminated, 'unobscured': self._unobscured, 'visible': self._visible,
+    #            'riseInfo': dict(self._riseInfo), 'setInfo': dict(self._setInfo), 'maxInfo': dict(self._maxInfo),
+    #            'firstUnobscured': dict(self._firstUnobscured) if self._firstUnobscured is not None else None,
+    #            'lastUnobscured': dict(self._lastUnobscured) if self._lastUnobscured is not None else None,
+    #            'firstIlluminated': dict(self._firstIlluminated) if self._firstIlluminated is not None else None,
+    #            'lastIlluminated': dict(self._lastIlluminated) if self._lastIlluminated is not None else None}
+    #
+    #     return rtn
 
     def getRiseInfo(self) -> PositionInfo:
         """Returns the rise time information."""

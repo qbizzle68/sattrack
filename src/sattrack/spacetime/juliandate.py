@@ -55,8 +55,8 @@ class JulianDate:
         """Returns a JSON like representation of the attribute values."""
         return json.dumps(dict(self))
 
-    def toJson(self):
-        return dict(self)
+    # def toJson(self):
+    #     return dict(self)
 
     @classmethod
     def fromJSON(cls, json):
