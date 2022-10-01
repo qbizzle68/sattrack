@@ -150,16 +150,13 @@ class SunInfo:
 
     def toJson(self):
         rtn = {'riseAzimuth': self._riseAzimuth, 'setAzimuth': self._setAzimuth, 'transitAltitude': self._transitAlt,
-               'dayLength': self._dayLength, 'distance': self._distance}
-        rtn['riseTime'] = dict(self._riseTime)
-        rtn['setTime'] = dict(self._setTime)
-        rtn['transitTime'] = dict(self._transitTime)
-        rtn['civilTwilightStart'] = dict(self._civilTwilightStart)
-        rtn['civilTwilightEnd'] = dict(self._civilTwilightEnd)
-        rtn['nauticalTwilightStart'] = dict(self._nauticalTwilightStart)
-        rtn['nauticalTwilightEnd'] = dict(self._nauticalTwilightEnd)
-        rtn['astronomicalTwilightStart'] = dict(self._astronomicalTwilightStart)
-        rtn['astronomicalTwilightEnd'] = dict(self._astronomicalTwilightEnd)
+               'dayLength': self._dayLength, 'distance': self._distance, 'riseTime': dict(self._riseTime),
+               'setTime': dict(self._setTime), 'transitTime': dict(self._transitTime),
+               'civilTwilightStart': dict(self._civilTwilightStart), 'civilTwilightEnd': dict(self._civilTwilightEnd),
+               'nauticalTwilightStart': dict(self._nauticalTwilightStart),
+               'nauticalTwilightEnd': dict(self._nauticalTwilightEnd),
+               'astronomicalTwilightStart': dict(self._astronomicalTwilightStart),
+               'astronomicalTwilightEnd': dict(self._astronomicalTwilightEnd)}
         return rtn
 
     @classmethod
@@ -169,7 +166,7 @@ class SunInfo:
         hours = int(seconds / 3600.0)
         seconds -= hours * 3600.0
         minutes = int(seconds / 60.0)
-        seconds = int(seconds - minutes * 60.0) # to remove trailing zeros in the string
+        seconds = int(seconds - minutes * 60.0)  # to remove trailing zeros in the string
 
         # hours = int(length * 24.0)
         # minutes = int((length - hours / 24.0) * 60.0)
@@ -222,6 +219,7 @@ class SunInfo:
 
     def getAstronomicalTwilightEnd(self):
         return self._astronomicalTwilightEnd
+
 
 # def getSunPosition2(time: JulianDate):
 #     """
@@ -821,6 +819,7 @@ class SunPositionController2:
         except KeyError:
             self.__computeTopoLocalHA()
             HP = self._internal['HP']
+        return HP
 
     def getTransitAltitude(self):
         try:
