@@ -10,7 +10,7 @@ from sattrack.structures.coordinates import *
 from sattrack.structures.elements import OrbitalElements
 from sattrack.structures.satellite import Satellite
 from sattrack.structures.tle import *
-from sattrack.sun import getSunPosition, SunPositionController2
+from sattrack.sun import getSunPosition, SunPositionController2, getSunCoordinates, getSunAltAz
 from sattrack.topos import getAltitude
 from sattrack.util.anomalies import trueToMean
 from sattrack.util.constants import SUN_RADIUS, TWOPI
@@ -48,88 +48,145 @@ plist = pc.getPassList(1)
 #         num = int(localVal)
 #     return JulianDate.fromNumber(num, 0.5 - tzOffset, time.getTimeZone())
 #
-# time = JulianDate(9, 29, 2022, 0, 0, 0, -5)
-# target = -0.8333333333
-# DELTAT = 72.6
-#
-# sc = SunPositionController2()
-# # figure the details here later, for now use middle of the day, not noon
-# # A.2.1
-# # jd = JulianDate.fromNumber(time.number())
-# jd = time
-# v = sc.getApparentSiderealTime(jd)
-# # A.2.2
-# dt = DELTAT / 86400.0
-# time_m1 = jd.future(dt - 1)
-# time_0 = jd.future(dt)
-# time_p1 = jd.future(dt + 1)
+time = JulianDate(10, 2, 2022, 0, 0, 0, -5)
+target = -0.8333333333
+DELTAT = 72.6
+
+sc = SunPositionController2(time, geo)
+# figure the details here later, for now use middle of the day, not noon
+# A.2.1
+# jd = JulianDate.fromNumber(time.number())
+jd = time
+v = sc.getApparentSiderealTime()
+# A.2.2
+dt = DELTAT / 86400.0
+time_m1 = jd.future(dt - 1)
+time_0 = jd.future(dt)
+time_p1 = jd.future(dt + 1)
 # alpha_m1 = sc.getSolarRightAscension(time_m1)
 # alpha_0 = sc.getSolarRightAscension(time_0)
 # alpha_p1 = sc.getSolarRightAscension(time_p1)
 # delta_m1 = sc.getSolarDeclination(time_m1)
 # delta_0 = sc.getSolarDeclination(time_0)
 # delta_p1 = sc.getSolarDeclination(time_p1)
-# # A.2.3
-# sigma = radians(geo.getLongitude())
-# m0 = (alpha_0 - sigma - v) / TWOPI
-# # A.2.4
-# hp0 = radians(target)
-# phi = radians(geo.getLatitude())
-# H0 = acos((sin(hp0) - sin(phi)*sin(delta_0)) / (cos(phi) * cos(delta_0))) % pi
-# # A.2.5
-# m1 = (m0 - (H0 / TWOPI)) % 1.0
-# # A.2.6
-# m2 = (m0 + (H0 / TWOPI)) % 1.0
-# # A.2.8
-# v0 = v + radians(360.985647) * m0
-# v1 = v + radians(360.985647) * m1
-# v2 = v + radians(360.985647) * m2
-# # A.2.9
-# n0 = m0 + dt
-# n1 = m1 + dt
-# n2 = m2 + dt
-# # A.2.10
-# a = degrees(alpha_0 - alpha_m1)
-# if abs(a) > 2:
-#     a %= 1.0
-# a = radians(a)
-# b = degrees(alpha_p1 - alpha_0)
-# if abs(b) > 2:
-#     b %= 1.0
-# b = radians(b)
-# ap = degrees(delta_0 - delta_m1)
-# if abs(ap) > 2:
-#     ap %= 1.0
-# ap = radians(ap)
-# bp = degrees(delta_p1 - delta_0)
-# if abs(bp) > 2:
-#     bp %= 1.0
-# bp = radians(bp)
-# c = b - a
-# cp = bp - ap
-# alphap0 = alpha_0 + ((n0 * (a + b + c * n0)) / 2.0)
-# alphap1 = alpha_0 + ((n1 * (a + b + c * n1)) / 2.0)
-# alphap2 = alpha_0 + ((n2 * (a + b + c * n2)) / 2.0)
-# deltap0 = delta_0 + ((n0 * (ap + bp + cp * n0)) / 2.0)
-# deltap1 = delta_0 + ((n1 * (ap + bp + cp * n1)) / 2.0)
-# deltap2 = delta_0 + ((n2 * (ap + bp + cp * n2)) / 2.0)
-# # A.2.11
-# Hp0 = (v0 + sigma - alphap0) % TWOPI
-# if Hp0 >= pi:
-#     Hp0 += -TWOPI
-# Hp1 = (v1 + sigma - alphap1) % TWOPI
-# if Hp1 >= pi:
-#     Hp1 += -TWOPI
-# Hp2 = (v2 + sigma - alphap2) % TWOPI
-# if Hp2 >= pi:
-#     Hp2 += -TWOPI
-# # A.2.12
-# h0 = asin(sin(phi)*sin(deltap0) + cos(phi)*cos(deltap0)*cos(Hp0)) # sun altitude at transit time
-# h1 = asin(sin(phi)*sin(deltap1) + cos(phi)*cos(deltap1)*cos(Hp1))
-# h2 = asin(sin(phi)*sin(deltap2) + cos(phi)*cos(deltap2)*cos(Hp2))
-# # A.2.13
-# T = m0 - (Hp0 / TWOPI)
-# # A.2.14
-# R = m1 + ((h1 - hp0) / (TWOPI*cos(deltap1)*cos(phi)*sin(Hp1)))
-# # A.2.15
-# S = m2 + ((h2 - hp0) / (TWOPI*cos(deltap2)*cos(phi)*sin(Hp2)))
+m1vals = getSunCoordinates(time_m1)
+alpha_m1 = m1vals[0] * pi / 12.0
+delta_m1 = m1vals[1] * pi / 180.0
+vals0 = getSunCoordinates(time_0)
+alpha_0 = vals0[0] * pi / 12.0
+delta_0 = vals0[1] * pi / 180.0
+p1vals = getSunCoordinates(time_p1)
+alpha_p1 = p1vals[0] * pi / 12.0
+delta_p1 = p1vals[1] * pi / 180.0
+# A.2.3
+sigma = radians(geo.getLongitude())
+m0 = (alpha_0 - sigma - v) / TWOPI
+# A.2.4
+hp0 = radians(target)
+phi = radians(geo.getLatitude())
+H0 = acos((sin(hp0) - sin(phi)*sin(delta_0)) / (cos(phi) * cos(delta_0))) % pi
+# A.2.5
+m1 = (m0 - (H0 / TWOPI)) % 1.0
+# A.2.6
+m2 = (m0 + (H0 / TWOPI)) % 1.0
+# A.2.8
+v0 = v + radians(360.985647) * m0
+v1 = v + radians(360.985647) * m1
+v2 = v + radians(360.985647) * m2
+# A.2.9
+n0 = m0 + dt
+n1 = m1 + dt
+n2 = m2 + dt
+# A.2.10
+a = degrees(alpha_0 - alpha_m1)
+if abs(a) > 2:
+    a %= 1.0
+a = radians(a)
+b = degrees(alpha_p1 - alpha_0)
+if abs(b) > 2:
+    b %= 1.0
+b = radians(b)
+ap = degrees(delta_0 - delta_m1)
+if abs(ap) > 2:
+    ap %= 1.0
+ap = radians(ap)
+bp = degrees(delta_p1 - delta_0)
+if abs(bp) > 2:
+    bp %= 1.0
+bp = radians(bp)
+c = b - a
+cp = bp - ap
+alphap0 = alpha_0 + ((n0 * (a + b + c * n0)) / 2.0)
+alphap1 = alpha_0 + ((n1 * (a + b + c * n1)) / 2.0)
+alphap2 = alpha_0 + ((n2 * (a + b + c * n2)) / 2.0)
+deltap0 = delta_0 + ((n0 * (ap + bp + cp * n0)) / 2.0)
+deltap1 = delta_0 + ((n1 * (ap + bp + cp * n1)) / 2.0)
+deltap2 = delta_0 + ((n2 * (ap + bp + cp * n2)) / 2.0)
+# A.2.11
+Hp0 = (v0 + sigma - alphap0) % TWOPI
+if Hp0 >= pi:
+    Hp0 += -TWOPI
+Hp1 = (v1 + sigma - alphap1) % TWOPI
+if Hp1 >= pi:
+    Hp1 += -TWOPI
+Hp2 = (v2 + sigma - alphap2) % TWOPI
+if Hp2 >= pi:
+    Hp2 += -TWOPI
+# A.2.12
+h0 = asin(sin(phi)*sin(deltap0) + cos(phi)*cos(deltap0)*cos(Hp0)) # sun altitude at transit time
+h1 = asin(sin(phi)*sin(deltap1) + cos(phi)*cos(deltap1)*cos(Hp1))
+h2 = asin(sin(phi)*sin(deltap2) + cos(phi)*cos(deltap2)*cos(Hp2))
+# A.2.13
+T = m0 - (Hp0 / TWOPI)
+# A.2.14
+R = m1 + ((h1 - hp0) / (TWOPI*cos(deltap1)*cos(phi)*sin(Hp1)))
+# A.2.15
+S = m2 + ((h2 - hp0) / (TWOPI*cos(deltap2)*cos(phi)*sin(Hp2)))
+
+# riseAltAz = getSunAltAz(time.future(R), geo)
+# count = 0
+# while abs(riseAltAz[0]-hp0) > 1e-5:
+#     print('count:', count)
+#     print('riseAlt:', riseAltAz[0])
+#     print('riseTime:', time.future(R))
+#
+#     # try setting this to T +/- H0/TWOPI
+#     m0 = T
+#     m1 = R
+#     m2 = S
+#
+#     v0 = v + radians(360.985647) * m0
+#     v1 = v + radians(360.985647) * m1
+#     v2 = v + radians(360.985647) * m2
+#
+#     n0 = m0 + dt
+#     n1 = m1 + dt
+#     n2 = m2 + dt
+#
+#     alphap0 = alpha_0 + ((n0 * (a + b + c * n0)) / 2.0)
+#     alphap1 = alpha_0 + ((n1 * (a + b + c * n1)) / 2.0)
+#     alphap2 = alpha_0 + ((n2 * (a + b + c * n2)) / 2.0)
+#     deltap0 = delta_0 + ((n0 * (ap + bp + cp * n0)) / 2.0)
+#     deltap1 = delta_0 + ((n1 * (ap + bp + cp * n1)) / 2.0)
+#     deltap2 = delta_0 + ((n2 * (ap + bp + cp * n2)) / 2.0)
+#
+#     Hp0 = (v0 + sigma - alphap0) % TWOPI
+#     if Hp0 >= pi:
+#         Hp0 += -TWOPI
+#     Hp1 = (v1 + sigma - alphap1) % TWOPI
+#     if Hp1 >= pi:
+#         Hp1 += -TWOPI
+#     Hp2 = (v2 + sigma - alphap2) % TWOPI
+#     if Hp2 >= pi:
+#         Hp2 += -TWOPI
+#
+#     h0 = asin(sin(phi) * sin(deltap0) + cos(phi) * cos(deltap0) * cos(Hp0))  # sun altitude at transit time
+#     h1 = asin(sin(phi) * sin(deltap1) + cos(phi) * cos(deltap1) * cos(Hp1))
+#     h2 = asin(sin(phi) * sin(deltap2) + cos(phi) * cos(deltap2) * cos(Hp2))
+#
+#     T = m0 - (Hp0 / TWOPI)
+#     R = m1 + ((h1 - hp0) / (TWOPI * cos(deltap1) * cos(phi) * sin(Hp1)))
+#     S = m2 + ((h2 - hp0) / (TWOPI * cos(deltap2) * cos(phi) * sin(Hp2)))
+#
+#     count += 1
+#     riseAltAz = getSunAltAz(time.future(R), geo)
