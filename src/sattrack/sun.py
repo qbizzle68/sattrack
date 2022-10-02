@@ -117,13 +117,13 @@ class SunInfo:
 
     def __init__(self, day: JulianDate, geo: GeoPosition):
         spc = SunPositionController2(day, geo)
-        self._riseTime, self._setTime, self._transitTime = spc.getAngleTimes()
+        self._riseTime, self._setTime, self._transitTime = spc.getPreciseAngleTimes()
         self._dayLength = self._setTime.value() - self._riseTime.value()
         self._distance = spc.getSunDistance()
         self._transitAlt = spc.getTransitAltitude()
-        self._civilTwilightStart, self._civilTwilightEnd, UNUSED = spc.getAngleTimes(-6.0)
-        self._nauticalTwilightStart, self._nauticalTwilightEnd, UNUSED = spc.getAngleTimes(-12.0)
-        self._astronomicalTwilightStart, self._astronomicalTwilightEnd, UNUSED = spc.getAngleTimes(-18.0)
+        self._civilTwilightStart, self._civilTwilightEnd, UNUSED = spc.getPreciseAngleTimes(-6.0)
+        self._nauticalTwilightStart, self._nauticalTwilightEnd, UNUSED = spc.getPreciseAngleTimes(-12.0)
+        self._astronomicalTwilightStart, self._astronomicalTwilightEnd, UNUSED = spc.getPreciseAngleTimes(-18.0)
         UNUSED, self._riseAzimuth = getSunAltAz(self._riseTime, geo)
         UNUSED, self._setAzimuth = getSunAltAz(self._setTime, geo)
 
@@ -802,6 +802,32 @@ class SunPositionController2:
         S = m2 + ((h2 - hp0) / (TWOPI * cos(deltaP2) * cos(phi) * sin(Hp2)))
         return time.future(R), time.future(S), time.future(T)
 
+    def getPreciseAngleTimes(self, target = None, epsilon = 1e-6):
+        """Continues iterating until successive values are below an epsilon value."""
+        riseTime, setTime, transitTime = self.getAngleTimes(target)
+        spc = SunPositionController2(riseTime, self._geo)
+        Hp1 = spc.getHourAngle()
+        spc.setTime(setTime)
+        Hp2 = spc.getHourAngle()
+        rate = degrees(Hp2 - Hp1) / ((setTime - riseTime) * 86400) # degrees / second
+        if target is None:
+            target = -0.5 / 0.6
+
+        riseAlt = getSunAltAz(riseTime, self._geo)[0]
+        while abs(riseAlt - target) > epsilon:
+            dt = ((riseAlt - target) / rate) / 86400.0 # solar days
+            riseTime = riseTime - dt
+            riseAlt = getSunAltAz(riseTime, self._geo)[0]
+
+        setAlt = getSunAltAz(setTime, self._geo)[0]
+        while abs(setAlt - target) > epsilon:
+            dt = ((setAlt - target) / rate) / 86400.0 # solar days
+            setTime = setTime + dt
+            setAlt = getSunAltAz(setTime, self._geo)[0]
+
+        return riseTime, setTime, transitTime
+
+
     def getApparentSiderealTime(self):
         try:
             v = self._internal['v']
@@ -835,7 +861,7 @@ class SunPositionController2:
         except KeyError:
             self.__computeTopoLocalHA()
             HP = self._internal['HP']
-        return HP
+        return HP if HP < pi else HP - TWOPI
 
     def getTransitAltitude(self):
         try:
