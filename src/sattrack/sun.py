@@ -696,6 +696,7 @@ class SunPositionController2:
         return EVector(xComp, yComp, zComp) * R * AU
 
     def getSunCoordinates(self):
+        """return right ascension in time units and declination in degrees"""
         try:
             ra = self._internal['alpha']
         except KeyError:
