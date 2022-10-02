@@ -80,10 +80,25 @@ def getSunCoordinates(time: JulianDate) -> EVector:
 
 
 def getSunRiseSetTimes(time: JulianDate, geo: GeoPosition):
+    """Returns the solar rise and set times for the day given."""
     spc = SunPositionController2(time, geo)
     vals = spc.getAngleTimes()
     return vals[0], vals[1]
 
+def getSunRiseSetTimes2(time: JulianDate, geo: GeoPosition):
+    """Returns the solar rise and set times, but with special rules. If the time is after sunrise, the previous sunrise
+    is returned, otherwise the next sunrise will be returned. Therefore, if the time is during the day the returned
+    times are that day's sunrise and sunset, and if the time is during the night the returned times are the next day's
+    sunrise and sunset. The next sunset is always returned."""
+    spc = SunPositionController2(time, geo)
+    riseDayOf, setDayOf, transitDayOf = spc.getAngleTimes()
+    if time.value() <= setDayOf.value():
+        return riseDayOf, setDayOf
+    else:
+        time_p1 = JulianDate.fromNumber(time.number(), 0.51 - time.getTimeZone() / 24.0, time.getTimeZone())
+        spc.setTime(time_p1)
+        riseTime, setTime, UNUSED = spc.getAngleTimes()
+        return riseTime, setTime
 
 def getSunTransitTime(time: JulianDate, geo: GeoPosition):
     spc = SunPositionController2(time, geo)

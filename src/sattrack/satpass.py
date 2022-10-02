@@ -12,7 +12,7 @@ from sattrack.structures.coordinates import GeoPosition, zenithVector, geoPositi
 from sattrack.structures.elements import computeEccentricVector, raanProcessionRate, OrbitalElements
 from sattrack.structures.satellite import Satellite
 from sattrack.structures.tle import TwoLineElement
-from sattrack.sun import TwilightType, getSunRiseSetTimes, getTwilightType, getSunPosition
+from sattrack.sun import TwilightType, getTwilightType, getSunPosition, getSunRiseSetTimes2
 from sattrack.topos import getPVector, toTopocentric, getAltitude, azimuthAngleString
 from sattrack.util.anomalies import trueToMean, timeToNearestTrueAnomaly, computeTrueAnomaly
 from sattrack.util.constants import SUN_RADIUS, TWOPI, EARTH_FLATTENING, EARTH_EQUITORIAL_RADIUS
@@ -422,7 +422,7 @@ class PassController:
         riseTime, setTime = riseSetTimes(self._sat, self._geo, nextPassTime)
         self._shadowController.computeValues(riseTime)
         enterTime, exitTime = self._shadowController.getTimes()
-        sunRiseTime, sunSetTime = getSunRiseSetTimes(riseTime, self._geo)
+        sunRiseTime, sunSetTime = getSunRiseSetTimes2(riseTime, self._geo)
 
         firstIlluminatedTime = riseTime
         lastIlluminatedTime = setTime
