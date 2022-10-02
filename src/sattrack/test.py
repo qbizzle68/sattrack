@@ -5,7 +5,7 @@ from pyevspace import norm, dot
 
 from sattrack.rotation.order import ZXZ
 from sattrack.rotation.rotation import rotateOrderTo
-from sattrack.satpass import nextPassMax
+from sattrack.satpass import nextPassMax, PassController
 from sattrack.structures.coordinates import *
 from sattrack.structures.elements import OrbitalElements
 from sattrack.structures.satellite import Satellite
@@ -31,6 +31,9 @@ time = JulianDate(9, 25, 2022, 11, 47, 15.468)
 iss = Satellite(tle)
 jd = now()
 geo = GeoPosition(38.0608, -97.9298)
+pc = PassController(iss, geo, jd)
+np = pc.getNextPass()
+plist = pc.getPassList(1)
 # elements = OrbitalElements.fromTle(tle, jd)
 
 # def foo(time: JulianDate):
