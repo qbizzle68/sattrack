@@ -81,7 +81,7 @@ class JulianDate:
         if type(other) is JulianDate:
             return self._day_number + self._day_fraction - other._day_number - other._day_fraction
         elif type(other) is int or type(other) is float:
-            return self.__add__(other)
+            return self.__add__(-other)
         else:
             raise NotImplemented
 
