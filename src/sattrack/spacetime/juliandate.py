@@ -58,9 +58,9 @@ class JulianDate:
     # def toJson(self):
     #     return dict(self)
 
-    @classmethod
-    def fromJSON(cls, json):
-        return cls.fromNumber(json['day_number'], json['day_fraction'])
+    # @classmethod
+    # def fromJSON(cls, json):
+    #     return cls.fromNumber(json['day_number'], json['day_fraction'])
 
     def setTime(self, month: int, day: int, year: int, hour: int, minute: int, sec: float, timeZone: int = 0):
         """
