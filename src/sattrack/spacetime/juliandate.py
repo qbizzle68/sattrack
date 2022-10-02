@@ -32,16 +32,15 @@ class JulianDate:
 
     @classmethod
     def fromNumber(cls, day: float, fraction: float, timezone: float = 0.0):
+        """Creates a JulianDate instance directly from the Julian date number."""
         rtn = cls(0, 0, 0, 0, 0, 0)
         rtn._day_number = int(day)
         rtn._timezone = timezone
-        if fraction is not None:
-            rtn._day_fraction = fraction
-        else:
-            rtn._day_fraction = 0.0
+        rtn._day_fraction = fraction
         return rtn
 
     def __iter__(self):
+        """Returns a generator object to iterate through the Julian date values."""
         yield from {
             'day_number': self._day_number,
             'day_fraction': self._day_fraction
@@ -55,12 +54,72 @@ class JulianDate:
         """Returns a JSON like representation of the attribute values."""
         return json.dumps(dict(self))
 
-    # def toJson(self):
-    #     return dict(self)
+    def __int__(self):
+        """Returns the day number of the Julian date."""
+        return self._day_number
 
-    # @classmethod
-    # def fromJSON(cls, json):
-    #     return cls.fromNumber(json['day_number'], json['day_fraction'])
+    def __add__(self, rhs: int | float):
+        """
+        Returns a future or past JulianDate relative to this instance.
+
+        Args:
+            rhs: The number of solar days in the future (positive) or past (negative).
+
+        Returns:
+            A new JulianDate object with the rhs argument added to it.
+        """
+        if type(rhs) is int or type(rhs) is float:
+            val = self._day_number + self._day_fraction + rhs
+            rtn = JulianDate(0, 0, 0, 0, 0, 0, self._timezone)
+            rtn._day_number = int(val)
+            rtn._day_fraction = val - rtn._day_number
+            return rtn
+        else:
+            raise NotImplemented
+
+    def __sub__(self, other) -> float:
+        if type(other) is JulianDate:
+            return self._day_number + self._day_fraction - other._day_number - other._day_fraction
+        elif type(other) is int or type(other) is float:
+            return self.__add__(other)
+        else:
+            raise NotImplemented
+
+    def __lt__(self, other):
+        if type(other) is int or type(other) is float:
+            val = other
+        elif type(other) is JulianDate:
+            val = other._day_number + other._day_fraction
+        else:
+            raise NotImplemented
+        return (self._day_number + self._day_fraction) < val
+
+    def __le__(self, other):
+        if type(other) is int or type(other) is float:
+            val = other
+        elif type(other) is JulianDate:
+            val = other._day_number + other._day_fraction
+        else:
+            raise NotImplemented
+        return (self._day_number + self._day_fraction) <= val
+
+    def __gt__(self, other):
+        if type(other) is int or type(other) is float:
+            val = other
+        elif type(other) is JulianDate:
+            val = other._day_number + other._day_fraction
+        else:
+            raise NotImplemented
+        return (self._day_number + self._day_fraction) > val
+
+    def __ge__(self, other):
+        if type(other) is int or type(other) is float:
+            val = other
+        elif type(other) is JulianDate:
+            val = other._day_number + other._day_fraction
+        else:
+            raise NotImplemented
+        return (self._day_number + self._day_fraction) >= val
 
     def setTime(self, month: int, day: int, year: int, hour: int, minute: int, sec: float, timeZone: int = 0):
         """
