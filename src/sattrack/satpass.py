@@ -1,4 +1,4 @@
-import json
+import json, re
 from math import cos, radians, pi, sqrt, acos, sin, degrees, asin, atan2
 
 from pyevspace import EVector, cross, dot, norm, vang
@@ -177,10 +177,10 @@ class Pass:
             'riseInfo': dict(self._riseInfo),
             'setInfo': dict(self._setInfo),
             'maxInfo': dict(self._maxInfo),
-            'firstUnobscured': dict(self._firstUnobscured) if self._firstUnobscured is not None else None,
-            'lastUnobscured': dict(self._lastUnobscured) if self._lastUnobscured is not None else None,
-            'firstIlluminated': dict(self._firstIlluminated) if self._firstIlluminated is not None else None,
-            'lastIlluminated': dict(self._lastIlluminated) if self._lastIlluminated is not None else None,
+            'firstUnobscuredInfo': dict(self._firstUnobscured) if self._firstUnobscured is not None else None,
+            'lastUnobscuredInfo': dict(self._lastUnobscured) if self._lastUnobscured is not None else None,
+            'firstIlluminatedInfo': dict(self._firstIlluminated) if self._firstIlluminated is not None else None,
+            'lastIlluminatedInfo': dict(self._lastIlluminated) if self._lastIlluminated is not None else None,
             'illuminated': self._illuminated,
             'unobscured': self._unobscured,
             'visible': self._visible
@@ -300,7 +300,68 @@ class PassConstraints:
             self.minDuration = minDuration
             self.maxDuration = maxDuration
         self.illuminated = illuminated
+        self.unobscured = unobscured
         self.visible = visible
+
+
+def filterPassList(plist: list[Pass], constraints: PassConstraints) -> list[Pass]:
+    filteredList = []
+    for p in plist:
+        altitudes = {}
+        times = []
+        infos = [i[1] for i in p if i[1] is not None and re.search('[a-zA-Z]+Info$', i[0])]
+        if constraints.visible is not None:
+            if constraints.visible is True:
+                if not p.getVisibility():
+                    continue
+                # do alt / time computations here
+                for i in infos:
+                    if i['visible'] is True:
+                        altitudes[i['altitude']] = i
+                        times.append(i['time']['day_number'] + i['time']['day_fraction'])
+            elif constraints.visible is False and p.getVisibility():
+                continue
+        if constraints.illuminated is not None:
+            if constraints.illuminated is True:
+                if not p.getIlluminated():
+                    continue
+                if len(altitudes) == 0: #  only do this if we haven't already
+                    for i in infos:
+                        if i['illuminated'] is True:
+                            altitudes[i['altitude']] = i
+                            times.append(i['time']['day_number'] + i['time']['day_fraction'])
+            elif constraints.illuminated is False and p.getIlluminated():
+                continue
+        if constraints.unobscured is not None:
+            if constraints.unobscured is True:
+                if not p.getUnobscured():
+                    continue
+                if len(altitudes) == 0: #  only do this if we haven't already
+                    for i in infos:
+                        if i['unobscured'] is True:
+                            altitudes[i['altitude']] = i
+                            times.append(i['time']['day_number'] + i['time']['day_fraction'])
+            elif constraints.unobscured is False and p.getUnobscured():
+                continue
+
+        if constraints.visible is True or constraints.illuminated is True or constraints.unobscured is True:
+            highestAlt = max(altitudes.keys())
+            earliestTime = min(times)
+            latestTime = max(times)
+
+            if constraints.minAltitude is not None and highestAlt < constraints.minAltitude:
+                continue
+            if constraints.maxAltitude is not None and highestAlt > constraints.maxAltitude:
+                continue
+            duration = (latestTime - earliestTime) * 1440.0
+            if constraints.minDuration is not None and duration < constraints.minDuration:
+                continue
+            if constraints.maxDuration is not None and duration > constraints.maxDuration:
+                continue
+
+        filteredList.append(p)
+
+    return filteredList
 
 
 class PassController:
@@ -386,13 +447,14 @@ class PassController:
         else:
             riseIlluminated = True
             setIlluminated = True
-        if self._constraints is not None:
-            if self._constraints.illuminated is True and not (riseIlluminated or setIlluminated):
-                self._time = futurePassTime
-                return self.getNextPass()
-            elif self._constraints.illuminated is False and (riseIlluminated or setIlluminated):
-                self._time = futurePassTime
-                return self.getNextPass()
+        # check for illumination constraints
+        # if self._constraints is not None:
+        #     if self._constraints.illuminated is True and not (riseIlluminated or setIlluminated):
+        #         self._time = futurePassTime
+        #         return self.getNextPass()
+        #     elif self._constraints.illuminated is False and (riseIlluminated or setIlluminated):
+        #         self._time = futurePassTime
+        #         return self.getNextPass()
 
         firstUnobscuredTime = riseTime
         lastUnobscuredTime = setTime
@@ -417,24 +479,43 @@ class PassController:
         else:
             riseUnobscured = True
             setUnobscured = True
-        if self._constraints is not None:
-            if self._constraints.visible is True and not (riseUnobscured or setUnobscured):
-                self._time = futurePassTime
-                return self.getNextPass()
-            elif self._constraints.visible is False and (riseIlluminated or setIlluminated):
-                self._time = futurePassTime
-                return self.getNextPass()
+        # check for visibility and unobscured constraints
+        # if self._constraints is not None:
+        #     if self._constraints.unobscured is True and not (riseUnobscured or setUnobscured):
+        #         self._time = futurePassTime
+        #         return self.getNextPass()
+        #     elif self._constraints.unobscured is False and (riseIlluminated or setIlluminated):
+        #         self._time = futurePassTime
+        #         return self.getNextPass()
+        #     if self._constraints.visible is True:
+        #         if firstUnobscuredTime is None or firstIlluminatedTime is None:
+        #             self._time = futurePassTime
+        #             return self.getNextPass()
+        #         elif not (firstIlluminatedTime is firstUnobscuredTime or lastIlluminatedTime is lastUnobscuredTime) or \
+        #             not (lastUnobscuredTime.value() > firstIlluminatedTime.value() or lastIlluminatedTime.value() > firstUnobscuredTime.value()):
+        #             self._time = futurePassTime
+        #             return self.getNextPass()
+        #     elif self._constraints.visible is False:
+        #         if firstUnobscuredTime is not None or firstUnobscuredTime is not None:
+        #             self._time = futurePassTime
+        #             return self.getNextPass()
+        #         elif (firstIlluminatedTime is firstUnobscuredTime or lastIlluminatedTime is lastUnobscuredTime) or \
+        #                 (lastUnobscuredTime.value() > firstIlluminatedTime.value() or lastIlluminatedTime.value() > firstUnobscuredTime.value()):
+        #             self._time = futurePassTime
+        #             return self.getNextPass()
 
         risePos = self._sat.getState(riseTime)[0]
         risePosSez = toTopocentric(risePos, riseTime, self._geo)
-        riseInfo = PositionInfo(degrees(asin(risePosSez[2] / risePosSez.mag())),
+        riseAlt = degrees(asin(risePosSez[2] / risePosSez.mag()))
+        riseInfo = PositionInfo(riseAlt,
                                 degrees(atan3(risePosSez[1], -risePosSez[0])),
                                 riseTime,
                                 riseIlluminated,
                                 riseUnobscured)
         setPos = self._sat.getState(setTime)[0]
         setPosSez = toTopocentric(setPos, setTime, self._geo)
-        setInfo = PositionInfo(degrees(asin(setPosSez[2] / setPosSez.mag())),
+        setAlt = degrees(asin(setPosSez[2] / setPosSez.mag()))
+        setInfo = PositionInfo(setAlt,
                                degrees(atan3(setPosSez[1], -setPosSez[0])),
                                setTime,
                                setIlluminated,
@@ -469,7 +550,7 @@ class PassController:
             lastIlluminatedInfo = PositionInfo(lastIllAlt,
                                                degrees(atan3(lastIllPosSez[1], -lastIllPosSez[0])),
                                                lastIlluminatedTime,
-                                               False,
+                                               True,
                                                lastIlluminatedTime.value() < sunRiseTime.value()
                                                or lastIlluminatedTime.value() >= sunSetTime.value())
         firstUnobscuredInfo, lastUnobscuredInfo = None, None
@@ -493,62 +574,176 @@ class PassController:
                                               lastUnobscuredTime,
                                               lastUnobscuredTime.value() < enterTime.value()
                                               or lastUnobscuredTime.value() >= exitTime.value(),
-                                              False)
+                                              True)
 
-        if self._constraints is not None:
-            if self._constraints.visible is True:
-                maxAltList = [firstUnobAlt, lastUnobAlt]
-                if maxInfo.getVisibility():
-                    maxAltList.append(maxAlt)
-                if firstUnobscuredInfo is not None:
-                    earliestTime = firstUnobscuredTime
-                elif self._constraints.illuminated is True and firstIlluminatedInfo is not None:
-                    earliestTime = firstIlluminatedTime
-                else:
-                    earliestTime = riseTime
-                if lastUnobscuredInfo is not None:
-                    latestTime = lastUnobscuredTime
-                elif self._constraints.illuminated is True and lastIlluminatedInfo is not None:
-                    latestTime = lastIlluminatedTime
-                else:
-                    latestTime = setTime
-            elif self._constraints.illuminated is True:
-                maxAltList = [firstIllAlt, lastIllAlt]
-                if maxIlluminated:
-                    maxAltList.append(maxAlt)
-                if firstIlluminatedInfo is not None:
-                    earliestTime = firstIlluminatedTime
-                else:
-                    earliestTime = riseTime
-                if lastIlluminatedInfo is not None:
-                    latestTime = lastIlluminatedTime
-                else:
-                    latestTime = setTime
-            else:
-                maxAltList = [maxAlt]
-                earliestTime = riseTime
-                latestTime = setTime
+        # if self._constraints is not None and (self._constraints.minAltitude is not None
+        #                                       or self._constraints.maxAltitude is not None
+        #                                       or self._constraints.minDuration is not None
+        #                                       or self._constraints.maxDuration is not None):
+        #     # want to find max height, then check if it's between constraint boundaries
+        #     # prioritize visible, illuminated then unobscured
+        # 
+        #     altitudes = {}
+        #     times = {}
+        #     if self._constraints.visible is True:
+        #         if riseIlluminated and riseUnobscured:
+        #             altitudes[riseAlt] = riseInfo
+        #             times[riseTime.value()] = riseTime
+        #         if maxIlluminated and maxUnobscured:
+        #             altitudes[maxAlt] = maxInfo
+        #             times[nextPassTime.value()] = nextPassTime
+        #         if setIlluminated and setUnobscured:
+        #             altitudes[setAlt] = setInfo
+        #             times[setTime.value()] = setTime
+        #         if firstIlluminatedInfo is not None and firstIlluminatedInfo.getVisibility():
+        #             altitudes[firstIllAlt] = firstIlluminatedInfo
+        #             times[firstIlluminatedTime.value()] = firstIlluminatedTime
+        #         if lastIlluminatedInfo is not None and lastIlluminatedInfo.getVisibility():
+        #             altitudes[lastIllAlt] = lastIlluminatedInfo
+        #             times[lastIlluminatedTime.value()] = lastIlluminatedTime
+        #         if firstUnobscuredInfo is not None and firstUnobscuredInfo.getVisibility():
+        #             altitudes[firstUnobAlt] = firstUnobscuredInfo
+        #             times[firstUnobscuredTime.value()] = firstUnobscuredTime
+        #         if lastUnobscuredInfo is not None and lastUnobscuredInfo.getVisibility():
+        #             altitudes[lastUnobAlt] = lastUnobscuredInfo
+        #             times[lastUnobscuredTime.value()] = lastUnobscuredTime
+        #         # todo: if len(altitudes) == 0, this isn't visible. maybe this is easier to check for visibility
+        #         highestAlt = max(altitudes.keys())
+        #         earliestTime = times[min(times.keys())]
+        #         latestTime = times[max(times.keys())]
+        #     elif self._constraints.illuminated is True:
+        #         if riseIlluminated:
+        #             altitudes[riseAlt] = riseInfo
+        #             times[riseTime.value()] = riseTime
+        #         if maxIlluminated:
+        #             altitudes[maxAlt] = maxInfo
+        #             times[nextPassTime.value()] = nextPassTime
+        #         if setIlluminated:
+        #             altitudes[setAlt] = setInfo
+        #             times[setTime.value()] = setTime
+        #         if firstIlluminatedInfo is not None:
+        #             altitudes[firstIllAlt] = firstIlluminatedInfo
+        #             times[firstIlluminatedTime.value()] = firstIlluminatedTime
+        #         if lastIlluminatedInfo is not None:
+        #             altitudes[lastIllAlt] = lastIlluminatedInfo
+        #             times[lastIlluminatedTime.value()] = lastIlluminatedTime
+        #         if firstUnobscuredInfo is not None and firstUnobscuredInfo.getIlluminated():
+        #             altitudes[firstUnobAlt] = firstUnobscuredInfo
+        #             times[firstUnobscuredTime.value()] = firstUnobscuredTime
+        #         if lastUnobscuredInfo is not None and lastUnobscuredInfo.getIlluminated():
+        #             altitudes[lastUnobAlt] = lastUnobscuredInfo
+        #             times[lastUnobscuredTime.value()] = lastUnobscuredTime
+        #         highestAlt = max(altitudes.keys())
+        #         earliestTime = times[min(times.keys())]
+        #         latestTime = times[max(times.keys())]
+        #     elif self._constraints.unobscured is True:
+        #         if riseUnobscured:
+        #             altitudes[riseAlt] = riseInfo
+        #             times[riseTime.value()] = riseTime
+        #         if maxUnobscured:
+        #             altitudes[maxAlt] = maxInfo
+        #             times[nextPassTime.value()] = nextPassTime
+        #         if setUnobscured:
+        #             altitudes[setAlt] = setInfo
+        #             times[setTime.value()] = setTime
+        #         if firstIlluminatedInfo is not None and firstIlluminatedInfo.getUnobscured():
+        #             altitudes[firstIllAlt] = firstIlluminatedInfo
+        #             times[firstIlluminatedTime.value()] = firstIlluminatedTime
+        #         if lastIlluminatedInfo is not None and lastIlluminatedInfo.getUnobscured():
+        #             altitudes[lastIllAlt] = lastIlluminatedInfo
+        #             times[lastIlluminatedTime.value()] = lastIlluminatedTime
+        #         if firstUnobscuredInfo is not None:
+        #             altitudes[firstUnobAlt] = firstUnobscuredInfo
+        #             times[firstUnobscuredTime.value()] = firstUnobscuredTime
+        #         if lastUnobscuredInfo is not None:
+        #             altitudes[lastUnobAlt] = lastUnobscuredInfo
+        #             times[lastUnobscuredTime.value()] = lastUnobscuredTime
+        #         highestAlt = max(altitudes.keys())
+        #         earliestTime = times[min(times.keys())]
+        #         latestTime = times[max(times.keys())]
+        #     else:
+        #         highestAlt = maxAlt
+        #         earliestTime = riseTime
+        #         latestTime = setTime
+        #     print('highestAlt:', highestAlt)
+        #     print('earliestTime:', earliestTime)
+        #     print('latestTime:', latestTime)
+        # 
+        #     if self._constraints.minAltitude is not None and highestAlt < self._constraints.minAltitude:
+        #         self._time = futurePassTime
+        #         return self.getNextPass()
+        #     if self._constraints.maxAltitude is not None and highestAlt > self._constraints.maxAltitude:
+        #         self._time = futurePassTime
+        #         return self.getNextPass()
+        #     duration = (latestTime.value() - earliestTime.value()) * 1440.0
+        #     if self._constraints.minDuration is not None and duration < self._constraints.minDuration:
+        #         self._time = futurePassTime
+        #         return self.getNextPass()
+        #     if self._constraints.maxDuration is not None and duration > self._constraints.maxDuration:
+        #         self._time = futurePassTime
+        #         return self.getNextPass()
 
-            if self._constraints.minAltitude is not None:
-                if self._constraints.minAltitude > max(maxAltList):
-                    self._time = futurePassTime
-                    return self.getNextPass()
-            if self._constraints.maxAltitude is not None:
-                if self._constraints.maxAltitude < max(maxAltList):
-                    self._time = futurePassTime
-                    return self.getNextPass()
-            if self._constraints.minDuration is not None:
-                if self._constraints.minDuration < latestTime.difference(earliestTime) * 1440:
-                    self._time = futurePassTime
-                    return self.getNextPass()
-                if self._constraints.maxDuration > latestTime.difference(earliestTime) * 1440:
-                    self._time = futurePassTime
-                    return self.getNextPass()
+            # if self._constraints.visible is True:
+            #     maxAltList = [firstUnobAlt, lastUnobAlt]
+            #     if maxInfo.getVisibility():
+            #         maxAltList.append(maxAlt)
+            #     if firstUnobscuredInfo is not None:
+            #         earliestTime = firstUnobscuredTime
+            #     elif self._constraints.illuminated is True and firstIlluminatedInfo is not None:
+            #         earliestTime = firstIlluminatedTime
+            #     else:
+            #         earliestTime = riseTime
+            #     if lastUnobscuredInfo is not None:
+            #         latestTime = lastUnobscuredTime
+            #     elif self._constraints.illuminated is True and lastIlluminatedInfo is not None:
+            #         latestTime = lastIlluminatedTime
+            #     else:
+            #         latestTime = setTime
+            # elif self._constraints.illuminated is True:
+            #     maxAltList = [firstIllAlt, lastIllAlt]
+            #     if maxIlluminated:
+            #         maxAltList.append(maxAlt)
+            #     if firstIlluminatedInfo is not None:
+            #         earliestTime = firstIlluminatedTime
+            #     else:
+            #         earliestTime = riseTime
+            #     if lastIlluminatedInfo is not None:
+            #         latestTime = lastIlluminatedTime
+            #     else:
+            #         latestTime = setTime
+            # else:
+            #     maxAltList = [maxAlt]
+            #     earliestTime = riseTime
+            #     latestTime = setTime
 
-        self._time = futurePassTime
-        return Pass(riseInfo, setInfo, maxInfo, firstUnobscuredInfo=firstUnobscuredInfo,
+            # if self._constraints.minAltitude is not None:
+            #     if self._constraints.minAltitude > max(maxAltList):
+            #         self._time = futurePassTime
+            #         return self.getNextPass()
+            # if self._constraints.maxAltitude is not None:
+            #     if self._constraints.maxAltitude < max(maxAltList):
+            #         self._time = futurePassTime
+            #         return self.getNextPass()
+            # if self._constraints.minDuration is not None:
+            #     if self._constraints.minDuration < latestTime.difference(earliestTime) * 1440:
+            #         self._time = futurePassTime
+            #         return self.getNextPass()
+            #     if self._constraints.maxDuration > latestTime.difference(earliestTime) * 1440:
+            #         self._time = futurePassTime
+            #         return self.getNextPass()
+
+        # self._time = futurePassTime
+        np = Pass(riseInfo, setInfo, maxInfo, firstUnobscuredInfo=firstUnobscuredInfo,
                     lastUnobscuredInfo=lastUnobscuredInfo,
                     firstIlluminatedInfo=firstIlluminatedInfo, lastIlluminatedInfo=lastIlluminatedInfo)
+        self._time = futurePassTime
+        if self._constraints is not None:
+            filterPass = filterPassList([np], self._constraints)
+            if filterPass == []:
+                return self.getNextPass()
+            return filterPass[0]
+        return np
+
 
     def getPassList(self, duration: float, start: JulianDate = None):
         tmp = self._time
