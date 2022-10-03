@@ -33,6 +33,6 @@ setup(
         'Topic :: Scientific/Engineering :: Astronomy'
     ],
     packages = ['sattrack', 'sattrack.rotation', 'sattrack.spacetime', 'sattrack.structures', 'sattrack.util'],
-    package_dir = {'sattrack': 'src/sattrack'},
+    package_dir = {'': 'src'},
     ext_modules = ext_modules,
 )
