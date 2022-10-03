@@ -31,7 +31,6 @@ class JulianDate:
         self.setTime(month, day, year, hour, minute, second, timeZone)
 
     @classmethod
-    # def fromNumber(cls, day: float, fraction: float, timezone: float = 0.0):
     def fromNumber(cls, number: float, timeZone: float = 0.0):
         """Creates a JulianDate instance directly from the Julian date number."""
         rtn = cls(0, 0, 0, 0, 0, 0, timeZone)
@@ -202,49 +201,51 @@ class JulianDate:
 
         return self.value() - jd.value()
 
-    def date(self, timezone: float = None) -> str:
+    def date(self, timeZone: float = None) -> str:
         """
         Generates a string with the Gregorian calendar date equivalent of the calling date. The timezone offset adjusts
         to the correct time. Printing this string allows the printed string to accommodate a timezone offset, something
         the __str__ method can't do.
 
         Args:
-            timezone: Timezone offset if the desired time is not UTC. (Default = 0)
+            timeZone: Timezone offset if the desired time is not UTC. (Default = 0)
 
         Returns:
             A string representing the date as a Gregorian calendar date.
         """
 
-        if timezone is None:
-            timezone = self._timezone
+        if timeZone is None:
+            timeZone = self._timezone
 
-        val = self.value()
-        Z = int(val + 0.5 + (timezone / 24.0))
-        F = (val + 0.5 + (timezone / 24.0)) - Z
+        val = self._dayNumber + self._dayFraction + 0.5 + (timeZone / 24.0)
+        Z = int(val)
+        F = val - Z
         if Z < 2299161:
             A = Z
         else:
             B = int((Z - 1867216.25) / 36524.25)
-            A = Z + 1 + B - (B / 4)
+            A = Z + 1 + B - int(B / 4)
         C = A + 1524
         D = int((C - 122.1) / 365.25)
         G = int(365.25 * D)
-        _I = int((C - G) / 30.6001)
-        d = C - G - int(30.6001 * _I) + F
-        m = _I - 1 if _I < 14 else _I - 13
+        I = int((C - G) / 30.6001)
+        d = C - G - int(30.6001 * I) + F
+        m = I - 1 if I < 14 else I - 13
         y = D - 4716 if m > 2 else D - 4715
 
-        dayFrac = d - int(d)
-        h = int(dayFrac * 24)
-        mi = int((dayFrac - (h / 24.0)) * 1440.0)
-        s = (dayFrac - (h / 24.0) - (mi / 1440.0)) * 86400.0
+        frac = val - int(val)
+        s = round(frac * 86400.0, 3)
+        h = int(s / 3600.0)
+        s -= h * 3600.0
+        mi = int(s / 60.0)
+        s -= mi * 60.0
 
         return ('{}/{}/{} {}:{}:{} {} UTC'
                 .format(m, int(d) if d >= 10 else '0' + str(int(d)),
                         y, h if h >= 10 else '0' + str(h),
                         mi if mi >= 10 else '0' + str(mi),
                         str(round(s, 3)) if s >= 10 else '0' + str(round(s, 3)),
-                        str(timezone) if timezone < 0 else '+' + str(timezone)
+                        str(timeZone) if timeZone < 0 else '+' + str(timeZone)
                         ))
 
     def day(self, timezone: float = None) -> str:
