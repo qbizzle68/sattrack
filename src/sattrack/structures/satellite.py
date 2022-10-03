@@ -4,7 +4,8 @@ from pyevspace import EVector
 
 from sattrack.rotation.order import ZXZ
 from sattrack.rotation.rotation import ReferenceFrame, EulerAngles
-from sattrack.structures.sgp4 import SGP4_Propagator
+# from sattrack.structures.sgp4 import SGP4_Propagator
+from sattrack.sgp4 import SGP4_Propagator
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.structures.body import Body, EARTH_BODY
 from sattrack.structures.elements import OrbitalElements
