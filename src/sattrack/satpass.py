@@ -187,17 +187,17 @@ class Pass:
         self._lastUnobscured = lastUnobscuredInfo
         self._firstIlluminated = firstIlluminatedInfo
         self._lastIlluminated = lastIlluminatedInfo
-        if firstIlluminatedInfo is not None or riseInfo.getIlluminated():
+        if firstIlluminatedInfo is not None or riseInfo.illuminated:
             self._illuminated = True
         else:
             self._illuminated = False
-        if firstUnobscuredInfo is not None or riseInfo.getUnobscured():
+        if firstUnobscuredInfo is not None or riseInfo.unobscured:
             self._unobscured = True
         else:
             self._unobscured = False
-        if self._riseInfo.getVisibility() \
-                or (self._firstIlluminated is not None and self._firstIlluminated.getVisibility()) \
-                or (self._firstUnobscured is not None and self._firstUnobscured.getVisibility()):
+        if self._riseInfo.visible \
+                or (self._firstIlluminated is not None and self._firstIlluminated.visible) \
+                or (self._firstUnobscured is not None and self._firstUnobscured.visible):
             self._visible = True
         else:
             self._visible = False
@@ -221,20 +221,20 @@ class Pass:
         riseStr = f'Rise:\n{self._riseInfo}'
         setStr = f'Set:\n{self._setInfo}'
         maxStr = f'Max:\n{self._maxInfo}'
-        strDict = {info.getTime().value(): string for info, string in
+        strDict = {info.time.value(): string for info, string in
                    zip((self._riseInfo, self._setInfo, self._maxInfo), (riseStr, setStr, maxStr))}
         if self._firstIlluminated is not None:
             firstIllStr = f'First Illuminated:\n{self._firstIlluminated}'
-            strDict[self._firstIlluminated.getTime().value()] = firstIllStr
+            strDict[self._firstIlluminated.time.value()] = firstIllStr
         if self._lastIlluminated is not None:
             lastIllStr = f'Last Illuminated:\n{self._lastIlluminated}'
-            strDict[self._lastIlluminated.getTime().value()] = lastIllStr
+            strDict[self._lastIlluminated.time.value()] = lastIllStr
         if self._firstUnobscured is not None:
             firstStr = f'First Unobscured:\n{self._firstUnobscured}'
-            strDict[self._firstUnobscured.getTime().value()] = firstStr
+            strDict[self._firstUnobscured.time.value()] = firstStr
         if self._lastUnobscured is not None:
             lastStr = f'Last Unobscured:\n{self._lastUnobscured}'
-            strDict[self._lastUnobscured.getTime().value()] = lastStr
+            strDict[self._lastUnobscured.time.value()] = lastStr
         rtn = ""
         for i in range(len(strDict)):
             minTm = min(strDict.keys())
@@ -789,8 +789,8 @@ class PassController:
             if nPass is None:
                 self._time = tmp
                 return tuple(passList)
-            nTime = nPass.getMaxInfo().getTime()
-            if nPass.getMaxInfo().getTime().difference(self._initTime) < duration:
+            nTime = nPass.getMaxInfo().time
+            if nPass.getMaxInfo().time.difference(self._initTime) < duration:
                 passList.append(nPass)
 
         self._time = tmp
