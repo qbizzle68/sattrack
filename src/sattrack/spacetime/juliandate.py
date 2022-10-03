@@ -25,8 +25,8 @@ class JulianDate:
             second: Second of the minute
             timeZone: Timezone offset of the time (default = 0)
         """
-        self._day_number = 0
-        self._day_fraction = 0
+        self._dayNumber = 0
+        self._dayFraction = 0
         self._timezone = timeZone
         self.setTime(month, day, year, hour, minute, second, timeZone)
 
@@ -35,8 +35,8 @@ class JulianDate:
     def fromNumber(cls, number: float, timeZone: float = 0.0):
         """Creates a JulianDate instance directly from the Julian date number."""
         rtn = cls(0, 0, 0, 0, 0, 0, timeZone)
-        rtn._day_number = int(number)
-        rtn._day_fraction = number - rtn._day_number
+        rtn._dayNumber = int(number)
+        rtn._dayFraction = number - rtn._dayNumber
         return rtn
 
         # rtn._day_number = int(day)
@@ -47,8 +47,8 @@ class JulianDate:
     def __iter__(self):
         """Returns a generator object to iterate through the Julian date values."""
         yield from {
-            'day_number': self._day_number,
-            'day_fraction': self._day_fraction
+            'dayNumber': self._dayNumber,
+            'dayFraction': self._dayFraction
         }.items()
 
     def __str__(self) -> str:
@@ -61,7 +61,7 @@ class JulianDate:
 
     def __int__(self):
         """Returns the day number of the Julian date."""
-        return self._day_number
+        return self._dayNumber
 
     def __add__(self, rhs: int | float):
         """
@@ -84,7 +84,7 @@ class JulianDate:
 
     def __sub__(self, other) -> float:
         if type(other) is JulianDate:
-            return self._day_number + self._day_fraction - other._day_number - other._day_fraction
+            return self._dayNumber + self._dayFraction - other.value()
         elif type(other) is int or type(other) is float:
             return self.__add__(-other)
         else:
@@ -94,37 +94,37 @@ class JulianDate:
         if type(other) is int or type(other) is float:
             val = other
         elif type(other) is JulianDate:
-            val = other._day_number + other._day_fraction
+            val = other.value()
         else:
             raise NotImplemented
-        return (self._day_number + self._day_fraction) < val
+        return (self._dayNumber + self._dayFraction) < val
 
     def __le__(self, other):
         if type(other) is int or type(other) is float:
             val = other
         elif type(other) is JulianDate:
-            val = other._day_number + other._day_fraction
+            val = other.value()
         else:
             raise NotImplemented
-        return (self._day_number + self._day_fraction) <= val
+        return (self._dayNumber + self._dayFraction) <= val
 
     def __gt__(self, other):
         if type(other) is int or type(other) is float:
             val = other
         elif type(other) is JulianDate:
-            val = other._day_number + other._day_fraction
+            val = other.value()
         else:
             raise NotImplemented
-        return (self._day_number + self._day_fraction) > val
+        return (self._dayNumber + self._dayFraction) > val
 
     def __ge__(self, other):
         if type(other) is int or type(other) is float:
             val = other
         elif type(other) is JulianDate:
-            val = other._day_number + other._day_fraction
+            val = other.value()
         else:
             raise NotImplemented
-        return (self._day_number + self._day_fraction) >= val
+        return (self._dayNumber + self._dayFraction) >= val
 
     def setTime(self, month: int, day: int, year: int, hour: int, minute: int, sec: float, timeZone: int = 0):
         """
@@ -143,27 +143,27 @@ class JulianDate:
         t0 = int((1461 * (year + 4800 + int((month - 14) / 12))) / 4)
         t1 = int((367 * (month - 2 - (12 * int((month - 14) / 12)))) / 12)
         t2 = int((3 * int((year + 4900 + int((month - 14) / 12)) / 100)) / 4)
-        self._day_number = t0 + t1 - t2 + day - 32075
-        self._day_fraction = ((hour - 12) / 24.0) + (minute / 1440.0) + (sec / 86400.0) - (timeZone / 24.0)
-        if self._day_fraction >= 1.0:
-            self._day_number += 1
-            self._day_fraction -= 1.0
-        elif self._day_fraction < 0:
-            self._day_number -= 1
-            self._day_fraction += 1.0
+        self._dayNumber = t0 + t1 - t2 + day - 32075
+        self._dayFraction = ((hour - 12) / 24.0) + (minute / 1440.0) + (sec / 86400.0) - (timeZone / 24.0)
+        if self._dayFraction >= 1.0:
+            self._dayNumber += 1
+            self._dayFraction -= 1.0
+        elif self._dayFraction < 0:
+            self._dayNumber -= 1
+            self._dayFraction += 1.0
         self._timezone = timeZone
 
     def value(self):
         """Returns the value of the JulianDate."""
-        return self._day_number + self._day_fraction
+        return self._dayNumber + self._dayFraction
 
     def number(self):
         """Returns the Julian day number."""
-        return self._day_number
+        return self._dayNumber
 
     def fraction(self):
         """Returns the fraction part of the JulianDate."""
-        return self._day_fraction
+        return self._dayFraction
 
     def future(self, days: float):
         """
@@ -179,11 +179,11 @@ class JulianDate:
 
         rtn = JulianDate(0, 0, 0, 0, 0, 0)
         int_day = int(days)
-        rtn._day_number = self._day_number + int_day
-        rtn._day_fraction = self._day_fraction + (days - int_day)
-        if rtn._day_fraction >= 1.0:
-            rtn._day_number += 1
-            rtn._day_fraction -= 1.0
+        rtn._dayNumber = self._dayNumber + int_day
+        rtn._dayFraction = self._dayFraction + (days - int_day)
+        if rtn._dayFraction >= 1.0:
+            rtn._dayNumber += 1
+            rtn._dayFraction -= 1.0
         rtn._timezone = self._timezone
         return rtn
 

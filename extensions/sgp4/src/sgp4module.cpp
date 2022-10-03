@@ -16,10 +16,10 @@ static void _elsetrec_init(_SGP4_Propagator* prop, PyObject* tle) {
 	PyObject* next = NULL;
 
 	PyObject* tle_epoch = PyObject_GetAttrString(tle, "_epoch");
-	next = PyObject_GetAttrString(tle_epoch, "_day_number");
+	next = PyObject_GetAttrString(tle_epoch, "_dayNumber");
 	prop->satrec.jdsatepoch = PyLong_AsDouble(next);
 	Py_DECREF(next);
-	next = PyObject_GetAttrString(tle_epoch, "_day_fraction");
+	next = PyObject_GetAttrString(tle_epoch, "_dayFraction");
 	prop->satrec.jdsatepochF = PyFloat_AsDouble(next);
 	Py_DECREF(next);
 	Py_DECREF(tle_epoch);
@@ -101,10 +101,10 @@ static PyObject* getState(_SGP4_Propagator* prop, PyObject* const* args, Py_ssiz
 	}
 
 	PyObject* tle_epoch = PyObject_GetAttrString(tle, "_epoch");
-	PyObject* tle_jd_num = PyObject_GetAttrString(tle_epoch, "_day_number");
-	PyObject* tle_jd_frac = PyObject_GetAttrString(tle_epoch, "_day_fraction");
-	PyObject* jd_num = PyObject_GetAttrString(jd, "_day_number");
-	PyObject* jd_frac = PyObject_GetAttrString(jd, "_day_fraction");
+	PyObject* tle_jd_num = PyObject_GetAttrString(tle_epoch, "_dayNumber");
+	PyObject* tle_jd_frac = PyObject_GetAttrString(tle_epoch, "_dayFraction");
+	PyObject* jd_num = PyObject_GetAttrString(jd, "_dayNumber");
+	PyObject* jd_frac = PyObject_GetAttrString(jd, "_dayFraction");
 
 	double tsince = (PyFloat_AsDouble(jd_num)
 		- PyFloat_AsDouble(tle_jd_num)
@@ -119,7 +119,7 @@ static PyObject* getState(_SGP4_Propagator* prop, PyObject* const* args, Py_ssiz
 	SGP4Funcs::sgp4(prop->satrec, tsince, r, v);
 
 	if (prop->satrec.error > 0) {
-		PyErr_SetString(PyExc_Exception, "Error occured in sgp4().");
+		PyErr_SetString(PyExc_Exception, "Error occurred in sgp4().");
 		return NULL;
 	}
 
