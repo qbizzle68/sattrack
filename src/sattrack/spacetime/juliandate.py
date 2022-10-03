@@ -31,13 +31,18 @@ class JulianDate:
         self.setTime(month, day, year, hour, minute, second, timeZone)
 
     @classmethod
-    def fromNumber(cls, day: float, fraction: float, timezone: float = 0.0):
+    # def fromNumber(cls, day: float, fraction: float, timezone: float = 0.0):
+    def fromNumber(cls, number: float, timeZone: float = 0.0):
         """Creates a JulianDate instance directly from the Julian date number."""
-        rtn = cls(0, 0, 0, 0, 0, 0)
-        rtn._day_number = int(day)
-        rtn._timezone = timezone
-        rtn._day_fraction = fraction
-        return rtn
+        rtn = cls(0, 0, 0, 0, 0, 0, timeZone)
+        rtn._day_number = int(number)
+        rtn._day_fraction = number - rtn._day_number
+        return rtnx
+
+        # rtn._day_number = int(day)
+        # rtn._timezone = timezone
+        # rtn._day_fraction = fraction
+        # return rtn
 
     def __iter__(self):
         """Returns a generator object to iterate through the Julian date values."""

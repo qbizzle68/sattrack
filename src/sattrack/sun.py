@@ -95,7 +95,8 @@ def getSunRiseSetTimes2(time: JulianDate, geo: GeoPosition):
     if time.value() <= setDayOf.value():
         return riseDayOf, setDayOf
     else:
-        time_p1 = JulianDate.fromNumber(time.number(), 0.51 - time.getTimeZone() / 24.0, time.getTimeZone())
+        # time_p1 = JulianDate.fromNumber(time.number(), 0.51 - time.getTimeZone() / 24.0, time.getTimeZone())
+        time_p1 = JulianDate.fromNumber(time.number() + 0.51 - time.getTimeZone() / 24.0, time.getTimeZone())
         spc.setTime(time_p1)
         riseTime, setTime, UNUSED = spc.getAngleTimes()
         return riseTime, setTime
@@ -716,7 +717,8 @@ class SunPositionController2:
         num = int(localVal)
         if localVal - int(localVal) < 0.5:
             num -= 1
-        time = JulianDate.fromNumber(num, 0.5 - tzOffset, self._JD.getTimeZone())
+        # time = JulianDate.fromNumber(num, 0.5 - tzOffset, self._JD.getTimeZone())
+        time = JulianDate.fromNumber(num + 0.5 - tzOffset, self._JD.getTimeZone())
         spc_time = SunPositionController2(time, self._geo)
         v = spc_time.getApparentSiderealTime()
         if target is None:
