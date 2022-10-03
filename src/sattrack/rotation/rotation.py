@@ -1,10 +1,9 @@
-from copy import deepcopy
+from copy import copy
 from math import cos, sin
 
 from pyevspace import EVector, EMatrix, transpose
 
 from sattrack.rotation.order import Axis, EulerOrder
-import copyreg
 
 
 def _xRotation(angle: float) -> EMatrix:
@@ -109,12 +108,8 @@ class EulerAngles:
         else:
             raise StopIteration
 
-
-def pickle_EulerAngles(angs):
-    return EulerAngles, (angs[0], angs[1], angs[2])
-
-
-copyreg.pickle(EulerAngles, pickle_EulerAngles)
+    def __reduce__(self):
+        return (self.__class__, (self._angles[0], self._angles[1], self._angles[2]))
 
 
 # purposefully not documenting these since I intend to implement this in C.
@@ -249,7 +244,7 @@ class ReferenceFrame:
 
     def getAngles(self) -> EulerAngles:
         """Returns a copy of the EulerAngles for this rotation."""
-        return deepcopy(self._angles)
+        return copy(self._angles)
 
     def getOrder(self) -> EulerOrder:
         """Returns the EulerOrder that describes this rotation."""
