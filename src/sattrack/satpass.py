@@ -33,6 +33,8 @@ class PositionInfo:
         visible: Visibility of the satellite, defaults to false.
     """
 
+    __slots__ = '_altitude', '_azimuth', '_direction', '_time', '_illuminated', '_unobscured', '_visible'
+
     def __init__(self, altitude: float, azimuth: float, time: JulianDate, illuminated: bool = False,
                  unobscured: bool = False):
         """
@@ -83,33 +85,61 @@ class PositionInfo:
     #     rtn['time'] = dict(self._time)
     #     return rtn
 
-    def getAltitude(self) -> float:
-        """Returns the altitude measured in degrees.."""
+    @property
+    def altitude(self):
         return self._altitude
 
-    def getAzimuth(self) -> float:
-        """Returns the azimuth, measured clockwise from north in degrees."""
+    @property
+    def azimuth(self):
         return self._azimuth
 
-    def getDirection(self) -> str:
-        """Returns the azimuth compass direction."""
+    @property
+    def direction(self):
         return self._direction
 
-    def getTime(self) -> JulianDate:
-        """Returns a JulianDate representing the time of this instance."""
+    @property
+    def time(self):
         return self._time
 
-    def getIlluminated(self) -> bool:
-        """Returns whether the satellite is illuminated."""
+    @property
+    def illuminated(self):
         return self._illuminated
 
-    def getUnobscured(self) -> bool:
-        """Returns whether the satellite is unobscured."""
+    @property
+    def unobscured(self):
         return self._unobscured
 
-    def getVisibility(self) -> bool:
-        """Returns the visibility of the satellite."""
+    @property
+    def visible(self):
         return self._visible
+
+    # def getAltitude(self) -> float:
+    #     """Returns the altitude measured in degrees.."""
+    #     return self._altitude
+    #
+    # def getAzimuth(self) -> float:
+    #     """Returns the azimuth, measured clockwise from north in degrees."""
+    #     return self._azimuth
+    #
+    # def getDirection(self) -> str:
+    #     """Returns the azimuth compass direction."""
+    #     return self._direction
+    #
+    # def getTime(self) -> JulianDate:
+    #     """Returns a JulianDate representing the time of this instance."""
+    #     return self._time
+    #
+    # def getIlluminated(self) -> bool:
+    #     """Returns whether the satellite is illuminated."""
+    #     return self._illuminated
+    #
+    # def getUnobscured(self) -> bool:
+    #     """Returns whether the satellite is unobscured."""
+    #     return self._unobscured
+    #
+    # def getVisibility(self) -> bool:
+    #     """Returns the visibility of the satellite."""
+    #     return self._visible
 
 
 class Pass:
