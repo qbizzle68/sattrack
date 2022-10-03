@@ -37,7 +37,7 @@ class JulianDate:
         rtn = cls(0, 0, 0, 0, 0, 0, timeZone)
         rtn._day_number = int(number)
         rtn._day_fraction = number - rtn._day_number
-        return rtnx
+        return rtn
 
         # rtn._day_number = int(day)
         # rtn._timezone = timezone
