@@ -96,7 +96,7 @@ def getSunRiseSetTimes2(time: JulianDate, geo: GeoPosition):
         return riseDayOf, setDayOf
     else:
         # time_p1 = JulianDate.fromNumber(time.number(), 0.51 - time.getTimeZone() / 24.0, time.getTimeZone())
-        time_p1 = JulianDate.fromNumber(time.number() + 0.51 - time.getTimeZone() / 24.0, time.getTimeZone())
+        time_p1 = JulianDate.fromNumber(time.getNumber() + 0.51 - time.getTimeZone() / 24.0, time.getTimeZone())
         spc.setTime(time_p1)
         riseTime, setTime, UNUSED = spc.getAngleTimes()
         return riseTime, setTime

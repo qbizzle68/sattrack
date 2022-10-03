@@ -157,11 +157,11 @@ class JulianDate:
         """Returns the value of the JulianDate."""
         return self._dayNumber + self._dayFraction
 
-    def number(self):
+    def getNumber(self):
         """Returns the Julian day number."""
         return self._dayNumber
 
-    def fraction(self):
+    def getFraction(self):
         """Returns the fraction part of the JulianDate."""
         return self._dayFraction
 
