@@ -676,6 +676,3 @@ fabric.properties
 # CodeStream plugin
 # https://plugins.jetbrains.com/plugin/12206-codestream
 .idea/codestream.xml
-
-# expect this to be removed when combining project for distribution
-!src/sattrack/structures/sgp4.pyd
