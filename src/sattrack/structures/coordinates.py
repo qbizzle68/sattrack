@@ -1,4 +1,4 @@
-import json
+import json as _json
 from abc import ABC, abstractmethod
 from math import sin, cos, tan, atan, radians, degrees, sqrt, asin
 from sattrack.util.constants import EARTH_FLATTENING, EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS
@@ -15,6 +15,7 @@ class Coordinates(ABC):
 
     def __init__(self, lat: float, lng: float):
         """Initializes the object to the latitude and longitude given in degrees."""
+        self._check_angles(lat, lng)
         self._lat = lat
         self._lng = self._fmod(lng)
 
@@ -23,7 +24,7 @@ class Coordinates(ABC):
         return f'Latitude: {self._lat}, Longitude: {self._lng}'
 
     def toJSON(self):
-        return json.dumps(self, indent=4, default=lambda o: o.__dict__)
+        return _json.dumps(self, indent=4, default=lambda o: o.__dict__)
 
     def getLatitude(self) -> float:
         """Returns the latitude in degrees."""
@@ -44,6 +45,9 @@ class Coordinates(ABC):
     @abstractmethod
     def _fmod(self, val: float) -> float:
         """Abstract method to be overridden in derived classes, which modulates the longitude value when set."""
+        pass
+
+    def _check_angles(self, lat, lng):
         pass
 
 
