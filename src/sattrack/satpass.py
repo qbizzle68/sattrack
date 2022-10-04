@@ -1,5 +1,6 @@
 import json, re
 from math import cos, radians, pi, sqrt, acos, sin, degrees, asin, atan2
+from operator import index
 
 from pyevspace import EVector, cross, dot, norm, vang
 
@@ -311,27 +312,113 @@ class PassConstraints:
         minDuration: Minimum duration the satellite must be above the horizon in minutes.
         illuminated: Whether the satellite is illuminated at any point of the pass.
     """
+    __slots__ = '_minAltitude', '_maxAltitude', '_minDuration', '_maxDuration', '_illuminated', '_unobscured', '_visible'
 
     def __init__(self, *, minAltitude: float = None, maxAltitude: float = None, minDuration: float = None,
                  maxDuration: float = None, illuminated: bool = None, unobscured: bool = None, visible: bool = None):
         """Initializes the values to the argument values."""
-        if minAltitude is not None and maxAltitude is not None:
-            if minAltitude > maxAltitude:
-                raise PassConstraintException('Cannot set a minimum altitude constraint less than a maximum altitude '
-                                              'constraint.')
-        else:
-            self.minAltitude = minAltitude
-            self.maxAltitude = maxAltitude
-        if minDuration is not None and maxDuration is not None:
-            if minDuration > maxDuration:
-                raise PassConstraintException('Cannot set a minimum duration constraint longer than a maximum duration'
-                                              'constraint.')
-        else:
-            self.minDuration = minDuration
-            self.maxDuration = maxDuration
-        self.illuminated = illuminated
-        self.unobscured = unobscured
-        self.visible = visible
+        self._check_altitudes(minAltitude, maxAltitude)
+        self._check_duration(minDuration, maxDuration)
+        self._minAltitude = minAltitude
+        self._maxAltitude = maxAltitude
+        self._minAltitude = minAltitude
+        self._maxAltitude = maxAltitude
+        self._illuminated = illuminated
+        self._unobscured = unobscured
+        self._visible = visible
+
+    @property
+    def minAltitude(self):
+        return self._minAltitude
+
+    @minAltitude.setter
+    def minAltitude(self, value):
+        self._check_altitudes(value, self._maxAltitude)
+        self._minAltitude = value
+
+    @minAltitude.deleter
+    def minAltitude(self):
+        self._minAltitude = None
+
+    @property
+    def maxAltitude(self):
+        return self._maxAltitude
+
+    @maxAltitude.setter
+    def maxAltitude(self, value):
+        self._check_altitudes(self._minAltitude, value)
+        self._maxAltitude = value
+
+    @maxAltitude.deleter
+    def maxAltitude(self):
+        self._maxAltitude = None
+
+    @property
+    def minDuration(self):
+        return self._minDuration
+
+    @minDuration.setter
+    def minDuration(self, value):
+        self._check_duration(value, self._maxDuration)
+        self._minDuration = value
+
+    @minDuration.deleter
+    def minDuration(self):
+        self._minDuration = None
+
+    @property
+    def maxDuration(self):
+        return self._maxDuration
+
+    @maxDuration.setter
+    def maxDuration(self, value):
+        self._check_duration(self._minDuration, value)
+        self._maxDuration = value
+
+    @maxDuration.deleter
+    def maxDuration(self):
+        self._maxDuration = None
+
+    @property
+    def illuminated(self):
+        return self._illuminated
+
+    @illuminated.setter
+    def illuminated(self, value):
+        self._illuminated = index(value)
+
+    @illuminated.deleter
+    def illuminated(self):
+        self._illuminated = None
+
+    @property
+    def unobscured(self):
+        return self._unobscured
+
+    @unobscured.setter
+    def unobscured(self, value):
+        self._unobscured = index(value)
+
+    @unobscured.deleter
+    def unobscured(self):
+        self._unobscured = None
+
+    def _check_altitudes(self, minAlt, maxAlt):
+        if minAlt is not None and maxAlt is not None and minAlt > maxAlt:
+            raise PassConstraintException('Cannot set a minimum altitude constraint less than a maximum altitude '
+                                          'constraint.')
+        if minAlt is not None and minAlt > 90:
+            raise ValueError('minAltitude cannot be above 90 degrees')
+        if maxAlt is not None and maxAlt < 0:
+            raise ValueError('maxAltitude cannot be below 0 degrees')
+
+    def _check_duration(self, minDur, maxDur):
+        if minDur is not None and maxDur is not None and minDur > maxDur:
+            raise PassConstraintException('Cannot set a minimum duration constraint longer than a maximum duration'
+                                          'constraint.')
+        if maxDur is not None and maxDur < 0:
+            raise ValueError('maxDuration cannot be less than 0')
+
 
 
 def filterPassList(plist: list[Pass], constraints: PassConstraints) -> list[Pass]:
