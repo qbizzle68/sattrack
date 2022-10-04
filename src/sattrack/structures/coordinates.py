@@ -23,8 +23,11 @@ class Coordinates(ABC):
         """Returns a string representation of the object."""
         return f'Latitude: {self._lat}, Longitude: {self._lng}'
 
-    def toJSON(self):
-        return _json.dumps(self, indent=4, default=lambda o: o.__dict__)
+    def __repr__(self) -> str:
+        return _json.dumps(self, default=lambda o: dict(o))
+
+    # def toJSON(self):
+    #     return _json.dumps(self, indent=4, default=lambda o: o.__dict__)
 
     def getLatitude(self) -> float:
         """Returns the latitude in degrees."""
