@@ -119,7 +119,7 @@ class SunInfo:
     def __init__(self, day: JulianDate, geo: GeoPosition):
         spc = SunPositionController2(day, geo)
         self._riseTime, self._setTime, self._transitTime = spc.getPreciseAngleTimes()
-        self._dayLength = self._setTime.value() - self._riseTime.value()
+        self._dayLength = self._setTime.value - self._riseTime.value
         self._distance = spc.getSunDistance()
         self._transitAlt = spc.getTransitAltitude()
         self._civilTwilightStart, self._civilTwilightEnd, UNUSED = spc.getPreciseAngleTimes(-6.0)
