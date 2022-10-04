@@ -403,7 +403,20 @@ class PassConstraints:
     def unobscured(self):
         self._unobscured = None
 
-    def _check_altitudes(self, minAlt, maxAlt):
+    @property
+    def visible(self):
+        return self._visible
+
+    @visible.setter
+    def visible(self, value):
+        self._visible = _index(value)
+
+    @visible.deleter
+    def visible(self):
+        self._unobscured = None
+
+    @staticmethod
+    def _check_altitudes(minAlt, maxAlt):
         if minAlt is not None and maxAlt is not None and minAlt > maxAlt:
             raise PassConstraintException('Cannot set a minimum altitude constraint less than a maximum altitude '
                                           'constraint.')
@@ -412,7 +425,8 @@ class PassConstraints:
         if maxAlt is not None and maxAlt < 0:
             raise ValueError('maxAltitude cannot be below 0 degrees')
 
-    def _check_duration(self, minDur, maxDur):
+    @staticmethod
+    def _check_duration(minDur, maxDur):
         if minDur is not None and maxDur is not None and minDur > maxDur:
             raise PassConstraintException('Cannot set a minimum duration constraint longer than a maximum duration'
                                           'constraint.')
