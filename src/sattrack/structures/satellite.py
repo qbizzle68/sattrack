@@ -57,19 +57,19 @@ class Satellite:
             respectively.
         """
 
-        if jd.value() in self._states:
-            return self._states[jd.value()]
+        if jd.value in self._states:
+            return self._states[jd.value]
         if self._tle:
             rawState = self._propagator.getState(self._tle, jd)
             state = (EVector(rawState[0][0], rawState[0][1], rawState[0][2]),
                      EVector(rawState[1][0], rawState[1][1], rawState[1][2]))
             if cache:
-                self._states[jd.value()] = state
+                self._states[jd.value] = state
             return state
         else:
             state = self._elements.getState(jd)
             if cache:
-                self._states[jd.value()] = state
+                self._states[jd.value] = state
             return state
 
     def update(self, obj: TwoLineElement | OrbitalElements):

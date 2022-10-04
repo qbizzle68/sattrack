@@ -14,7 +14,7 @@ def siderealTime(jd: JulianDate) -> float:
         The Earth's sidereal time at the given solar time.
     """
 
-    dt = jd.difference(J2000)
+    dt = jd - J2000
     tmp = (18.697_374_558 + 24.065_709_824_419_08 * dt) % 24.0
     return tmp + 24.0 if tmp < 0 else tmp
 

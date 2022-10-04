@@ -150,7 +150,8 @@ def timeToNextMeanAnomaly(meanMotion: float, m0: float, epoch0: JulianDate, m1: 
 
     n = meanMotion * 86400 / TWOPI
     pePass = epoch0.future(-m0 / (TWOPI * n))
-    revs = time.difference(pePass) * n
+    # revs = time.difference(pePass) * n
+    revs = (time - pePass) * n
     m0 = (revs - floor(revs)) * TWOPI
     if m1 < m0:
         dm = m1 + TWOPI - m0
@@ -176,7 +177,8 @@ def timeToPrevMeanAnomaly(meanMotion: float, m0: float, epoch0: JulianDate, m1: 
 
     n = meanMotion * 86400 / TWOPI
     pePass = epoch0.future(-m0 / (TWOPI * n))
-    revs = time.difference(pePass) * n
+    # revs = time.difference(pePass) * n
+    revs = (time - pePass) * n
     m0 = (revs - floor(revs)) * TWOPI
     if m0 < m1:
         dm = m1 - TWOPI - m0
@@ -239,7 +241,8 @@ def meanAnomalyAt(meanMotion: float, m0: float, epoch0: JulianDate, epoch: Julia
         The mean anomaly in radians.
     """
 
-    dM = meanMotion * epoch.difference(epoch0) * 86400.0
+    # dM = meanMotion * epoch.difference(epoch0) * 86400.0
+    dM = meanMotion * (epoch - epoch0) * 86400.0
     return (m0 + dM) % TWOPI
 
 

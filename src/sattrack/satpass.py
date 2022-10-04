@@ -221,20 +221,20 @@ class Pass:
         riseStr = f'Rise:\n{self._riseInfo}'
         setStr = f'Set:\n{self._setInfo}'
         maxStr = f'Max:\n{self._maxInfo}'
-        strDict = {info.time.value(): string for info, string in
+        strDict = {info.time.value: string for info, string in
                    zip((self._riseInfo, self._setInfo, self._maxInfo), (riseStr, setStr, maxStr))}
         if self._firstIlluminated is not None:
             firstIllStr = f'First Illuminated:\n{self._firstIlluminated}'
-            strDict[self._firstIlluminated.time.value()] = firstIllStr
+            strDict[self._firstIlluminated.time.value] = firstIllStr
         if self._lastIlluminated is not None:
             lastIllStr = f'Last Illuminated:\n{self._lastIlluminated}'
-            strDict[self._lastIlluminated.time.value()] = lastIllStr
+            strDict[self._lastIlluminated.time.value] = lastIllStr
         if self._firstUnobscured is not None:
             firstStr = f'First Unobscured:\n{self._firstUnobscured}'
-            strDict[self._firstUnobscured.time.value()] = firstStr
+            strDict[self._firstUnobscured.time.value] = firstStr
         if self._lastUnobscured is not None:
             lastStr = f'Last Unobscured:\n{self._lastUnobscured}'
-            strDict[self._lastUnobscured.time.value()] = lastStr
+            strDict[self._lastUnobscured.time.value] = lastStr
         rtn = ""
         for i in range(len(strDict)):
             minTm = min(strDict.keys())
@@ -445,7 +445,8 @@ class PassController:
             return None
         # stop searching for a pass after a time-out period
         if self._time is not None:
-            if nextPassTime.difference(self._initTime) > self._timeout:
+            # if nextPassTime.difference(self._initTime) > self._timeout:
+            if nextPassTime - self._initTime > self._timeout:
                 return None
         futurePassTime = nextPassTime.future(0.001)
 
@@ -457,18 +458,18 @@ class PassController:
         firstIlluminatedTime = riseTime
         lastIlluminatedTime = setTime
         #   rise and set sandwich shadow entrance
-        if riseTime.value() < enterTime.value() < setTime.value():
+        if riseTime.value < enterTime.value < setTime.value:
             riseIlluminated = True
             setIlluminated = False
             lastIlluminatedTime = enterTime
         #   rise and set sandwich shadow exit
-        elif riseTime.value() < exitTime.value() < setTime.value():
+        elif riseTime.value < exitTime.value < setTime.value:
             riseIlluminated = False
             firstIlluminatedTime = exitTime
             setIlluminated = True
         #   rise and set are in shadow
-        elif enterTime.value() < riseTime.value() < exitTime.value() \
-                and enterTime.value() < setTime.value() < exitTime.value():
+        elif enterTime.value < riseTime.value < exitTime.value \
+                and enterTime.value < setTime.value < exitTime.value:
             riseIlluminated = False
             firstIlluminatedTime = None
             setIlluminated = False
@@ -489,18 +490,18 @@ class PassController:
         firstUnobscuredTime = riseTime
         lastUnobscuredTime = setTime
         #   rise and set sandwich sunrise
-        if riseTime.value() < sunRiseTime.value() < setTime.value():
+        if riseTime.value < sunRiseTime.value < setTime.value:
             riseUnobscured = True
             setUnobscured = False
             lastUnobscuredTime = sunRiseTime
         #   rise and set sandwich sunset
-        elif riseTime.value() < sunSetTime.value() < setTime.value():
+        elif riseTime.value < sunSetTime.value < setTime.value:
             riseUnobscured = False
             firstUnobscuredTime = sunSetTime
             setUnobscured = True
         #   rise and set are during the day
-        elif sunRiseTime.value() < riseTime.value() < sunSetTime.value() \
-                and sunRiseTime.value() < setTime.value() < sunSetTime.value():
+        elif sunRiseTime.value < riseTime.value < sunSetTime.value \
+                and sunRiseTime.value < setTime.value < sunSetTime.value:
             riseUnobscured = False
             firstUnobscuredTime = None
             setUnobscured = False
@@ -522,7 +523,7 @@ class PassController:
         #             self._time = futurePassTime
         #             return self.getNextPass()
         #         elif not (firstIlluminatedTime is firstUnobscuredTime or lastIlluminatedTime is lastUnobscuredTime) or \
-        #             not (lastUnobscuredTime.value() > firstIlluminatedTime.value() or lastIlluminatedTime.value() > firstUnobscuredTime.value()):
+        #             not (lastUnobscuredTime.value > firstIlluminatedTime.value or lastIlluminatedTime.value > firstUnobscuredTime.value):
         #             self._time = futurePassTime
         #             return self.getNextPass()
         #     elif self._constraints.visible is False:
@@ -530,7 +531,7 @@ class PassController:
         #             self._time = futurePassTime
         #             return self.getNextPass()
         #         elif (firstIlluminatedTime is firstUnobscuredTime or lastIlluminatedTime is lastUnobscuredTime) or \
-        #                 (lastUnobscuredTime.value() > firstIlluminatedTime.value() or lastIlluminatedTime.value() > firstUnobscuredTime.value()):
+        #                 (lastUnobscuredTime.value > firstIlluminatedTime.value or lastIlluminatedTime.value > firstUnobscuredTime.value):
         #             self._time = futurePassTime
         #             return self.getNextPass()
 
@@ -553,8 +554,8 @@ class PassController:
         maxPos = self._sat.getState(nextPassTime)[0]
         maxPosSez = toTopocentric(maxPos, nextPassTime, self._geo)
         maxAlt = degrees(asin(maxPosSez[2] / maxPosSez.mag()))
-        maxIlluminated = not (enterTime.value() <= nextPassTime.value() <= exitTime.value())
-        maxUnobscured = nextPassTime.value() < sunRiseTime.value() or nextPassTime.value() >= sunSetTime.value()
+        maxIlluminated = not (enterTime.value <= nextPassTime.value <= exitTime.value)
+        maxUnobscured = nextPassTime.value < sunRiseTime.value or nextPassTime.value >= sunSetTime.value
         maxInfo = PositionInfo(maxAlt,
                                degrees(atan3(maxPosSez[1], -maxPosSez.mag())),
                                nextPassTime,
@@ -571,8 +572,8 @@ class PassController:
                                                 degrees(atan3(firstIllPosSez[1], -firstIllPosSez[0])),
                                                 firstIlluminatedTime,
                                                 True,
-                                                firstIlluminatedTime.value() < sunRiseTime.value()
-                                                or firstIlluminatedTime.value() >= sunSetTime.value())
+                                                firstIlluminatedTime.value < sunRiseTime.value
+                                                or firstIlluminatedTime.value >= sunSetTime.value)
         if lastIlluminatedTime is not None and lastIlluminatedTime != setTime:
             lastIllPos = self._sat.getState(lastIlluminatedTime)[0]
             lastIllPosSez = toTopocentric(lastIllPos, lastIlluminatedTime, self._geo)
@@ -581,8 +582,8 @@ class PassController:
                                                degrees(atan3(lastIllPosSez[1], -lastIllPosSez[0])),
                                                lastIlluminatedTime,
                                                True,
-                                               lastIlluminatedTime.value() < sunRiseTime.value()
-                                               or lastIlluminatedTime.value() >= sunSetTime.value())
+                                               lastIlluminatedTime.value < sunRiseTime.value
+                                               or lastIlluminatedTime.value >= sunSetTime.value)
         firstUnobscuredInfo, lastUnobscuredInfo = None, None
         firstUnobAlt, lastUnobAlt = 0, 0
         if firstUnobscuredTime is not None and firstUnobscuredTime == sunSetTime:
@@ -592,8 +593,8 @@ class PassController:
             firstUnobscuredInfo = PositionInfo(firstUnobAlt,
                                                degrees(atan3(firstUnobPosSez[1], -firstUnobPosSez[0])),
                                                firstUnobscuredTime,
-                                               firstUnobscuredTime.value() < enterTime.value()
-                                               or firstUnobscuredTime.value >= exitTime.value(),
+                                               firstUnobscuredTime.value < enterTime.value
+                                               or firstUnobscuredTime.value >= exitTime.value,
                                                True)
         if lastUnobscuredTime is not None and lastUnobscuredTime == sunRiseTime:
             lastUnobPos = self._sat.getState(lastUnobscuredTime)[0]
@@ -602,8 +603,8 @@ class PassController:
             lastUnobscuredInfo = PositionInfo(lastUnobAlt,
                                               degrees(atan3(lastUnobPosSez[1], -lastUnobPosSez[0])),
                                               lastUnobscuredTime,
-                                              lastUnobscuredTime.value() < enterTime.value()
-                                              or lastUnobscuredTime.value() >= exitTime.value(),
+                                              lastUnobscuredTime.value < enterTime.value
+                                              or lastUnobscuredTime.value >= exitTime.value,
                                               True)
 
         # if self._constraints is not None and (self._constraints.minAltitude is not None
@@ -618,25 +619,25 @@ class PassController:
         #     if self._constraints.visible is True:
         #         if riseIlluminated and riseUnobscured:
         #             altitudes[riseAlt] = riseInfo
-        #             times[riseTime.value()] = riseTime
+        #             times[riseTime.value] = riseTime
         #         if maxIlluminated and maxUnobscured:
         #             altitudes[maxAlt] = maxInfo
-        #             times[nextPassTime.value()] = nextPassTime
+        #             times[nextPassTime.value] = nextPassTime
         #         if setIlluminated and setUnobscured:
         #             altitudes[setAlt] = setInfo
-        #             times[setTime.value()] = setTime
+        #             times[setTime.value] = setTime
         #         if firstIlluminatedInfo is not None and firstIlluminatedInfo.getVisibility():
         #             altitudes[firstIllAlt] = firstIlluminatedInfo
-        #             times[firstIlluminatedTime.value()] = firstIlluminatedTime
+        #             times[firstIlluminatedTime.value] = firstIlluminatedTime
         #         if lastIlluminatedInfo is not None and lastIlluminatedInfo.getVisibility():
         #             altitudes[lastIllAlt] = lastIlluminatedInfo
-        #             times[lastIlluminatedTime.value()] = lastIlluminatedTime
+        #             times[lastIlluminatedTime.value] = lastIlluminatedTime
         #         if firstUnobscuredInfo is not None and firstUnobscuredInfo.getVisibility():
         #             altitudes[firstUnobAlt] = firstUnobscuredInfo
-        #             times[firstUnobscuredTime.value()] = firstUnobscuredTime
+        #             times[firstUnobscuredTime.value] = firstUnobscuredTime
         #         if lastUnobscuredInfo is not None and lastUnobscuredInfo.getVisibility():
         #             altitudes[lastUnobAlt] = lastUnobscuredInfo
-        #             times[lastUnobscuredTime.value()] = lastUnobscuredTime
+        #             times[lastUnobscuredTime.value] = lastUnobscuredTime
         #         # todo: if len(altitudes) == 0, this isn't visible. maybe this is easier to check for visibility
         #         highestAlt = max(altitudes.keys())
         #         earliestTime = times[min(times.keys())]
@@ -644,50 +645,50 @@ class PassController:
         #     elif self._constraints.illuminated is True:
         #         if riseIlluminated:
         #             altitudes[riseAlt] = riseInfo
-        #             times[riseTime.value()] = riseTime
+        #             times[riseTime.value] = riseTime
         #         if maxIlluminated:
         #             altitudes[maxAlt] = maxInfo
-        #             times[nextPassTime.value()] = nextPassTime
+        #             times[nextPassTime.value] = nextPassTime
         #         if setIlluminated:
         #             altitudes[setAlt] = setInfo
-        #             times[setTime.value()] = setTime
+        #             times[setTime.value] = setTime
         #         if firstIlluminatedInfo is not None:
         #             altitudes[firstIllAlt] = firstIlluminatedInfo
-        #             times[firstIlluminatedTime.value()] = firstIlluminatedTime
+        #             times[firstIlluminatedTime.value] = firstIlluminatedTime
         #         if lastIlluminatedInfo is not None:
         #             altitudes[lastIllAlt] = lastIlluminatedInfo
-        #             times[lastIlluminatedTime.value()] = lastIlluminatedTime
+        #             times[lastIlluminatedTime.value] = lastIlluminatedTime
         #         if firstUnobscuredInfo is not None and firstUnobscuredInfo.getIlluminated():
         #             altitudes[firstUnobAlt] = firstUnobscuredInfo
-        #             times[firstUnobscuredTime.value()] = firstUnobscuredTime
+        #             times[firstUnobscuredTime.value] = firstUnobscuredTime
         #         if lastUnobscuredInfo is not None and lastUnobscuredInfo.getIlluminated():
         #             altitudes[lastUnobAlt] = lastUnobscuredInfo
-        #             times[lastUnobscuredTime.value()] = lastUnobscuredTime
+        #             times[lastUnobscuredTime.value] = lastUnobscuredTime
         #         highestAlt = max(altitudes.keys())
         #         earliestTime = times[min(times.keys())]
         #         latestTime = times[max(times.keys())]
         #     elif self._constraints.unobscured is True:
         #         if riseUnobscured:
         #             altitudes[riseAlt] = riseInfo
-        #             times[riseTime.value()] = riseTime
+        #             times[riseTime.value] = riseTime
         #         if maxUnobscured:
         #             altitudes[maxAlt] = maxInfo
-        #             times[nextPassTime.value()] = nextPassTime
+        #             times[nextPassTime.value] = nextPassTime
         #         if setUnobscured:
         #             altitudes[setAlt] = setInfo
-        #             times[setTime.value()] = setTime
+        #             times[setTime.value] = setTime
         #         if firstIlluminatedInfo is not None and firstIlluminatedInfo.getUnobscured():
         #             altitudes[firstIllAlt] = firstIlluminatedInfo
-        #             times[firstIlluminatedTime.value()] = firstIlluminatedTime
+        #             times[firstIlluminatedTime.value] = firstIlluminatedTime
         #         if lastIlluminatedInfo is not None and lastIlluminatedInfo.getUnobscured():
         #             altitudes[lastIllAlt] = lastIlluminatedInfo
-        #             times[lastIlluminatedTime.value()] = lastIlluminatedTime
+        #             times[lastIlluminatedTime.value] = lastIlluminatedTime
         #         if firstUnobscuredInfo is not None:
         #             altitudes[firstUnobAlt] = firstUnobscuredInfo
-        #             times[firstUnobscuredTime.value()] = firstUnobscuredTime
+        #             times[firstUnobscuredTime.value] = firstUnobscuredTime
         #         if lastUnobscuredInfo is not None:
         #             altitudes[lastUnobAlt] = lastUnobscuredInfo
-        #             times[lastUnobscuredTime.value()] = lastUnobscuredTime
+        #             times[lastUnobscuredTime.value] = lastUnobscuredTime
         #         highestAlt = max(altitudes.keys())
         #         earliestTime = times[min(times.keys())]
         #         latestTime = times[max(times.keys())]
@@ -705,7 +706,7 @@ class PassController:
         #     if self._constraints.maxAltitude is not None and highestAlt > self._constraints.maxAltitude:
         #         self._time = futurePassTime
         #         return self.getNextPass()
-        #     duration = (latestTime.value() - earliestTime.value()) * 1440.0
+        #     duration = (latestTime.value - earliestTime.value) * 1440.0
         #     if self._constraints.minDuration is not None and duration < self._constraints.minDuration:
         #         self._time = futurePassTime
         #         return self.getNextPass()
@@ -784,13 +785,15 @@ class PassController:
 
         passList = []
         nTime = self._initTime.future(-0.001)
-        while nTime.difference(self._initTime) < duration:
+        # while nTime.difference(self._initTime) < duration:
+        while nTime - self._initTime < duration:
             nPass = self.getNextPass()
             if nPass is None:
                 self._time = tmp
                 return tuple(passList)
             nTime = nPass.getMaxInfo().time
-            if nPass.getMaxInfo().time.difference(self._initTime) < duration:
+            # if nPass.getMaxInfo().time.difference(self._initTime) < duration:
+            if nPass.getMaxInfo().time - self._initTime < duration:
                 passList.append(nPass)
 
         self._time = tmp
@@ -833,21 +836,21 @@ def nextPass(sat: Satellite, geo: GeoPosition, time: JulianDate,
 
     riseTime, setTime = riseSetTimes(sat, geo, nextPassTime)
     # rise and set sandwich shadow entrance
-    if riseTime.value() < enterTime.value() < setTime.value():
+    if riseTime.value < enterTime.value < setTime.value:
         riseIlluminated = True
         firstTime = riseTime
         setIlluminated = False
         lastTime = enterTime
     # rise and set sandwich shadow exit
-    elif riseTime.future(1 / sat.getTle().getMeanMotion()).value() < exitTime.value() and \
-            riseTime.value() < exitTime.value() < setTime.value():
+    elif riseTime.future(1 / sat.getTle().getMeanMotion()).value < exitTime.value and \
+            riseTime.value < exitTime.value < setTime.value:
         riseIlluminated = False
         firstTime = exitTime
         setIlluminated = True
         lastTime = setTime
     # rise and set are in shadow
-    elif enterTime.value() < riseTime.value() < exitTime.value() \
-            and enterTime.value() < setTime.value() < exitTime.value():
+    elif enterTime.value < riseTime.value < exitTime.value \
+            and enterTime.value < setTime.value < exitTime.value:
         riseIlluminated = False
         firstTime = riseTime  # avoids setting the firstInfo object
         setIlluminated = False
@@ -872,7 +875,8 @@ def nextPass(sat: Satellite, geo: GeoPosition, time: JulianDate,
                 return nextPass(sat, geo, nextPassTime.future(0.001), constraints)
         if constraints.minDuration is not None:
             #   when minimum duration is not met
-            if constraints.minDuration > setTime.difference(riseTime) * 1440:
+            # if constraints.minDuration > setTime.difference(riseTime) * 1440:
+            if constraints.minDuration > (setTime - riseTime) * 1440:
                 return nextPass(sat, geo, nextPassTime.future(0.001), constraints)
 
     risePos = sat.getState(riseTime)[0]
@@ -933,10 +937,12 @@ def getPassList(sat: Satellite, geo: GeoPosition, start: JulianDate, duration: f
 
     passList = []
     nTime = start.future(-0.001)
-    while nTime.difference(start) < duration:
+    # while nTime.difference(start) < duration:
+    while nTime - start < duration:
         nPass = nextPass(sat, geo, nTime.future(0.001), constraints)
-        nTime = nPass.getMaxInfo().getTime()
-        if nPass.getMaxInfo().getTime().difference(start) < duration:
+        nTime = nPass.getMaxInfo().time
+        # if nPass.getMaxInfo().time.difference(start) < duration:
+        if nPass.getMaxInfo().time - start < duration:
             passList.append(nPass)
     return tuple(passList)
 
@@ -1120,7 +1126,7 @@ def riseSetGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> tuple[Ju
     n = sat.getTle().getMeanMotion() * TWOPI / 86400.0
     jd1 = timeToNearestTrueAnomaly(n, sat.getTle().getEcc(), ta10, time, ta1)
     jd2 = timeToNearestTrueAnomaly(n, sat.getTle().getEcc(), ta20, time, ta2)
-    if jd1.value() < jd2.value():
+    if jd1.value < jd2.value:
         return jd1, jd2
     else:
         return jd2, jd1
@@ -1371,18 +1377,20 @@ class ShadowController:
                 self._Re[i] = self.__computeRe(i)
                 self._phi[i] = self.__computePhi(i)
                 jd = self.__computeTimes(i)
-                if abs(jd.difference(self._jd[i])) < (0.1 / 86400.0):  # 0.1 of a second
+                # if abs(jd.difference(self._jd[i])) < (0.1 / 86400.0):  # 0.1 of a second
+                if abs(jd - self._jd[i]) < (0.1 / 86400.0) :    # 0.1 of a second
                     self._jd[i] = jd
                     break
                 else:
                     self._jd[i] = jd
 
-        if self._originalTime.future(1 / self._tle.getMeanMotion()).value() <= self._jd[1].value():
-            middleTime = self._jd[0].future(self._jd[1].difference(self._jd[0]) / 2.0)
+        if self._originalTime.future(1 / self._tle.getMeanMotion()).value <= self._jd[1].value:
+            # middleTime = self._jd[0].future(self._jd[1].difference(self._jd[0]) / 2.0)
+            middleTime = self._jd[0].future((self._jd[1] - self._jd[0]) / 2.0)
             self.computeValues(middleTime.future(-2.0 / self._tle.getMeanMotion()))
         else:
             self._originalTime = None
-        if self._jd[1].value() < time.value():
+        if self._jd[1].value < time.value:
             self.computeValues(time.future((1 / self._tle.getMeanMotion()) * 0.5))
         else:
             self._originalTime = None

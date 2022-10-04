@@ -78,7 +78,7 @@ class TwoLineElement:
         epochYear = int(line1Tokens[3][:2])
         epochYear += 2000 if epochYear < 57 else 1900
         epochDay = float(line1Tokens[3][2:])
-        self._epoch = JulianDate(12, 31, epochYear - 1, 0, 0, 0).future(epochDay)
+        self._epoch = JulianDate(12, 31, epochYear - 1, 0, 1, 1).future(epochDay - (61/86400))
         self._nDot = float(line1Tokens[4])
         dDotSign = 1
         if line1Tokens[5][0] == '-':

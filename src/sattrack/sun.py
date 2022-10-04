@@ -92,11 +92,11 @@ def getSunRiseSetTimes2(time: JulianDate, geo: GeoPosition):
     sunrise and sunset. The next sunset is always returned."""
     spc = SunPositionController2(time, geo)
     riseDayOf, setDayOf, transitDayOf = spc.getAngleTimes()
-    if time.value() <= setDayOf.value():
+    if time.value <= setDayOf.value:
         return riseDayOf, setDayOf
     else:
         # time_p1 = JulianDate.fromNumber(time.number(), 0.51 - time.getTimeZone() / 24.0, time.getTimeZone())
-        time_p1 = JulianDate.fromNumber(time.getNumber() + 0.51 - time.getTimeZone() / 24.0, time.getTimeZone())
+        time_p1 = JulianDate.fromNumber(time.getNumber + 0.51 - time.timeZone / 24.0, time.timeZone)
         spc.setTime(time_p1)
         riseTime, setTime, UNUSED = spc.getAngleTimes()
         return riseTime, setTime
@@ -344,9 +344,11 @@ class SunPositionController2:
         self._DELTAT = 72.6  # seconds from https://webspace.science.uu.nl/~gent0113/deltat/deltat.htm
         self._JD = time
         self._JDE = time.future(self._DELTAT / 86400.0)
-        self._JC = time.difference(J2000) / 36525.0
-        self._JC = time.difference(J2000) / 36525.0
-        self._JCE = self._JDE.difference(J2000) / 36525.0
+        # self._JC = time.difference(J2000) / 36525.0
+        # self._JC = time.difference(J2000) / 36525.0
+        self._JC = (time - J2000) / 36525.0
+        # self._JCE = self._JDE.difference(J2000) / 36525.0
+        self._JCE = (self._JDE - J2000) / 36525.0
         self._JME = self._JCE / 10.0
         self._geo = geo
         self._internal = {'phi': radians(geo.getLatitude()), 'sigma': radians(geo.getLongitude())}
@@ -666,8 +668,10 @@ class SunPositionController2:
     def setTime(self, time: JulianDate):
         self._JD = time
         self._JDE = time.future(self._DELTAT / 86400.0)
-        self._JC = time.difference(J2000) / 36525.0
-        self._JCE = self._JDE.difference(J2000) / 36525.0
+        # self._JC = time.difference(J2000) / 36525.0
+        # self._JCE = self._JDE.difference(J2000) / 36525.0
+        self._JC = (time - J2000) / 36525.0
+        self._JCE = (self._JDE - J2000) / 36525.0
         self._JME = self._JCE / 10.0
         self._internal = {'phi': radians(self._geo.getLatitude()), 'sigma': radians(self._geo.getLongitude())}
 
@@ -712,13 +716,13 @@ class SunPositionController2:
 
     def getAngleTimes(self, target=None):
         """target in degrees"""
-        tzOffset = self._JD.getTimeZone() / 24.0
-        localVal = self._JD.value() + tzOffset
+        tzOffset = self._JD.timeZone / 24.0
+        localVal = self._JD.value + tzOffset
         num = int(localVal)
         if localVal - int(localVal) < 0.5:
             num -= 1
         # time = JulianDate.fromNumber(num, 0.5 - tzOffset, self._JD.getTimeZone())
-        time = JulianDate.fromNumber(num + 0.5 - tzOffset, self._JD.getTimeZone())
+        time = JulianDate.fromNumber(num + 0.5 - tzOffset, self._JD.timeZone)
         spc_time = SunPositionController2(time, self._geo)
         v = spc_time.getApparentSiderealTime()
         if target is None:
@@ -995,7 +999,7 @@ class SunPositionController2:
             self.__computeTrueObliquity()
             epsilon = self._internal['epsilon']
             dPsi = self._internal['dPsi']
-        v0 = 4.894961212735793 + 6.300388098984957 * (self._JD.value() - 2451545) + 6.770708127139162e-06 \
+        v0 = 4.894961212735793 + 6.300388098984957 * (self._JD.value - 2451545) + 6.770708127139162e-06 \
             * (self._JC ** 2.0) - ((self._JC ** 3.0) / 675616.953447005)
         self._internal['v'] = (v0 % TWOPI) + dPsi * cos(epsilon)
 

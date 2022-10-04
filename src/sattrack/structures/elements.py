@@ -90,7 +90,8 @@ class OrbitalElements:
     @classmethod
     def __tleToElements(cls, tle: TwoLineElement, time: JulianDate) -> dict:
         """Logic for computing elements from TLE."""
-        dt = time.difference(tle.getEpoch())
+        # dt = time.difference(tle.getEpoch())
+        dt = time - tle.getEpoch()
         args = {'inc': tle.getInc()}
         inc = radians(tle.getInc())
         n0 = tle.getMeanMotion()
@@ -258,12 +259,14 @@ class OrbitalElements:
         if self._epoch is None:
             raise ValueError('Epoch was not set for this instance.')
         if self._tle is not None:
-            dt = time.difference(self._tle.getEpoch())
+            # dt = time.difference(self._tle.getEpoch())
+            dt = time - self._tle.getEpoch()
             dM = (dt * (self._tle.getMeanMotion() + dt * (self._tle.getMeanMotionDot() + dt *
                                                           self._tle.getMeanMotionDDot()))) * TWOPI
             return (radians(self._tle.getMeanAnomaly()) + dM) % TWOPI
         #   non-TLE computation
-        dt = time.difference(self._epoch)
+        # dt = time.difference(self._epoch)
+        dt = time - self._epoch
         dM = smaToMeanMotion(self._sma) * dt * 86400.0
         return (self._meanAnomaly + dM) % TWOPI
 
