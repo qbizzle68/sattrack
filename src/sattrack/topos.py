@@ -28,8 +28,8 @@ def toTopocentric(vec: EVector, time: JulianDate, geo: GeoPosition) -> EVector:
     mat = getEulerMatrix(
         ZYX,
         EulerAngles(
-            radians(geo.getLongitude()) + earthOffsetAngle(time),
-            radians(90 - geo.getLatitude()),
+            radians(geo.longitude) + earthOffsetAngle(time),
+            radians(90 - geo.latitude),
             0.0
         )
     )
@@ -53,8 +53,8 @@ def fromTopocentric(vec: EVector, time: JulianDate, geo: GeoPosition) -> EVector
     mat = getEulerMatrix(
         ZYX,
         EulerAngles(
-            radians(geo.getLongitude()) + earthOffsetAngle(time),
-            radians(90 - geo.getLatitude()),
+            radians(geo.longitude) + earthOffsetAngle(time),
+            radians(90 - geo.latitude),
             0.0
         )
     )

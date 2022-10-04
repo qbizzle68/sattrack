@@ -29,21 +29,21 @@ class Coordinates(ABC):
     # def toJSON(self):
     #     return _json.dumps(self, indent=4, default=lambda o: o.__dict__)
 
-    def getLatitude(self) -> float:
-        """Returns the latitude in degrees."""
-        return self._lat
-
-    def setLatitude(self, lat: float) -> None:
-        """Sets the latitude to the given value in degrees."""
-        self._lat = lat
-
-    def getLongitude(self) -> float:
-        """Returns the longitude in degrees."""
-        return self._lng
-
-    def setLongitude(self, lng: float) -> None:
-        """Sets the longitude to the given value in degrees."""
-        self._lng = self._fmod(lng)
+    # def getLatitude(self) -> float:
+    #     """Returns the latitude in degrees."""
+    #     return self._lat
+    #
+    # def setLatitude(self, lat: float) -> None:
+    #     """Sets the latitude to the given value in degrees."""
+    #     self._lat = lat
+    #
+    # def getLongitude(self) -> float:
+    #     """Returns the longitude in degrees."""
+    #     return self._lng
+    #
+    # def setLongitude(self, lng: float) -> None:
+    #     """Sets the longitude to the given value in degrees."""
+    #     self._lng = self._fmod(lng)
 
     @abstractmethod
     def _fmod(self, val: float) -> float:
@@ -78,17 +78,51 @@ class GeoPosition(Coordinates):
         super().__init__(lat, lng)
         self._elevation = elevation
 
-    @classmethod
-    def fromJSON(cls, json):
-        return cls(json['_lat'], json['_lng'], json['_elevation'])
+    def __iter__(self):
+        yield from {
+            'latitude': self._lat,
+            'longitude': self._lng,
+            'elevation': self._elevation
+        }.items()
 
-    def getElevation(self) -> float:
-        """Returns the elevation in meters."""
+    def __reduce__(self):
+        return self.__class__, (self._lat, self._lng, self._elevation)
+
+    @property
+    def latitude(self):
+        return self._lat
+
+    @latitude.setter
+    def latitude(self, value):
+        self._lat = value
+
+    @property
+    def longitude(self):
+        return self._lng
+
+    @longitude.setter
+    def longitude(self, value):
+        self._lng = self._fmod(value)
+
+    @property
+    def elevation(self):
         return self._elevation
 
-    def setElevation(self, elevation: float) -> None:
-        """Sets the elevation to the given value in meters."""
-        self._elevation = elevation
+    @elevation.setter
+    def elevation(self, value):
+        self._elevation = value
+
+    # @classmethod
+    # def fromJSON(cls, json):
+    #     return cls(json['_lat'], json['_lng'], json['_elevation'])
+
+    # def getElevation(self) -> float:
+    #     """Returns the elevation in meters."""
+    #     return self._elevation
+    #
+    # def setElevation(self, elevation: float) -> None:
+    #     """Sets the elevation to the given value in meters."""
+    #     self._elevation = elevation
 
     def getRadius(self) -> float:
         """
@@ -177,19 +211,19 @@ def geoPositionVector(geo: GeoPosition, jd: JulianDate = None) -> EVector:
         return rotateOrderFrom(
             ZYX,
             EulerAngles(
-                radians(geo.getLatitude()),
-                radians(-geodeticToGeocentric(geo.getLatitude())),
+                radians(geo.latitude),
+                radians(-geodeticToGeocentric(geo.latitude)),
                 0.0),
             EVector(
                 # radians(radiusAtLatitude(geo.getLatitude())),
-                radiusAtLatitude(geo.getLatitude()) + geo.getElevation(),
+                radiusAtLatitude(geo.latitude) + geo.elevation,
                 0.0,
                 0.0)
         )
     else:
-        radiusAtLat = radiusAtLatitude(geo.getLatitude()) + geo.getElevation()
-        geocentricLat = radians(geodeticToGeocentric(geo.getLatitude()))
-        lst = radians(geo.getLongitude()) + earthOffsetAngle(jd)
+        radiusAtLat = radiusAtLatitude(geo.latitude) + geo.elevation
+        geocentricLat = radians(geodeticToGeocentric(geo.latitude))
+        lst = radians(geo.longitude) + earthOffsetAngle(jd)
         return EVector(
             radiusAtLat * cos(geocentricLat) * cos(lst),
             radiusAtLat * cos(geocentricLat) * sin(lst),
@@ -214,18 +248,18 @@ def zenithVector(geo: GeoPosition, jd: JulianDate = None) -> EVector:
         return rotateOrderFrom(
             ZYX,
             EulerAngles(
-                radians(geo.getLatitude()),
-                radians(geo.getLatitude()),
+                radians(geo.latitude),
+                radians(geo.latitude),
                 0.0),
             EVector(
-                radiusAtLatitude(geo.getLatitude()) + geo.getElevation(),
+                radiusAtLatitude(geo.latitude) + geo.elevation,
                 0.0,
                 0.0)
         )
     else:
-        radiusAtLat = radiusAtLatitude(geo.getLatitude()) + geo.getElevation()
-        lat = radians(geo.getLatitude())
-        lst = radians(geo.getLongitude()) + earthOffsetAngle(jd)
+        radiusAtLat = radiusAtLatitude(geo.latitude) + geo.elevation
+        lat = radians(geo.latitude)
+        lst = radians(geo.longitude) + earthOffsetAngle(jd)
         return EVector(
             radiusAtLat * cos(lat) * cos(lst),
             radiusAtLat * cos(lat) * sin(lst),

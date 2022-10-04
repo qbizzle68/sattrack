@@ -1261,8 +1261,8 @@ def horizonTimeRefine(sat: Satellite, geo: GeoPosition, time: JulianDate) -> Jul
         sezVel = rotateOrderTo(
             ZYX,
             EulerAngles(
-                radians(geo.getLongitude()) + earthOffsetAngle(time),
-                radians(90 - geo.getLatitude()),
+                radians(geo.longitude) + earthOffsetAngle(time),
+                radians(90 - geo.latitude),
                 0.0
             ),
             state[1]

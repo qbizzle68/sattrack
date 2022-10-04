@@ -351,7 +351,7 @@ class SunPositionController2:
         self._JCE = (self._JDE - J2000) / 36525.0
         self._JME = self._JCE / 10.0
         self._geo = geo
-        self._internal = {'phi': radians(geo.getLatitude()), 'sigma': radians(geo.getLongitude())}
+        self._internal = {'phi': radians(geo.latitude), 'sigma': radians(geo.longitude)}
         self._LTable = [
             [
                 [175347046, 0, 0],
@@ -673,7 +673,7 @@ class SunPositionController2:
         self._JC = (time - J2000) / 36525.0
         self._JCE = (self._JDE - J2000) / 36525.0
         self._JME = self._JCE / 10.0
-        self._internal = {'phi': radians(self._geo.getLatitude()), 'sigma': radians(self._geo.getLongitude())}
+        self._internal = {'phi': radians(self._geo.latitude), 'sigma': radians(self._geo.longitude)}
 
     def getSunPosition(self):
         try:
@@ -1080,7 +1080,7 @@ class SunPositionController2:
             delta = self._internal['delta']
         zeta = radians(8.794 / (3600.0 * R))
         u = atan(0.99664719 * tan(self._internal['phi']))
-        E = self._geo.getElevation()
+        E = self._geo.elevation
         x = cos(u) + (E / 6378140) * cos(self._internal['phi'])
         y = 0.99664719 * sin(u) + (E / 6378140) * sin(self._internal['phi'])
         dAlpha = atan2(-x * sin(zeta) * sin(H), cos(delta) - x * sin(zeta) * cos(H))
@@ -1108,7 +1108,7 @@ class SunPositionController2:
             delta = self._internal['delta']
         zeta = radians(8.794 / (3600.0 * R))
         u = atan(0.99664719 * tan(self._internal['phi']))
-        E = self._geo.getElevation()
+        E = self._geo.elevation
         x = cos(u) + (E / 6378140) * cos(self._internal['phi'])
         dAlpha = atan2(-x * sin(zeta) * sin(H), cos(delta) - x * sin(zeta) * cos(H))
         self._internal['HP'] = H - dAlpha

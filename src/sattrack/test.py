@@ -79,11 +79,11 @@ p1vals = getSunCoordinates(time_p1)
 alpha_p1 = p1vals[0] * pi / 12.0
 delta_p1 = p1vals[1] * pi / 180.0
 # A.2.3
-sigma = radians(geo.getLongitude())
+sigma = radians(geo.longitude)
 m0 = (alpha_0 - sigma - v) / TWOPI
 # A.2.4
 hp0 = radians(target)
-phi = radians(geo.getLatitude())
+phi = radians(geo.latitude)
 H0 = acos((sin(hp0) - sin(phi)*sin(delta_0)) / (cos(phi) * cos(delta_0))) % pi
 # A.2.5
 m1 = (m0 - (H0 / TWOPI)) % 1.0
