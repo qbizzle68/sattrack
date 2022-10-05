@@ -42,7 +42,7 @@ def _check_args(month, day, year, hour, minute, second):
 
 
 def _jd_to_gregorian(value, timeZone):
-    value += (timeZone / 24.0)
+    value += (timeZone / 24.0) + 0.5
     Z = int(value)
     F = value - Z
     if Z < 2299161:
@@ -279,7 +279,7 @@ class JulianDate:
         elif not isinstance(timeZone, (int, float)):
             raise TypeError('timeZone parameter must be an int or float type')
 
-        m, d, y, h, mi, s = _jd_to_gregorian(self.value, self._timezone)
+        m, d, y, h, mi, s = _jd_to_gregorian(self.value, timeZone)
 
         return ('{}/{}/{} {}:{}:{} {} UTC'
                 .format(m, int(d) if d >= 10 else '0' + str(int(d)),
@@ -308,7 +308,7 @@ class JulianDate:
 
 def now(utc=False) -> JulianDate:
     """Returns a new JulianDate object equal to the current UTC time with the local time zone if utc is True"""
-    if utc is True:
+    if utc is False:
         tz = _time.localtime().tm_gmtoff / 3600.0
     else:
         tz = 0.0
