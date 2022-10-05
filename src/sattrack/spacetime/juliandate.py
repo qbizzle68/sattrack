@@ -242,12 +242,12 @@ class JulianDate:
         return self._dayNumber + self._dayFraction
 
     @property
-    def getNumber(self):
+    def number(self):
         """Returns the Julian day number."""
         return self._dayNumber
 
     @property
-    def getFraction(self):
+    def fraction(self):
         """Returns the fraction part of the JulianDate."""
         return self._dayFraction
 
