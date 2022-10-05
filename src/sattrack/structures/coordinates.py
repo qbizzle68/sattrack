@@ -17,6 +17,8 @@ _DEG_TO_HOURS = 15
 class Coordinates(_abc.ABC):
     """Base class for all coordinate type classes."""
 
+    __slots__ = '_lat', '_lng'
+
     def __init__(self, lat: float, lng: float):
         """Initializes the object to the latitude and longitude given in degrees."""
         self._lat = self._check_lat(lat)
@@ -78,6 +80,8 @@ class GeoPosition(Coordinates):
     Latitudes are measured zero at the equator, positive to the north, and negative to the south. Longitude is measured
     zero on the longitude passing through Greenwich, England, and is positive to the east, and negative to the west.
     """
+
+    __slots__ =  '_elevation',
 
     def __init__(self, lat: float, lng: float, elevation: float = 0):
         """
