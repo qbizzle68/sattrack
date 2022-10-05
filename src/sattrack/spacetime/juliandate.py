@@ -309,6 +309,8 @@ class JulianDate:
 def now(timezone=None) -> JulianDate:
     if timezone is None:
         tz = _time.localtime().tm_gmtoff / 3600.0
+    elif isinstance(timezone, (int, float)):
+        raise TypeError('timezone parameter must be int or float type')
     else:
         tz = timezone
     tm = _datetime.datetime.now(_datetime.timezone(_datetime.timedelta(hours=tz)))
