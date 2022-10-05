@@ -260,10 +260,10 @@ class OrbitalElements:
             raise ValueError('Epoch was not set for this instance.')
         if self._tle is not None:
             # dt = time.difference(self._tle.getEpoch())
-            dt = time - self._tle.epoch
+            dt = time - self._tle.getEpoch()
             dM = (dt * (self._tle.getMeanMotion() + dt * (self._tle.getMeanMotionDot() + dt *
                                                           self._tle.getMeanMotionDDot()))) * TWOPI
-            return (_math.radians(self._tle.meanAnomaly) + dM) % TWOPI
+            return (_math.radians(self._tle.getMeanAnomaly()) + dM) % TWOPI
         #   non-TLE computation
         # dt = time.difference(self._epoch)
         dt = time - self._epoch

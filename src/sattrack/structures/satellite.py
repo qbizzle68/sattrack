@@ -25,7 +25,7 @@ class Satellite:
         """
 
         self._tle = None
-        self._name = obj.name
+        self._name = obj.getName()
         self._propagator = None
         self._epoch = None
         self._elements = None
@@ -83,7 +83,7 @@ class Satellite:
         if type(obj) == TwoLineElement:
             self._tle = obj
             self._propagator = SGP4_Propagator(obj)
-            self._epoch = obj.epoch
+            self._epoch = obj.getEpoch()
             self._elements = None
         elif type(obj) == OrbitalElements:
             self._tle = None
