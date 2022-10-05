@@ -54,12 +54,13 @@ def _jd_to_gregorian(value, timeZone):
     D = int((C - 122.1) / 365.25)
     G = int(365.25 * D)
     I = int((C - G) / 30.6001)
-    d = C - G - int(30.6001 * I) + F
+    # do not add the fractional part to the day
+    d = C - G - int(30.6001 * I)
     m = I - 1 if I < 14 else I - 13
     y = D - 4716 if m > 2 else D - 4715
 
-    frac = value - int(value)
-    s = round(frac * 86400.0, 3)
+    # frac = value - int(value)
+    s = round(F * 86400.0, 3)
     h = int(s / 3600.0)
     s -= h * 3600.0
     mi = int(s / 60.0)
