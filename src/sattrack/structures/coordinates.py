@@ -81,7 +81,7 @@ class GeoPosition(Coordinates):
     zero on the longitude passing through Greenwich, England, and is positive to the east, and negative to the west.
     """
 
-    __slots__ =  '_elevation',
+    __slots__ = '_elevation',
 
     def __init__(self, lat: float, lng: float, elevation: float = 0):
         """
