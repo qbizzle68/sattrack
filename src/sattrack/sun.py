@@ -822,13 +822,13 @@ class SunPositionController2:
         riseAlt = getSunAltAz(riseTime, self._geo)[0]
         while abs(riseAlt - target) > epsilon:
             dt = ((riseAlt - target) / rate) / 86400.0 # solar days
-            riseTime = riseTime - dt
+            riseTime = riseTime.future(-dt)
             riseAlt = getSunAltAz(riseTime, self._geo)[0]
 
         setAlt = getSunAltAz(setTime, self._geo)[0]
         while abs(setAlt - target) > epsilon:
             dt = ((setAlt - target) / rate) / 86400.0 # solar days
-            setTime = setTime + dt
+            setTime = setTime.future(dt)
             setAlt = getSunAltAz(setTime, self._geo)[0]
 
         return riseTime, setTime, transitTime
