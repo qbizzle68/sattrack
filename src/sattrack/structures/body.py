@@ -55,7 +55,7 @@ class Body:
         rtn = f'{self._name}\nMU: {"%.4f" % self._MU} km^3s^-2\nEquitorial radius: {"%.3f" % self._radiusEq} km\n' \
               f'Polar radius: {"%.3f" % self._radiusPl} km\nSidereal day: {self._revPeriod} seconds'
         if self._parent is not None:
-            rtn += f'\nParent: {self._parent.getName()}'
+            rtn += f'\nParent: {self._parent.name}'
         return rtn
 
     def getName(self) -> str:

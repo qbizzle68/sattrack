@@ -25,7 +25,7 @@ class Satellite:
         """
 
         self._tle = None
-        self._name = obj.getName()
+        self._name = obj.name
         self._propagator = None
         self._epoch = None
         self._elements = None
@@ -83,12 +83,12 @@ class Satellite:
         if type(obj) == TwoLineElement:
             self._tle = obj
             self._propagator = SGP4_Propagator(obj)
-            self._epoch = obj.getEpoch()
+            self._epoch = obj.epoch
             self._elements = None
         elif type(obj) == OrbitalElements:
             self._tle = None
             self._propagator = None
-            self._epoch = obj.getEpoch()
+            self._epoch = obj.epoch
             self._elements = obj
 
     def hasTle(self):
@@ -148,9 +148,9 @@ class Satellite:
             return ReferenceFrame(
                 ZXZ,
                 EulerAngles(
-                    radians(self._tle.getRaan()),
-                    radians(self._tle.getInc()),
-                    radians(self._tle.getAop())
+                    radians(self._tle.raan),
+                    radians(self._tle.inc),
+                    radians(self._tle.aop)
                 )
             )
         else:
@@ -158,9 +158,9 @@ class Satellite:
             return ReferenceFrame(
                 ZXZ,
                 EulerAngles(
-                    elements.getRaan(),
-                    elements.getInc(),
-                    elements.getAop()
+                    elements.raan,
+                    elements.inc,
+                    elements.aop
                 )
             )
 
@@ -178,19 +178,19 @@ class Satellite:
         # todo: figure out why we can't compute this from the state.
         if time is None:
             rot = ReferenceFrame(ZXZ, EulerAngles(
-                    radians(self._tle.getRaan()),
-                    radians(self._tle.getInc()),
-                    radians(self._tle.getAop())
+                    radians(self._tle.raan),
+                    radians(self._tle.inc),
+                    radians(self._tle.aop)
                 ))
-            return rot.RotateFrom(EVector.e1) * self._tle.getEcc()
+            return rot.RotateFrom(EVector.e1) * self._tle.ecc
         else:
             elements = OrbitalElements.fromTle(self._tle, time)
             rot = ReferenceFrame(ZXZ, EulerAngles(
-                    elements.getRaan(),
-                    elements.getInc(),
-                    elements.getAop()
-                ))
-            return rot.RotateTo(EVector.e1) * elements.getEcc()
+                    elements.raan,
+                    elements.inc,
+                    elements.aop
+            ))
+            return rot.RotateTo(EVector.e1) * elements.ecc
 
     def timeToNextMeanAnomaly(self, mAnom: float, time: JulianDate) -> JulianDate:
         """
@@ -209,9 +209,9 @@ class Satellite:
         else:
             elements = self._elements
         return timeToNextMeanAnomaly(
-            smaToMeanMotion(elements.getSma()),
-            elements.getMeanAnomaly(),
-            elements.getEpoch(),
+            smaToMeanMotion(elements.sma),
+            elements.meanAnomaly,
+            elements.epoch,
             mAnom,
             time
         )
@@ -233,9 +233,9 @@ class Satellite:
         else:
             elements = self._elements
         return timeToPrevMeanAnomaly(
-            smaToMeanMotion(elements.getSma()),
-            elements.getMeanAnomaly(),
-            elements.getEpoch(),
+            smaToMeanMotion(elements.sma),
+            elements.meanAnomaly,
+            elements.epoch,
             mAnom,
             time
         )
@@ -257,10 +257,10 @@ class Satellite:
         else:
             elements = self._elements
         return timeToNextMeanAnomaly(
-            smaToMeanMotion(elements.getSma()),
-            elements.getMeanAnomaly(),
-            elements.getEpoch(),
-            trueToMean(tAnom, elements.getEcc()),
+            smaToMeanMotion(elements.sma),
+            elements.meanAnomaly,
+            elements.epoch,
+            trueToMean(tAnom, elements.ecc),
             time
         )
 
@@ -281,9 +281,9 @@ class Satellite:
         else:
             elements = self._elements
         return timeToPrevMeanAnomaly(
-            smaToMeanMotion(elements.getSma()),
-            elements.getMeanAnomaly(),
-            elements.getEpoch(),
-            trueToMean(tAnom, elements.getEcc()),
+            smaToMeanMotion(elements.sma),
+            elements.meanAnomaly,
+            elements.epoch,
+            trueToMean(tAnom, elements.ecc),
             time
         )

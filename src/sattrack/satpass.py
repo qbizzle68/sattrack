@@ -1391,14 +1391,14 @@ def isEclipsed(sat: Satellite, time: JulianDate) -> bool:
 def __getPerspectiveRadius(sat: Satellite, time: JulianDate, sunPos: EVector) -> float:
     """Computes the Earth's radius from the perspective of a satellite at a given time."""
     elements = OrbitalElements.fromTle(sat.getTle(), time)
-    a = elements.getSma()
-    ecc = elements.getEcc()
-    inc = elements.getInc()
-    aop = elements.getAop()
+    a = elements.sma
+    ecc = elements.ecc
+    inc = elements.inc
+    aop = elements.aop
     f = EARTH_FLATTENING
     ae = EARTH_EQUITORIAL_RADIUS
     phi = elements.trueAnomalyAt(time)
-    s = rotateOrderTo(ZXZ, EulerAngles(elements.getRaan(), inc, aop), -norm(sunPos))
+    s = rotateOrderTo(ZXZ, EulerAngles(elements.raan, inc, aop), -norm(sunPos))
 
     Rz = (a * (1 - ecc * ecc) / (1 + ecc * cos(phi))) * (
             sin(aop) * sin(inc) * cos(phi) + cos(aop) * sin(inc) * sin(phi) - s[2] * (s[0] * cos(phi) + s[1] *
@@ -1587,19 +1587,19 @@ class ShadowController:
 
     def __escobalGFunction(self, phi: float, index: int) -> float:
         """Escobal's G function whose zeros represent the true anomalies of shadow entrance/exit."""
-        ecc = self._elements[index].getEcc()
-        c = (self._elements[index].getSma() * (1 - ecc * ecc)) ** 2
+        ecc = self._elements[index].ecc
+        c = (self._elements[index].sma * (1 - ecc * ecc)) ** 2
         term1 = self._Re[index] * self._Re[index] * ((1 + ecc * cos(phi)) ** 2)
         term2 = (-self._s[index][0] * cos(phi) - self._s[index][1] * sin(phi)) ** 2
         return term1 + c * term2 - c
 
     def __gPrime(self, phi: float, index: int) -> float:
         """Derivative of Escobal's G function, used while iterating Newton's method."""
-        ecc = self._elements[index].getEcc()
+        ecc = self._elements[index].ecc
         term1 = 2 * (1 + ecc * cos(phi)) * (-ecc * sin(phi))
         term2 = 2 * (-self._s[index][0] * cos(phi) - self._s[index][1] * sin(phi)) * (
                 self._s[index][0] * sin(phi) - self._s[index][1] * cos(phi))
-        return self._Re[index] * self._Re[index] * term1 + ((self._elements[index].getSma() * (
+        return self._Re[index] * self._Re[index] * term1 + ((self._elements[index].sma * (
                 1 - ecc * ecc)) ** 2) * term2
 
     def __escobalNewtonMethod(self, guess, index) -> float:
@@ -1619,10 +1619,10 @@ class ShadowController:
 
     def __computeRe(self, index: float):
         """Computes the radius of the earth that the sun (dis)appears from."""
-        a = self._elements[index].getSma()
-        ecc = self._elements[index].getEcc()
-        inc = self._elements[index].getInc()
-        aop = self._elements[index].getAop()
+        a = self._elements[index].sma
+        ecc = self._elements[index].ecc
+        inc = self._elements[index].inc
+        aop = self._elements[index].aop
         f = EARTH_FLATTENING
         ae = EARTH_EQUITORIAL_RADIUS
         phi = self._phi[index]
@@ -1671,5 +1671,5 @@ class ShadowController:
     def __computes(self, index: int):
         """Computes s, the unit projection vector of the Sun's position on the orbital plane."""
         S = -norm(getSunPosition(self._jd[index]))
-        return rotateOrderTo(ZXZ, EulerAngles(self._elements[index].getRaan(), self._elements[index].getInc(),
-                                              self._elements[index].getAop()), S)
+        return rotateOrderTo(ZXZ, EulerAngles(self._elements[index].raan, self._elements[index].inc,
+                                              self._elements[index].aop), S)
