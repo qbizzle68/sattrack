@@ -1,56 +1,69 @@
 import json as _json
-from abc import ABC, abstractmethod
-from math import sin, cos, tan, atan, radians, degrees, sqrt, asin
+import abc as _abc
+import math as _math
 from sattrack.util.constants import EARTH_FLATTENING, EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS
 from pyevspace import EVector
-from sattrack.rotation.rotation import rotateOrderFrom, EulerAngles
-from sattrack.rotation.order import ZYX
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.util.conversions import atan3
 
+__all__ = ['Coordinates', 'GeoPosition', 'CelestialCoordinates', 'radiusAtLatitude', 'geocentricToGeodetic',
+           'geodeticToGeocentric', 'geoPositionVector', 'zenithVector', 'getSubPoint']
 
-class Coordinates(ABC):
+_RAD_TO_HOURS = 12 / _math.pi
+_DEG_TO_HOURS = 15
+
+
+class Coordinates(_abc.ABC):
     """Base class for all coordinate type classes."""
 
     def __init__(self, lat: float, lng: float):
         """Initializes the object to the latitude and longitude given in degrees."""
-        self._check_angles(lat, lng)
-        self._lat = lat
-        self._lng = self._fmod(lng)
+        self._lat = self._check_lat(lat)
+        self._lng = self._check_lng(lng)
 
     def __str__(self) -> str:
         """Returns a string representation of the object."""
-        return f'Latitude: {self._lat}, Longitude: {self._lng}'
+        return f'Latitude: {self._fmt_lat()}, Longitude: {self._fmt_lng()}'
 
     def __repr__(self) -> str:
         return _json.dumps(self, default=lambda o: dict(o))
 
-    # def toJSON(self):
-    #     return _json.dumps(self, indent=4, default=lambda o: o.__dict__)
+    @property
+    def latitude(self):
+        return self._fmt_lat()
 
-    # def getLatitude(self) -> float:
-    #     """Returns the latitude in degrees."""
-    #     return self._lat
-    #
-    # def setLatitude(self, lat: float) -> None:
-    #     """Sets the latitude to the given value in degrees."""
-    #     self._lat = lat
-    #
-    # def getLongitude(self) -> float:
-    #     """Returns the longitude in degrees."""
-    #     return self._lng
-    #
-    # def setLongitude(self, lng: float) -> None:
-    #     """Sets the longitude to the given value in degrees."""
-    #     self._lng = self._fmod(lng)
+    @latitude.setter
+    def latitude(self, value):
+        self._lat = self._check_lat(value)
 
-    @abstractmethod
+    @property
+    def longitude(self):
+        return self._fmt_lng()
+
+    @longitude.setter
+    def longitude(self, value):
+        self._lng = self._check_lng(value)
+
+    @_abc.abstractmethod
     def _fmod(self, val: float) -> float:
         """Abstract method to be overridden in derived classes, which modulates the longitude value when set."""
         pass
 
-    def _check_angles(self, lat, lng):
+    @_abc.abstractmethod
+    def _check_lat(self, lat):
+        pass
+
+    @_abc.abstractmethod
+    def _check_lng(self, lng):
+        pass
+
+    @_abc.abstractmethod
+    def _fmt_lat(self):
+        pass
+
+    @_abc.abstractmethod
+    def _fmt_lng(self):
         pass
 
 
@@ -73,7 +86,7 @@ class GeoPosition(Coordinates):
         Args:
             lat: The latitude in degrees.
             lng: The longitude in degrees.
-            elevation: The elevation of the GeoPosition in meters (Default = 0).
+            elevation: The elevation of the GeoPosition in km (Default = 0).
         """
         super().__init__(lat, lng)
         self._elevation = elevation
@@ -86,23 +99,7 @@ class GeoPosition(Coordinates):
         }.items()
 
     def __reduce__(self):
-        return self.__class__, (self._lat, self._lng, self._elevation)
-
-    @property
-    def latitude(self):
-        return self._lat
-
-    @latitude.setter
-    def latitude(self, value):
-        self._lat = value
-
-    @property
-    def longitude(self):
-        return self._lng
-
-    @longitude.setter
-    def longitude(self, value):
-        self._lng = self._fmod(value)
+        return self.__class__, (_math.degrees(self._lat), _math.degrees(self._lng), self._elevation)
 
     @property
     def elevation(self):
@@ -112,25 +109,35 @@ class GeoPosition(Coordinates):
     def elevation(self, value):
         self._elevation = value
 
-    # @classmethod
-    # def fromJSON(cls, json):
-    #     return cls(json['_lat'], json['_lng'], json['_elevation'])
-
-    # def getElevation(self) -> float:
-    #     """Returns the elevation in meters."""
-    #     return self._elevation
-    #
-    # def setElevation(self, elevation: float) -> None:
-    #     """Sets the elevation to the given value in meters."""
-    #     self._elevation = elevation
-
     def getRadius(self) -> float:
         """
         Returns the radius of the GeoPosition from the Earth's center in kilometers. This accounts for Earth's
         oblateness as well as the elevation of the position (if set).
         """
+        return _radius_at_lat(self._lat) + self._elevation
 
-        return radiusAtLatitude(self._lat) + self._elevation
+    def getGeocentricLatitude(self) -> float:
+        return _geodetic_to_geocentric(self._lat)
+
+    def getPositionVector(self, jd: JulianDate = None) -> EVector:
+        if jd is not None and not isinstance(jd, JulianDate):
+            raise TypeError('jd parameter must be a JulianDate type')
+        return _compute_normal_vector(
+            _geodetic_to_geocentric(self._lat),
+            self._lng,
+            _radius_at_lat(self._lat) + self._elevation,
+            jd
+        )
+
+    def getZenithVector(self, jd: JulianDate = None) -> EVector:
+        if jd is not None and not isinstance(jd, JulianDate):
+            raise TypeError('jd parameter must be a JulianDate type')
+        return _compute_normal_vector(
+            self._lat,
+            self._lng,
+            _radius_at_lat(self._lat) + self._elevation,
+            jd
+        )
 
     def _fmod(self, val: float) -> float:
         """Modulates the longitude to a value of +/- 180.0 degrees."""
@@ -143,128 +150,101 @@ class GeoPosition(Coordinates):
         else:
             return val
 
+    def _check_lat(self, lat):
+        if not isinstance(lat, (int, float)):
+            raise TypeError('lat parameter must be an int or float type')
+        if not -90 <= lat <= 90:
+            raise ValueError('lat argument must be between -90 and 90 degrees')
+        return _math.radians(lat)
+
+    def _check_lng(self, lng):
+        if not isinstance(lng, (int, float)):
+            raise TypeError('lng parameter must be an int or float type')
+        return _math.radians(self._fmod(lng))
+
+    def _fmt_lat(self):
+        return _math.degrees(self._lat)
+
+    def _fmt_lng(self):
+        return _math.degrees(self._lng)
+
+
+def _geocentric_to_geodetic(lat):
+    """radians to radians"""
+    if not -_math.pi / 2 <= lat <= _math.pi / 2:
+        raise ValueError('lat argument must be between -90 and 90 degrees')
+    return _math.atan(_math.tan(lat) / ((1 - EARTH_FLATTENING) ** 2))
+
+
+def _geodetic_to_geocentric(lat):
+    """radians to radians"""
+    if not -_math.pi / 2 <= lat <= _math.pi / 2:
+        raise ValueError('lat argument must be between -90 and 90 degrees')
+    return _math.atan(((1 - EARTH_FLATTENING) ** 2) * _math.tan(lat))
+
 
 def geocentricToGeodetic(lat: float) -> float:
-    """
-    Converts a geocentric latitude to a geodetic latitude.
-
-    Args:
-        lat: Geocentric latitude in degrees.
-
-    Returns:
-        Geodetic latitude of the equivalent position in degrees.
-    """
-
-    lhs = tan(radians(lat)) / (1 - EARTH_FLATTENING) ** 2
-    return degrees(atan(lhs))
+    """Converts a geocentric latitude to a geodetic latitude.
+    (lat, return) in degrees"""
+    return _math.degrees(_geocentric_to_geodetic(_math.radians(lat)))
 
 
 def geodeticToGeocentric(lat: float) -> float:
-    """
-    Converts a geodetic latitude to a geocentric latitude.
+    """Converts a geodetic latitude to a geocentric latitude.
+    (lat, return) in degrees"""
+    return _math.degrees(_geodetic_to_geocentric(_math.radians(lat)))
 
-    Args:
-        lat: Geodetic latitude in degrees.
 
-    Returns:
-        Geocentric latitude of the equivalent position in degrees.
-    """
-    rhs = ((1 - EARTH_FLATTENING) ** 2) * tan(radians(lat))
-    return degrees(atan(rhs))
+def _radius_at_lat(lat):
+    """radians to km"""
+    if lat == 0:
+        return EARTH_EQUITORIAL_RADIUS
+    elif lat == 90 or lat == -90:
+        return EARTH_POLAR_RADIUS
+    geocentric = _geodetic_to_geocentric(lat)  # checks range of lat for us
+    bcos2 = (EARTH_POLAR_RADIUS * _math.cos(geocentric)) ** 2
+    asin2 = (EARTH_EQUITORIAL_RADIUS * _math.sin(geocentric)) ** 2
+    return (EARTH_POLAR_RADIUS * EARTH_EQUITORIAL_RADIUS) / _math.sqrt(bcos2 + asin2)
+
+
+def _compute_normal_vector(lat, lng, radius, jd):
+    if jd is not None:
+        lng += earthOffsetAngle(jd)
+    return EVector(
+        radius * _math.cos(lat) * _math.cos(lng),
+        radius * _math.cos(lat) * _math.sin(lng),
+        radius * _math.sin(lat)
+    )
 
 
 def radiusAtLatitude(lat: float) -> float:
-    """
-    Computes the radius at a given latitude due to the oblate shape of the Earth.
-
-    Args:
-        lat: The geodetic latitude in degrees.
-
-    Returns:
-        The Earth radius at the given geodetic latitude in kilometers.
-    """
-
-    if lat == 0:
-        return EARTH_EQUITORIAL_RADIUS
-    elif lat == 90:
-        return EARTH_POLAR_RADIUS
-    geocentric = radians(geodeticToGeocentric(lat))
-    bcos2 = (EARTH_POLAR_RADIUS * cos(geocentric)) ** 2
-    asin2 = (EARTH_EQUITORIAL_RADIUS * sin(geocentric)) ** 2
-    return (EARTH_POLAR_RADIUS * EARTH_EQUITORIAL_RADIUS) / sqrt(bcos2 + asin2)
+    """Computes the radius at a given geodetic latitude.
+    lat in degrees, return in kilometers"""
+    return _radius_at_lat(_math.radians(lat))
 
 
 def geoPositionVector(geo: GeoPosition, jd: JulianDate = None) -> EVector:
-    """
-    Computes the position vector in the geocentric equitorial reference frame, of a GeoPosition at a given time.
-
-    Args:
-        geo: GeoPosition of the position to find.
-        jd: Time of the desired position (used to incorporate the Earth offset). (Default = None, won't include the
-        Earth's offset from the inertial reference frame).
-
-    Returns:
-        The geocentric equitorial reference frame position vector of the GeoPosition.
-    """
-
-    if not jd:
-        return rotateOrderFrom(
-            ZYX,
-            EulerAngles(
-                radians(geo.latitude),
-                radians(-geodeticToGeocentric(geo.latitude)),
-                0.0),
-            EVector(
-                # radians(radiusAtLatitude(geo.getLatitude())),
-                radiusAtLatitude(geo.latitude) + geo.elevation,
-                0.0,
-                0.0)
-        )
-    else:
-        radiusAtLat = radiusAtLatitude(geo.latitude) + geo.elevation
-        geocentricLat = radians(geodeticToGeocentric(geo.latitude))
-        lst = radians(geo.longitude) + earthOffsetAngle(jd)
-        return EVector(
-            radiusAtLat * cos(geocentricLat) * cos(lst),
-            radiusAtLat * cos(geocentricLat) * sin(lst),
-            radiusAtLat * sin(geocentricLat)
-        )
+    """Computes the position vector of a geo-position at a given time.
+    jd is None to ignore earth offset (local sidereal time = 0), return in kilometers"""
+    lat = _math.radians(geo.latitude)
+    return _compute_normal_vector(
+        _geodetic_to_geocentric(lat),
+        _math.radians(geo.longitude),
+        _radius_at_lat(lat),
+        jd
+    )
 
 
 def zenithVector(geo: GeoPosition, jd: JulianDate = None) -> EVector:
-    """
-    Computes the zenith vector in the geocentric equitorial reference frame, of a GeoPosition at a given time.
-
-    Args:
-        geo: GeoPosition of the zenith to find.
-        jd: Time of the desired zenith (used to incorporate the Earth offset). (Default = None, won't include the
-        Earth's offset from the inertial reference frame).
-
-    Returns:
-        The geocentric equitorial reference frame vector of the zenith for the GeoPosition.
-    """
-
-    if not jd:
-        return rotateOrderFrom(
-            ZYX,
-            EulerAngles(
-                radians(geo.latitude),
-                radians(geo.latitude),
-                0.0),
-            EVector(
-                radiusAtLatitude(geo.latitude) + geo.elevation,
-                0.0,
-                0.0)
-        )
-    else:
-        radiusAtLat = radiusAtLatitude(geo.latitude) + geo.elevation
-        lat = radians(geo.latitude)
-        lst = radians(geo.longitude) + earthOffsetAngle(jd)
-        return EVector(
-            radiusAtLat * cos(lat) * cos(lst),
-            radiusAtLat * cos(lat) * sin(lst),
-            radiusAtLat * sin(lat)
-        )
+    """Computes the zenith vector of a geo-position at a given time.
+    jd is None to ignore earth offset angle (local sidereal time = 0), return in kilometers"""
+    lat = _math.radians(geo.latitude)
+    return _compute_normal_vector(
+        lat,
+        _math.radians(geo.longitude),
+        _radius_at_lat(lat),
+        jd
+    )
 
 
 class CelestialCoordinates(Coordinates):
@@ -285,22 +265,37 @@ class CelestialCoordinates(Coordinates):
         """
 
         super().__init__(dec, ra)
-        self.setRightAscension = super().setLongitude
-        self.getRightAscension = super().getLongitude
-        self.setDeclination = super().setLatitude
-        self.getDeclination = super().getLatitude
 
-    def __str__(self) -> str:
-        """Returns a string representation of the object."""
-        return f'Right-Ascension: {self._lng}, Declination: {self._lat}'
+    def __iter__(self):
+        yield from {
+            'right-ascension': self._lng,
+            'declination': self._lat
+        }.items()
 
-    def getLongitude(self) -> float:
-        """Returns the right-ascension as a longitude in degrees."""
-        return self._lng * 15.0
+    def __reduce__(self):
+        return self.__class__, (_math.degrees(self._lat), _math.degrees(self._lng))
 
     def _fmod(self, val: float) -> float:
         """Modulates the right-ascension value to between (0, 24}."""
         return val % 24.0
+
+    def _check_lat(self, dec):
+        if not isinstance(dec, (int, float)):
+            raise TypeError('lat parameter must be an int or float type')
+        if not -90 <= dec <= 90:
+            raise ValueError('dec argument must be between -90 and 90 degrees')
+        return _math.radians(dec)
+
+    def _check_lng(self, ra):
+        if not isinstance(ra, (int, float)):
+            raise TypeError('ra parameter must be an int or float type')
+        return self._fmod(ra) / _RAD_TO_HOURS
+
+    def _fmt_lat(self):
+        return _math.degrees(self._lat)
+
+    def _fmt_lng(self):
+        return self._lng * _RAD_TO_HOURS
 
 
 def getSubPoint(position: EVector, time: JulianDate) -> GeoPosition:
@@ -315,8 +310,8 @@ def getSubPoint(position: EVector, time: JulianDate) -> GeoPosition:
         The GeoPosition directly below the satellite.
     """
 
-    dec = degrees(asin(position[2] / position.mag()))
-    lng = (degrees(atan3(position[1], position[0]) - earthOffsetAngle(time))) % 360.0
+    dec = _math.degrees(_math.asin(position[2] / position.mag()))
+    lng = (_math.degrees(atan3(position[1], position[0]) - earthOffsetAngle(time))) % 360.0
     if lng > 180.0:
         lng = lng - 360.0
     return GeoPosition(geocentricToGeodetic(dec), lng)
