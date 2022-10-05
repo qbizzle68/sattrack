@@ -306,12 +306,11 @@ class JulianDate:
         return self.date(timeZone).split(' ')[1]
 
 
-def now(utc=False) -> JulianDate:
-    """Returns a new JulianDate object equal to the current UTC time with the local time zone if utc is True"""
-    if utc is False:
+def now(timezone=None) -> JulianDate:
+    if timezone is None:
         tz = _time.localtime().tm_gmtoff / 3600.0
     else:
-        tz = 0.0
+        tz = timezone
     tm = _datetime.datetime.now(_datetime.timezone(_datetime.timedelta(hours=tz)))
     return JulianDate.fromDatetime(tm)
 
