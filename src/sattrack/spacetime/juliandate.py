@@ -306,6 +306,14 @@ class JulianDate:
             raise TypeError('timeZone parameter must be an int or float type')
         return self.date(timeZone).split(' ')[1]
 
+    def toDatetime(self):
+        month, day, year, hour, minutes, secondsFloat = _jd_to_gregorian(self.value, self._timezone)
+        # split seconds into seconds and microseconds and convert to integers
+        secondsInt = int(secondsFloat)
+        microSeconds = round((secondsFloat - secondsInt) * 1000000)
+        timezone = _datetime.timezone(_datetime.timedelta(hours=self._timezone))
+        return _datetime.datetime(year, month, day, hour, minutes, secondsInt, microSeconds, timezone)
+
 
 def now(timezone=None) -> JulianDate:
     if timezone is None:
