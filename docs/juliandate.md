@@ -27,20 +27,17 @@ current time zone offset from UTC (including DST).
 ## Constants
 There is a single constant from the `juliandate` module which represents the J2000 epoch:
 
-`juliandate.`**J2000**:  
-
+`juliandate.`**J2000**:
 - The J2000 epoch equivalent to `JulianDate(1, 1, 2000, 12, 0, 0, timeZone=0)`
 
 ## Types
 *class* `juliandate.`**JulianDate**:
-
 - The JulianDate class represents an instance in time and is composed of a day number and fraction of the next day.
 
 ## Methods
 There is a single module level method which allows the creation of a `JulianDate` object with the current time.  
 
 *method* `juliandate.`**now(timezone=None)**:
-  
 - Return a new `JulianDate` object from the current time using python's standard modules, therefore the implementation 
 may be dependent on your python version.
 - If the timezone parameter is `None` the timezone offset is also computed using python's standard modules, otherwise
@@ -59,7 +56,6 @@ components, as well as handling the mathematical operations involved between ins
 
 ### Constructor: 
 *class* `juliandate.`**JulianDate(month, day, year, hour, minute, second, timezone=0)**
-
 - All arguments except timezone are required. timezone can be an integer or floating point number representing
 the offset of the timezone relative to UTC. seconds can be an integer or floating point number. All other parameters
 must be integers and in the following ranges:
@@ -73,17 +69,15 @@ must be integers and in the following ranges:
 
 ### Other Constructors:  
 *classmethod* `JulianDate.`**fromNumber(number, timezone=0)**
-
 - Creates a `JulianDate` directly from a known Julian day number. 
 - timezone can be an integer or floating point number representing the offset from UTC.
 - If the parameters are not integer or floating point numbers then TypeError is raised.
 
 *classmethod* `juliandate.`**fromDatetime(date)**
-
 - Creates a `JulianDate` from a `datetime` instance from python's `datetime` module.
 - If the date parameter is not a `datetime` type then TypeError is raised.
 
-**Instance attributes (read-only):**  
+### Instance attributes (read-only):
 `JulianDate.`**number**
 - The integer part of the Julian date, the Julian day number
 
