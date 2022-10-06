@@ -10,7 +10,7 @@ from sattrack.rotation.order import Axis, ZYX, ZXZ
 from sattrack.rotation.rotation import getMatrix, rotateOrderTo, EulerAngles
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
-from sattrack.structures.coordinates import GeoPosition, zenithVector, geoPositionVector
+from sattrack.structures.coordinates import GeoPosition
 from sattrack.structures.elements import computeEccentricVector, raanProcessionRate, OrbitalElements
 from sattrack.structures.satellite import Satellite
 from sattrack.structures.tle import TwoLineElement
@@ -1206,8 +1206,10 @@ def riseSetGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> tuple[Ju
     v = norm(cross(hNorm, u)) * b
     ce = -norm(u) * c
 
-    zeta = norm(zenithVector(geo, time))
-    gamma = geoPositionVector(geo, time)
+    # zeta = norm(zenithVector(geo, time))
+    zeta = norm(geo.getZenithVector(time))
+    # gamma = geoPositionVector(geo, time)
+    gamma = geo.getPositionVector(time)
 
     R = sqrt((dot(zeta, u) ** 2) + (dot(zeta, v) ** 2))
     try:
@@ -1327,9 +1329,11 @@ def orbitAltitude(sat: Satellite, geo: GeoPosition, time: JulianDate) -> float:
     sma = sat.getTle().getSma()
 
     # zenith vector for the GeoPosition
-    zeta = norm(zenithVector(geo, time))
+    # zeta = norm(zenithVector(geo, time))
+    zeta = norm(geo.getZenithVector(time))
     # GeoPosition vector in geocentric reference frame
-    gamma = geoPositionVector(geo, time)
+    # gamma = geoPositionVector(geo, time)
+    gamma = geo.getPositionVector(time)
     # normalized angular momentum, vector equation for orbital plane
     lamb = norm(cross(state[0], state[1]))
 

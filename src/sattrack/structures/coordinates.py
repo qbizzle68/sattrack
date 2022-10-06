@@ -8,7 +8,7 @@ from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.util.conversions import atan3
 
 __all__ = ['Coordinates', 'GeoPosition', 'CelestialCoordinates', 'radiusAtLatitude', 'geocentricToGeodetic',
-           'geodeticToGeocentric', 'geoPositionVector', 'zenithVector', 'getSubPoint']
+           'geodeticToGeocentric', 'getSubPoint']
 
 _RAD_TO_HOURS = 12 / _math.pi
 _DEG_TO_HOURS = 15
@@ -227,28 +227,27 @@ def radiusAtLatitude(lat: float) -> float:
     return _radius_at_lat(_math.radians(lat))
 
 
-def geoPositionVector(geo: GeoPosition, jd: JulianDate = None) -> EVector:
-    """Computes the position vector of a geo-position at a given time.
-    jd is None to ignore earth offset (local sidereal time = 0), return in kilometers"""
-    lat = _math.radians(geo.latitude)
-    return _compute_normal_vector(
-        _geodetic_to_geocentric(lat),
-        _math.radians(geo.longitude),
-        _radius_at_lat(lat),
-        jd
-    )
+# def geoPositionVector(geo: GeoPosition, jd: JulianDate = None) -> EVector:
+#     # return vector is in kilometers
+#     latitude = _math.radians(geo.latitude)
+#     # position vector needs geocentric latitude
+#     return _compute_normal_vector(
+#         _geodetic_to_geocentric(latitude),
+#         _math.radians(geo.longitude),
+#         _radius_at_lat(latitude),
+#         jd
+#     )
 
 
-def zenithVector(geo: GeoPosition, jd: JulianDate = None) -> EVector:
-    """Computes the zenith vector of a geo-position at a given time.
-    jd is None to ignore earth offset angle (local sidereal time = 0), return in kilometers"""
-    lat = _math.radians(geo.latitude)
-    return _compute_normal_vector(
-        lat,
-        _math.radians(geo.longitude),
-        _radius_at_lat(lat),
-        jd
-    )
+# def zenithVector(geo: GeoPosition, jd: JulianDate = None) -> EVector:
+#     # return vector is in kilometers
+#     latitude = _math.radians(geo.latitude)
+#     return _compute_normal_vector(
+#         latitude,
+#         _math.radians(geo.longitude),
+#         _radius_at_lat(latitude),
+#         jd
+#     )
 
 
 class CelestialCoordinates(Coordinates):

@@ -3,7 +3,7 @@ from math import degrees, asin, radians, sin, cos, tan, sqrt
 from pyevspace import EVector, cross, dot, norm
 
 from sattrack.rotation.order import ZYX
-from sattrack.structures.coordinates import GeoPosition, geoPositionVector, zenithVector
+from sattrack.structures.coordinates import GeoPosition
 from sattrack.rotation.rotation import getEulerMatrix, EulerAngles, rotateToThenOffset, undoRotateToThenOffset
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
@@ -24,7 +24,8 @@ def toTopocentric(vec: EVector, time: JulianDate, geo: GeoPosition) -> EVector:
         The transformed vector.
     """
 
-    geoVector = geoPositionVector(geo, time)
+    # geoVector = geoPositionVector(geo, time)
+    geoVector = geo.getPositionVector(time)
     mat = getEulerMatrix(
         ZYX,
         EulerAngles(
@@ -49,7 +50,8 @@ def fromTopocentric(vec: EVector, time: JulianDate, geo: GeoPosition) -> EVector
         The transformed vector.
     """
 
-    geoVector = geoPositionVector(geo, time)
+    # geoVector = geoPositionVector(geo, time)
+    geoVector = geo.getPositionVector(time)
     mat = getEulerMatrix(
         ZYX,
         EulerAngles(
@@ -78,8 +80,10 @@ def getPVector(geo: GeoPosition, position: EVector, velocity: EVector, jd: Julia
         The so-called 'P' vector of the orbit and horizontal planes.
     """
 
-    zeta = norm(zenithVector(geo, jd))
-    gamma = geoPositionVector(geo, jd)
+    # zeta = norm(zenithVector(geo, jd))
+    zeta = norm(geo.getZenithVector(jd))
+    # gamma = geoPositionVector(geo, jd)
+    gamma = geo.getPositionVector(jd)
     lamb = norm(cross(position, velocity))
     x = dot(zeta, gamma) / (zeta[0] - (zeta[1] * lamb[0] / lamb[1]))
     y = -lamb[0] * x / lamb[1]
