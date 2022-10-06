@@ -57,7 +57,7 @@ floating point number in your python version.
 The bulk of the `JulianDate` class handles converting from a date/time to a Julian date and back to its date and time 
 components, as well as handling the mathematical operations involved between instances and other python  classes.
 
-#### Constructor: 
+### Constructor: 
 *class* `juliandate.`**JulianDate(month, day, year, hour, minute, second, timezone=0)**
 
 - All arguments except timezone are required. timezone can be an integer or floating point number representing
@@ -71,7 +71,7 @@ must be integers and in the following ranges:
   - 0.0 <= second < 60.0  
 - A ValueError is raised if any argument is outside these values.
 
-#### Other Constructors:  
+### Other Constructors:  
 *classmethod* `JulianDate.`**fromNumber(number, timezone=0)**
 
 - Creates a `JulianDate` directly from a known Julian day number. 
@@ -96,7 +96,7 @@ must be integers and in the following ranges:
 `JulianDate.`**timezone**
 - If the object is naive 0, otherwise the UTC offset
 
-#### Supported Operations:  
+### Supported Operations:  
 
 | Operation            | Parameters   | Result       |
 |----------------------|--------------|--------------|
@@ -110,7 +110,7 @@ must be integers and in the following ranges:
 2. The \_\_sub__ method supports subtraction between `JulianDate` objects and returns a floating point number. To find
   the difference between a `JulianDate` and a number representation of a Julian date see `JulianDate.difference()`.
 
-#### Instance Methods:
+### Instance Methods:
 
 `JulianDate.`**setTime(month, day, year, hour, minute, second, timezone=0)**
 - Updates the current value of the Julian date. Useful for changing a Julian day value without needing to create a 
@@ -166,7 +166,7 @@ different timezone, or the current timezone if set to None (default behaviour).
 - >⚠️ If the JulianDate is not aware and timezone is not None the behavior may be unexpected and should not be 
   > trusted.
 
-#### Conversion methods:
+### Conversion methods:
 
 `JulianDate.`**toDatetime()**
 - Returns a `datetime` object with the equivalent date and time.
