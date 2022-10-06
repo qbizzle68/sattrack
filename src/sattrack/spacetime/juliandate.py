@@ -172,10 +172,6 @@ class JulianDate:
         """Returns a JSON like representation of the attribute values."""
         return _json.dumps(dict(self))
 
-    def __int__(self):
-        """Returns the day number of the Julian date."""
-        return self._dayNumber
-
     def __add__(self, other: _datetime.timedelta):
         """
         Returns a future or past JulianDate relative to this instance.
