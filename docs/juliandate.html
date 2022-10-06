@@ -1,0 +1,189 @@
+<!doctype html>
+<html>
+ <head> 
+  <title>IntelliJ Markdown Preview</title>               
+  <style>/* Reworked by IntelliJ Team The MIT License (MIT) Copyright (c) JetBrains Adapted from https://github.com/sindresorhus/github-markdown-css The MIT License (MIT) Copyright (c) Sindre Sorhus &lt;sindresorhus@gmail.com&gt; (sindresorhus.com) Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE. */ @font-face { font-family: octicons-anchor; src: url(data:font/woff;charset=utf-8;base64,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) format('woff'); } body { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; font-family: Helvetica, Arial, freesans, sans-serif; font-size: 14px; line-height: 1.6; word-wrap: break-word; margin: 0 2em; } strong { font-weight: bold; } img { border: 0; } input { color: inherit; font: inherit; margin: 0; line-height: normal; } html input[disabled] { cursor: default; } input[type="checkbox"] { box-sizing: border-box; padding: 0; } body * { box-sizing: border-box; } input { font: 13px/1.4 Helvetica, arial, nimbussansl, liberationsans, freesans, clean, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol"; } a { text-decoration: none; } a:hover, a:active { text-decoration: underline; } hr { height: 1px; padding: 0; margin: 20px 0; border: 0 none; } hr:before { display: table; content: ""; } hr:after { display: table; clear: both; content: ""; } blockquote { margin: 0; } ul, ol { padding: 0; margin-top: 0; margin-bottom: 0; } ol ol, ul ol { list-style-type: lower-roman; } ul ul ol, ul ol ol, ol ul ol, ol ol ol { list-style-type: lower-alpha; } dd { margin-left: 0; } .octicon { font: normal normal normal 16px/1 octicons-anchor; display: inline-block; text-decoration: none; text-rendering: auto; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; } .octicon-link:before { content: '\f05c'; } .markdown-body &gt; *:first-child { margin-top: 0 !important; } .markdown-body &gt; *:last-child { margin-bottom: 0 !important; } .anchor { position: absolute; top: 0; left: 0; display: block; padding-right: 6px; padding-left: 30px; margin-left: -30px; } .anchor:focus { outline: none; } h1, h2, h3, h4, h5, h6 { position: relative; margin-top: 1em; margin-bottom: 16px; font-weight: bold; line-height: 1.4; } h1 .octicon-link, h2 .octicon-link, h3 .octicon-link, h4 .octicon-link, h5 .octicon-link, h6 .octicon-link { display: none; color: #000; vertical-align: middle; } h1:hover .anchor, h2:hover .anchor, h3:hover .anchor, h4:hover .anchor, h5:hover .anchor, h6:hover .anchor { padding-left: 8px; margin-left: -30px; text-decoration: none; } h1:hover .anchor .octicon-link, h2:hover .anchor .octicon-link, h3:hover .anchor .octicon-link, h4:hover .anchor .octicon-link, h5:hover .anchor .octicon-link, h6:hover .anchor .octicon-link { display: inline-block; } h1 { font-size: 2.2em; padding-top: 0.6em; } h1 .anchor { line-height: 1; } h2 { font-size: 1.8em; line-height: 1.2; padding-top: 0.6em; } h2 .anchor { line-height: 1.2; } h3 { font-size: 1.3em; line-height: 1; padding-top: 0.6em; } h3 .anchor { line-height: 1.2; } h4 { font-size: 1em; } h4 .anchor { line-height: 1.2; } h5 { font-size: 1em; } h5 .anchor { line-height: 1.1; } h6 { font-size: 1em; } h6 .anchor { line-height: 1.1; } p, blockquote, ul, ol, dl, table, pre { margin-top: 16px; margin-bottom: 16px; } ul, ol { padding-left: 2em; } ul ul, ul ol, ol ol, ol ul { margin-top: 0; margin-bottom: 0; } li &gt; p { margin-top: 0; margin-bottom: 0; } dl { padding: 0; } dl dt { padding: 0; margin-top: 16px; font-size: 1em; font-style: italic; font-weight: bold; } dl dd { padding: 0 16px; margin-bottom: 16px; } blockquote { padding: 10px 10px 10px 16px; border-left: 2px solid; border-radius: 0 3px 3px 0; } blockquote &gt; :first-child { margin-top: 0; } blockquote &gt; :last-child { margin-bottom: 0; } table { display: block; width: 100%; overflow: auto; word-break: normal; border-collapse: collapse; border-spacing: 0; font-size: 1em; } table th { font-weight: bold; } table th, table td { padding: 6px 13px; background: transparent; } table tr { border-top: 1px solid; } img { max-width: 100%; box-sizing: border-box; } code { font: 0.9em "JetBrains Mono", Consolas, "Liberation Mono", Menlo, Courier, monospace; padding: 0.2em 0.4em; margin: 2px; border-radius: 3px; } pre &gt; code { padding: 0; margin: 0; font-size: 100%; word-break: normal; white-space: pre; background: transparent; border: 0; } .highlight { margin-bottom: 16px; } .highlight pre, pre { font: 0.85em "JetBrains Mono", Consolas, "Liberation Mono", Menlo, Courier, monospace; padding: 16px; overflow: auto; line-height: 1.45; border-radius: 3px; } pre code { display: inline; max-width: initial; padding: 0; margin: 0; overflow: initial; line-height: inherit; word-wrap: normal; background-color: transparent; border: 0; } pre code:before, pre code:after { content: normal; } kbd { font: 0.9em "JetBrains Mono", Consolas, "Liberation Mono", Menlo, Courier, monospace; padding: 0.2em 0.4em; margin: 2px; border-radius: 3px; } .task-list-item { list-style-type: none; } .task-list-item + .task-list-item { margin-top: 3px; } .task-list-item input { margin: 0 0.35em 0.25em -0.6em; vertical-align: middle; } :checked + .radio-label { z-index: 1; position: relative; } span.user-del { text-decoration: line-through; } ::-webkit-scrollbar { width: 6px; height: 6px; } ::-webkit-scrollbar-thumb { -webkit-border-radius: 10px; } ::-webkit-scrollbar-track:vertical { -webkit-box-shadow: -1px 0 0 #ededed; } ::-webkit-scrollbar-track { background-color: transparent; } ::-webkit-scrollbar { width: 6px; } </style>
+  <style>body { background-color: rgba(39, 40, 34, 255.0); font-size: 14px !important; } body, p, blockquote, ul, ol, dl, table, pre, code, tr { color: rgba(248, 248, 242, 255.0); } a { color: rgba(88, 157, 246, 255.0); } table td, table th { border: 1px solid rgba(81, 81, 81, 255.0); } hr { background-color: rgba(81, 81, 81, 255.0); } kbd, tr { border: 1px solid rgba(81, 81, 81, 255.0); } h6 { color: rgba(120, 120, 120, 255.0); } blockquote { border-left: 2px solid rgba(88, 157, 246, 0.4); } ::-webkit-scrollbar-thumb { background-color: rgba(166, 166, 166, 0.2784313725490196); } blockquote, code, pre { background-color: rgba(212, 222, 231, 0.09803921568627451); }</style>
+  <style>/* Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file. */ .code-fence-highlighter-copy-button { float: right; display: flex; } .code-fence-highlighter-copy-button-icon { max-width: 1em; } .code-fence:hover .code-fence-highlighter-copy-button-icon { /*noinspection CssUnknownTarget*/ content: url("copy-button-copy-icon.png"); } .code-fence:hover .code-fence-highlighter-copy-button:hover .code-fence-highlighter-copy-button-icon { /*noinspection CssUnknownTarget*/ content: url("copy-button-copy-icon-hovered.png"); cursor: pointer; } </style>
+  <style>/* Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file. */ .run-icon &gt; img { max-width: 1em; vertical-align: text-top; margin-right: 0.3em; } .code-block { position: absolute; left: 1em; } .hidden { display: none; }</style>
+ </head> 
+ <body>
+  <div md-src-pos="0..8792">
+   <h1 md-src-pos="0..27">Julian date python module</h1>
+   <p md-src-pos="29..268"><span md-src-pos="29..32">The</span> <code md-src-pos="33..45">juliandate</code> <span md-src-pos="46..144">module is designed to simplify the complexities in performing mathematical operations on different</span> <span md-src-pos="146..152">dates,</span> <span md-src-pos="153..193">while seamlessly interfacing with python</span>'<span md-src-pos="194..199">s own</span> <a href="https://docs.python.org/3/library/datetime.html" md-src-pos="200..259">datetime</a> <span md-src-pos="261..268">module.</span></p>
+   <p md-src-pos="270..556"><span md-src-pos="270..273">The</span> <code md-src-pos="274..286">juliandate</code> <span md-src-pos="287..381">module can be fully functional on its own if you wish to only be dependent on a single module.</span> <span md-src-pos="382..388">It can</span> <span md-src-pos="390..445">also interface with some of the objects found in python</span>'<span md-src-pos="446..456">s standard</span> <code md-src-pos="457..467">datetime</code> <span md-src-pos="468..501">module if your project uses them,</span> <span md-src-pos="502..508">or you</span> <span md-src-pos="510..556">wish to take advantage of their functionality.</span></p>
+   <h2 md-src-pos="558..576">Aware and Naive</h2>
+   <p md-src-pos="577..691"><span md-src-pos="577..600">According to the python</span> <a href="https://docs.python.org/3/library/datetime.html#aware-and-naive-objects" md-src-pos="601..689">documentation</a>:</p>
+   <blockquote md-src-pos="692..821">
+    <p md-src-pos="693..821"><span md-src-pos="693..736">Date and time objects may be categorized as</span> "<span md-src-pos="738..743">aware</span>" <span md-src-pos="745..747">or</span> "<span md-src-pos="749..754">naive</span>" <span md-src-pos="756..805">depending on whether or not they include timezone</span> <span md-src-pos="809..821">information.</span></p>
+   </blockquote>
+   <p md-src-pos="823..1014"><span md-src-pos="823..850">Using these definitions the</span> <code md-src-pos="851..863">JulianDate</code> <span md-src-pos="864..905">object can also be either aware or naive.</span> <span md-src-pos="906..942">If an object is constructed with the</span> <span md-src-pos="944..957">timezone set,</span> <span md-src-pos="958..983">the object will be aware,</span> <span md-src-pos="984..1014">otherwise the object is naive.</span></p>
+   <p md-src-pos="1016..1351"><span md-src-pos="1016..1048">The one ambiguity here is when a</span> <code md-src-pos="1049..1061">JulianDate</code> <span md-src-pos="1062..1120">object is purposely constructed to be in the GMT timezone.</span> <span md-src-pos="1121..1130">While the</span> <span md-src-pos="1132..1164">object is aware of its timezone,</span> <span md-src-pos="1165..1220">internally there is no difference between a timezone of</span> <span md-src-pos="1221..1243">+0 and a naive object.</span> <span md-src-pos="1244..1252">However,</span> <span md-src-pos="1254..1351">the user can be certain that any computations done with the former object are accurate and valid.</span></p>
+   <h3 md-src-pos="1353..1376">Note on time zones:</h3>
+   <p md-src-pos="1377..1545"><span md-src-pos="1377..1401">Unless stated otherwise,</span> <span md-src-pos="1402..1493">a time zone parameter refers to either an integer or floating point number representing the</span> <span md-src-pos="1495..1528">current time zone offset from UTC</span> (<span md-src-pos="1530..1543">including DST</span>)<span md-src-pos="1544..1545">.</span></p>
+   <h2 md-src-pos="1547..1559">Constants</h2>
+   <p md-src-pos="1560..1649"><span md-src-pos="1560..1595">There is a single constant from the</span> <code md-src-pos="1596..1608">juliandate</code> <span md-src-pos="1609..1648">module which represents the J2000 epoch</span>:</p>
+   <p md-src-pos="1651..1676"><code md-src-pos="1651..1664">juliandate.</code><strong md-src-pos="1664..1673">J2000</strong>:</p>
+   <ul md-src-pos="1678..1756">
+    <li md-src-pos="1678..1756">The J2000 epoch equivalent to <code md-src-pos="1710..1756">JulianDate(1, 1, 2000, 12, 0, 0, timeZone=0)</code></li>
+   </ul>
+   <h2 md-src-pos="1758..1766">Types</h2>
+   <p md-src-pos="1767..1803"><em md-src-pos="1767..1774">class</em> <code md-src-pos="1775..1788">juliandate.</code><strong md-src-pos="1788..1802">JulianDate</strong>:</p>
+   <ul md-src-pos="1805..1920">
+    <li md-src-pos="1805..1920">The JulianDate class represents an instance in time and is composed of a day number and fraction of the next day.</li>
+   </ul>
+   <h2 md-src-pos="1922..1932">Methods</h2>
+   <p md-src-pos="1933..2046"><span md-src-pos="1933..2001">There is a single module level method which allows the creation of a</span> <code md-src-pos="2002..2014">JulianDate</code> <span md-src-pos="2015..2044">object with the current time.</span></p>
+   <p md-src-pos="2048..2093"><em md-src-pos="2048..2056">method</em> <code md-src-pos="2057..2070">juliandate.</code><strong md-src-pos="2070..2092">now(timezone=None)</strong>:</p>
+   <ul md-src-pos="2097..2452">
+    <li md-src-pos="2097..2257">Return a new <code md-src-pos="2112..2124">JulianDate</code> object from the current time using python's standard modules, therefore the implementation may be dependent on your python version.</li>
+    <li md-src-pos="2258..2452">If the timezone parameter is <code md-src-pos="2289..2295">None</code> the timezone offset is also computed using python's standard modules, otherwise the current time is computed and adjusted to accommodate timezone parameter.</li>
+   </ul>
+   <h2 md-src-pos="2454..2475">JulianDate Objects</h2>
+   <p md-src-pos="2476..3100"><span md-src-pos="2476..2477">A</span> <code md-src-pos="2478..2490">JulianDate</code> <span md-src-pos="2491..2571">object represents a single instance in time by converting a calendar date into a</span> <a href="https://en.wikipedia.org/wiki/Julian_day" md-src-pos="2573..2627">Julian day</a> <span md-src-pos="2628..2635">number.</span> <span md-src-pos="2636..2677">A Julian date consists of the day number,</span> <span md-src-pos="2678..2690">or the whole</span> <span md-src-pos="2692..2734">number of days after a predetermined date,</span> <span md-src-pos="2735..2779">and the fraction of the current day after 12</span>:<span md-src-pos="2780..2782">00</span>:<span md-src-pos="2783..2790">00 UT1.</span> <span md-src-pos="2791..2809">The day number and</span> <span md-src-pos="2811..2904">day fraction are stored in two different variables to maintain precision of the day fraction,</span> <span md-src-pos="2905..2930">as the modern day numbers</span> <span md-src-pos="2932..2947">exceed 2460000.</span> <span md-src-pos="2948..2958">Therefore,</span> <span md-src-pos="2959..3052">the precision of the fraction part of the day can be guaranteed to be the same precision as a</span> <span md-src-pos="3054..3099">floating point number in your python version.</span></p>
+   <p md-src-pos="3102..3334"><span md-src-pos="3102..3117">The bulk of the</span> <code md-src-pos="3118..3130">JulianDate</code> <span md-src-pos="3131..3219">class handles converting from a date/time to a Julian date and back to its date and time</span> <span md-src-pos="3221..3232">components,</span> <span md-src-pos="3233..3334">as well as handling the mathematical operations involved between instances and other python classes.</span></p>
+   <h3 md-src-pos="3336..3353">Constructor:</h3>
+   <p md-src-pos="3354..3441"><em md-src-pos="3354..3361">class</em> <code md-src-pos="3362..3375">juliandate.</code><strong md-src-pos="3375..3441">JulianDate(month, day, year, hour, minute, second, timezone=0)</strong></p>
+   <ul md-src-pos="3443..3954">
+    <li md-src-pos="3443..3888">All arguments except timezone are required. timezone can be an integer or floating point number representing the offset of the timezone relative to UTC. seconds can be an integer or floating point number. All other parameters must be integers and in the following ranges:
+     <ul md-src-pos="3719..3888">
+      <li md-src-pos="3719..3737">1 &lt;= month &lt;= 12</li>
+      <li md-src-pos="3740..3796">1 &lt;= day &lt;= number of days in the given month and year</li>
+      <li md-src-pos="3799..3819">-inf &lt; year &lt; +inf</li>
+      <li md-src-pos="3822..3839">0 &lt;= hour &lt;= 59</li>
+      <li md-src-pos="3842..3861">0 &lt;= minute &lt;= 59</li>
+      <li md-src-pos="3864..3888">0.0 &lt;= second &lt; 60.0 </li>
+     </ul></li>
+    <li md-src-pos="3889..3954">A ValueError is raised if any argument is outside these values.</li>
+   </ul>
+   <h3 md-src-pos="3956..3981">Other Constructors:</h3>
+   <p md-src-pos="3982..4043"><em md-src-pos="3982..3995">classmethod</em> <code md-src-pos="3996..4009">JulianDate.</code><strong md-src-pos="4009..4043">fromNumber(number, timezone=0)</strong></p>
+   <ul md-src-pos="4045..4287">
+    <li md-src-pos="4045..4111">Creates a <code md-src-pos="4057..4069">JulianDate</code> directly from a known Julian day number. </li>
+    <li md-src-pos="4112..4199">timezone can be an integer or floating point number representing the offset from UTC.</li>
+    <li md-src-pos="4200..4287">If the parameters are not integer or floating point numbers then TypeError is raised.</li>
+   </ul>
+   <p md-src-pos="4289..4338"><em md-src-pos="4289..4302">classmethod</em> <code md-src-pos="4303..4316">juliandate.</code><strong md-src-pos="4316..4338">fromDatetime(date)</strong></p>
+   <ul md-src-pos="4340..4499">
+    <li md-src-pos="4340..4424">Creates a <code md-src-pos="4352..4364">JulianDate</code> from a <code md-src-pos="4372..4382">datetime</code> instance from python's <code md-src-pos="4406..4416">datetime</code> module.</li>
+    <li md-src-pos="4425..4499">If the date parameter is not a <code md-src-pos="4458..4468">datetime</code> type then TypeError is raised.</li>
+   </ul>
+   <p md-src-pos="4501..4563"><strong md-src-pos="4501..4537">Instance attributes (read-only):</strong><br> <code md-src-pos="4540..4553">JulianDate.</code><strong md-src-pos="4553..4563">number</strong></p>
+   <ul md-src-pos="4564..4624">
+    <li md-src-pos="4564..4624">The integer part of the Julian date, the Julian day number</li>
+   </ul>
+   <p md-src-pos="4626..4651"><code md-src-pos="4626..4639">JulianDate.</code><strong md-src-pos="4639..4651">fraction</strong></p>
+   <ul md-src-pos="4652..4690">
+    <li md-src-pos="4652..4690">The fraction part of the Julian date</li>
+   </ul>
+   <p md-src-pos="4692..4714"><code md-src-pos="4692..4705">JulianDate.</code><strong md-src-pos="4705..4714">value</strong></p>
+   <ul md-src-pos="4715..4789">
+    <li md-src-pos="4715..4789">The Julian date, equivalent to <code md-src-pos="4748..4789">JulianDate.number + JulianDate.fraction</code></li>
+   </ul>
+   <p md-src-pos="4791..4816"><code md-src-pos="4791..4804">JulianDate.</code><strong md-src-pos="4804..4816">timezone</strong></p>
+   <ul md-src-pos="4817..4869">
+    <li md-src-pos="4817..4869">If the object is naive 0, otherwise the UTC offset</li>
+   </ul>
+   <h3 md-src-pos="4871..4898">Supported Operations:</h3>
+   <table md-src-pos="4900..5174">
+    <thead>
+     <tr md-src-pos="4900..4954">
+      <th md-src-pos="4901..4923">Operation</th>
+      <th md-src-pos="4924..4938">Parameters</th>
+      <th md-src-pos="4939..4953">Result</th>
+     </tr>
+    </thead>
+    <tbody>
+     <tr md-src-pos="5010..5064">
+      <td md-src-pos="5011..5033">addition (1)</td>
+      <td md-src-pos="5034..5048"><code md-src-pos="5035..5046">timedelta</code></td>
+      <td md-src-pos="5049..5063"><code md-src-pos="5050..5062">JulianDate</code></td>
+     </tr>
+     <tr class="intellij-row-even" md-src-pos="5065..5119">
+      <td md-src-pos="5066..5088">subtraction (2)</td>
+      <td md-src-pos="5089..5103"><code md-src-pos="5090..5102">JulianDate</code></td>
+      <td md-src-pos="5104..5118"><code md-src-pos="5105..5112">float</code></td>
+     </tr>
+     <tr md-src-pos="5120..5174">
+      <td md-src-pos="5121..5143">==, !=, &lt;, &lt;=, &gt;, &gt;=</td>
+      <td md-src-pos="5144..5158"><code md-src-pos="5145..5157">JulianDate</code></td>
+      <td md-src-pos="5159..5173"><code md-src-pos="5160..5166">bool</code></td>
+     </tr>
+    </tbody>
+   </table>
+   <ol md-src-pos="5176..5662">
+    <li md-src-pos="5176..5427">The __add__ and __radd__ methods support addition of a <code md-src-pos="5238..5249">timedelta</code> object from python's <code md-src-pos="5271..5281">datetime</code> module and returns a new <code md-src-pos="5309..5321">JulianDate</code> object. To add an integer or floating point number to a <code md-src-pos="5378..5390">JulianDate</code> object, see <code md-src-pos="5405..5426">JulianDate.future()</code>.</li>
+    <li md-src-pos="5428..5662">The __sub__ method supports subtraction between <code md-src-pos="5481..5493">JulianDate</code> objects and returns a floating point number. To find the difference between a <code md-src-pos="5574..5586">JulianDate</code> and a number representation of a Julian date see <code md-src-pos="5636..5661">JulianDate.difference()</code>.</li>
+   </ol>
+   <h3 md-src-pos="5664..5685">Instance Methods:</h3>
+   <p md-src-pos="5687..5763"><code md-src-pos="5687..5700">JulianDate.</code><strong md-src-pos="5700..5763">setTime(month, day, year, hour, minute, second, timezone=0)</strong></p>
+   <ul md-src-pos="5764..6411">
+    <li md-src-pos="5764..5895">Updates the current value of the Julian date. Useful for changing a Julian day value without needing to create a new instance.</li>
+    <li md-src-pos="5896..6345">All arguments except timezone are required. timezone can be an integer or floating point number representing the offset of the timezone relative to UTC. seconds can be an integer or floating point number. All other parameters must be integers and in the following ranges:
+     <ul md-src-pos="6176..6345">
+      <li md-src-pos="6176..6194">1 &lt;= month &lt;= 12</li>
+      <li md-src-pos="6197..6253">1 &lt;= day &lt;= number of days in the given month and year</li>
+      <li md-src-pos="6256..6276">-inf &lt; year &lt; +inf</li>
+      <li md-src-pos="6279..6296">0 &lt;= hour &lt;= 59</li>
+      <li md-src-pos="6299..6318">0 &lt;= minute &lt;= 59</li>
+      <li md-src-pos="6321..6345">0.0 &lt;= second &lt; 60.0 </li>
+     </ul></li>
+    <li md-src-pos="6346..6411">A ValueError is raised if any argument is outside these values.</li>
+   </ul>
+   <p md-src-pos="6413..6442"><code md-src-pos="6413..6426">JulianDate.</code><strong md-src-pos="6426..6442">__iter__()</strong></p>
+   <ul md-src-pos="6443..6543">
+    <li md-src-pos="6443..6543">Yields a dictionary of the internal Julian day values with the keys <code md-src-pos="6513..6524">dayNumber</code> and <code md-src-pos="6529..6542">dayFraction</code>.</li>
+   </ul>
+   <p md-src-pos="6545..6573"><code md-src-pos="6545..6558">JulianDate.</code><strong md-src-pos="6558..6573">__str__()</strong></p>
+   <ul md-src-pos="6574..6868">
+    <li md-src-pos="6574..6868">Creates a string of the date and time components in the format 'NUMBER.FRACTION --- MM/DD/YYYY HH:MM:SS.SSS +/-T.T UTC' where:
+     <ul md-src-pos="6708..6868">
+      <li md-src-pos="6708..6741">NUMBER is the Julian day number</li>
+      <li md-src-pos="6744..6782">FRACTION is the Julian date fraction</li>
+      <li md-src-pos="6785..6868">+/-T.T is a floating point number representing the UTC offset (e.g. -6.0 for CST)</li>
+     </ul></li>
+   </ul>
+   <p md-src-pos="6870..6899"><code md-src-pos="6870..6883">JulianDate.</code><strong md-src-pos="6883..6899">__repr__()</strong></p>
+   <ul md-src-pos="6900..7016">
+    <li md-src-pos="6900..7016">Returns a JSON string representation of the Julian day number parts, represented as <code md-src-pos="6986..6997">dayNumber</code> and <code md-src-pos="7002..7015">dayFraction</code>.</li>
+   </ul>
+   <p md-src-pos="7018..7047"><code md-src-pos="7018..7031">JulianDate.</code><strong md-src-pos="7031..7047">future(days)</strong></p>
+   <ul md-src-pos="7048..7344">
+    <li md-src-pos="7048..7344">The numeric version of the addition operator. Computes a future (positive) or past (negative) <code md-src-pos="7144..7156">JulianDate</code> where days is in solar days, where a solar day is equal to 86400 seconds. Useful for addition without creating a <code md-src-pos="7272..7283">timedelta</code> object, equivalent to <code md-src-pos="7308..7343">JulianDate + timedelta(days=days)</code>.</li>
+   </ul>
+   <p md-src-pos="7346..7377"><code md-src-pos="7346..7359">JulianDate.</code><strong md-src-pos="7359..7377">difference(jd)</strong></p>
+   <ul md-src-pos="7378..7576">
+    <li md-src-pos="7378..7576">The numeric version of the subtraction operator. Computes the difference between two Julian dates when the subtractend is an int or float, equivalent to <code md-src-pos="7535..7575">JulianDate - JulianDate.fromNumber(jd)</code>.</li>
+   </ul>
+   <p md-src-pos="7578..7614"><code md-src-pos="7578..7591">JulianDate.</code><strong md-src-pos="7591..7614">date(timezone=None)</strong></p>
+   <ul md-src-pos="7615..7947">
+    <li md-src-pos="7615..7822">Returns a string of the date and time. If the <code md-src-pos="7663..7675">JulianDate</code> is aware, the timezone parameter is used to get the date/time in a different timezone, or the current timezone if set to None (default behaviour).</li>
+    <li md-src-pos="7823..7947">
+     <blockquote md-src-pos="7825..7947">
+      <p md-src-pos="7827..7947"><span md-src-pos="7827..7829">⚠️</span> <span md-src-pos="7830..7931">If the JulianDate is not aware and timezone is not None the behavior may be unexpected and should not</span> <span md-src-pos="7936..7947">be trusted.</span></p>
+     </blockquote></li>
+   </ul>
+   <p md-src-pos="7949..7984"><code md-src-pos="7949..7962">JulianDate.</code><strong md-src-pos="7962..7984">day(timezone=None)</strong></p>
+   <ul md-src-pos="7985..8313">
+    <li md-src-pos="7985..8189">Returns a string of the day of the year. If the <code md-src-pos="8035..8047">JulianDate</code> is aware, the timezone parameter is used to get the date in a different timezone, or the current timezone if set to None (default behaviour).</li>
+    <li md-src-pos="8190..8313">
+     <blockquote md-src-pos="8192..8313">
+      <p md-src-pos="8193..8313"><span md-src-pos="8193..8195">⚠️</span> <span md-src-pos="8196..8300">If the JulianDate is not aware and timezone is not None the behavior may be unexpected and should not be</span> <span md-src-pos="8305..8313">trusted.</span></p>
+     </blockquote></li>
+   </ul>
+   <p md-src-pos="8315..8351"><code md-src-pos="8315..8328">JulianDate.</code><strong md-src-pos="8328..8351">time(timezone=None)</strong></p>
+   <ul md-src-pos="8352..8670">
+    <li md-src-pos="8352..8545">Returns a string of the time. If the <code md-src-pos="8391..8403">JulianDate</code> is aware, the timezone parameter is used to get the time in a different timezone, or the current timezone if set to None (default behaviour).</li>
+    <li md-src-pos="8546..8670">
+     <blockquote md-src-pos="8548..8670">
+      <p md-src-pos="8549..8670"><span md-src-pos="8549..8551">⚠️</span> <span md-src-pos="8552..8656">If the JulianDate is not aware and timezone is not None the behavior may be unexpected and should not be</span> <span md-src-pos="8662..8670">trusted.</span></p>
+     </blockquote></li>
+   </ul>
+   <h3 md-src-pos="8672..8695">Conversion methods:</h3>
+   <p md-src-pos="8697..8726"><code md-src-pos="8697..8710">JulianDate.</code><strong md-src-pos="8710..8726">toDatetime()</strong></p>
+   <ul md-src-pos="8727..8791">
+    <li md-src-pos="8727..8791">Returns a <code md-src-pos="8739..8749">datetime</code> object with the equivalent date and time.</li>
+   </ul>
+  </div>
+ </body>
+</html>
