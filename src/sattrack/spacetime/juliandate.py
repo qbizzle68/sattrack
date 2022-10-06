@@ -5,10 +5,12 @@ from operator import index as _index
 
 __all__ = ("JulianDate", "now", "J2000")
 
+# -1 is placeholder for indexing
 _DAY_IN_MONTH = [-1, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
 
 def _is_leap(year):
+    # leap year every 4 years, but not every 100, except for every 400
     return (year % 4 == 0) and (year % 100 != 0 or year % 400 == 0)
 
 
@@ -41,8 +43,15 @@ def _check_args(month, day, year, hour, minute, second):
     return month, day, year, hour, minute, second
 
 
+def _check_timezone(timezone):
+    if not isinstance(timezone, (int, float)):
+        raise TypeError('timezone parameter must be an int or float type')
+
+
 def _jd_to_gregorian(value, timezone):
+    # incorporate timezone to offset Julian date value
     value += (timezone / 24.0) + 0.5
+    # algorithm taken from the 'Solar Position Algorithm for Solar Radiation Applications' paper in appendix A.3
     Z = int(value)
     F = value - Z
     if Z < 2299161:
@@ -59,7 +68,7 @@ def _jd_to_gregorian(value, timezone):
     m = I - 1 if I < 14 else I - 13
     y = D - 4716 if m > 2 else D - 4715
 
-    # frac = value - int(value)
+    # convert day fraction (measured from 0 hour) to time components
     s = round(F * 86400.0, 3)
     h = int(s / 3600.0)
     s -= h * 3600.0
@@ -96,6 +105,7 @@ class JulianDate:
     date()
     day()
     time()
+    toDatetime()
 
     Properties (readonly):
     value, number, fraction, timezone
@@ -104,52 +114,33 @@ class JulianDate:
     __slots__ = '_dayNumber', '_dayFraction', '_timezone', '_hashcode'
 
     def __new__(cls, month: int, day: int, year: int, hour: int, minute: int, second: float, timezone: int = 0):
-        """Creates a new instance from the components of a Gregorian date"""
+        # constructor
         self = object.__new__(cls)
         self._hashcode = -1
-        self.setTime(month, day, year, hour, minute, second, timezone)
+        month, day, year, hour, minute, second = _check_args(month, day, year, hour, minute, second)
+        _check_timezone(timezone)
+        self._date_to_jd(month, day, year, hour, minute, second, timezone)
         return self
 
-    def setTime(self, month: int, day: int, year: int, hour: int, minute: int, second: float, timezone: int = 0):
-        """Set the current instance to a different time"""
-
-        month, day, year, hour, minute, second = _check_args(month, day, year, hour, minute, second)
-        if not isinstance(timezone, (int, float)):
-            raise TypeError('timezone parameter must be an int or float type')
-
-        term0 = int((1461 * (year + 4800 + int((month - 14) / 12))) / 4)
-        term1 = int((367 * (month - 2 - (12 * int((month - 14) / 12)))) / 12)
-        term2 = int((3 * int((year + 4900 + int((month - 14) / 12)) / 100)) / 4)
-        self._dayNumber = term0 + term1 - term2 + day - 32075
-        self._dayFraction = ((hour - 12) / 24.0) + (minute / 1440.0) + (second / 86400.0) - (timezone / 24.0)
-        if self._dayFraction >= 1.0:
-            self._dayNumber += 1
-            self._dayFraction -= 1.0
-        elif self._dayFraction < 0:
-            self._dayNumber -= 1
-            self._dayFraction += 1.0
-        self._timezone = timezone
+    # other constructors (class methods)
 
     @classmethod
     def fromNumber(cls, number: float, timezone: float = 0.0) -> 'JulianDate':
-        """Creates a JulianDate instance directly from the Julian date number."""
         if isinstance(number, (int, float)):
-            if not isinstance(timezone, (int, float)):
-                raise TypeError('timezone parameter must be an int or float type,'
-                                ' not %s' % type(timezone).__name__)
+            _check_timezone(timezone)
+            # create an 'empty' object with values in valid ranges
             rtn = cls(1, 1, 0, 0, 1, 1, timezone)
             rtn._dayNumber = int(number)
             rtn._dayFraction = number - rtn._dayNumber
             rtn._timezone = timezone
             return rtn
-        raise TypeError('number parameter must be an int or float type,'
-                        ' not %s' % type(number).__name__)
+        raise TypeError('number parameter must be an int or float type')
 
     @classmethod
     def fromDatetime(cls, date: _datetime.datetime):
         if not isinstance(date, _datetime.datetime):
-            raise TypeError('fromDatetime() argument must be a datetime instance,'
-                            ' not %s' % type(date).__name__)
+            raise TypeError('fromDatetime() argument must be a datetime instance')
+        # check if date is aware or naive
         if date.tzinfo is None:
             tz = 0
         else:
@@ -158,33 +149,23 @@ class JulianDate:
         return JulianDate(date.month, date.day, date.year, date.hour, date.minute, seconds, tz)
 
     def __iter__(self):
-        """Returns a generator object to iterate through the Julian date values."""
         yield from {
             'dayNumber': self._dayNumber,
             'dayFraction': self._dayFraction
         }.items()
 
     def __str__(self) -> str:
-        """Returns the value and Gregorian date of the JulianDate as a string."""
         return str(round(self.value, 6)) + ' --- ' + self.date(self._timezone)
 
     def __repr__(self) -> str:
-        """Returns a JSON like representation of the attribute values."""
+        # represent as a JSON
         return _json.dumps(dict(self))
 
+    # operators
     def __add__(self, other: _datetime.timedelta):
-        """
-        Returns a future or past JulianDate relative to this instance.
-
-        Args:
-            other: The number of solar days in the future (positive) or past (negative).
-
-        Returns:
-            A new JulianDate object with the rhs argument added to it.
-        """
         if isinstance(other, _datetime.timedelta):
-            dt = other / _datetime.timedelta(days=1)
-            return JulianDate.fromNumber(self.value + dt, self._timezone)
+            deltaSolarDays = other / _datetime.timedelta(days=1)
+            return JulianDate.fromNumber(self.value + deltaSolarDays, self._timezone)
         return NotImplemented
 
     __radd__ = __add__
@@ -226,81 +207,67 @@ class JulianDate:
 
     def __hash__(self):
         if self._hashcode == -1:
-            self._hashcode = hash((self._dayNumber, self._dayFraction, self._timezone))
+            self._hashcode = hash((self._dayNumber, self._dayFraction))
         return self._hashcode
 
     def __reduce__(self):
         return self.__class__.fromNumber, (self._dayNumber + self._dayFraction, self._timezone)
 
+    # read-only properties
     @property
     def value(self):
-        """Returns the value of the JulianDate."""
         return self._dayNumber + self._dayFraction
 
     @property
     def number(self):
-        """Returns the Julian day number."""
         return self._dayNumber
 
     @property
     def fraction(self):
-        """Returns the fraction part of the JulianDate."""
         return self._dayFraction
 
     @property
     def timezone(self):
         return self._timezone
 
-    def future(self, days: float):
-        """Returns a future or past date relative to the calling date by a number of solar days."""
+    # numeric operators
+    def future(self, days: int | float):
+        # positive is forward in time, negative is backward in time
         if isinstance(days, (int, float)):
             return JulianDate.fromNumber(self.value + days, self._timezone)
         raise TypeError('days parameter must be an int or float type')
 
     def difference(self, jd: int | float) -> float:
-        """
-        Returns the difference between this instance and a Julian date number.
-        Equivalent to:
-        >>> self - JulianDate.fromNumber(jd)
-        """
-
         if isinstance(jd, (int, float)):
+            # if self > jd return will be positive, if self < jd return will be negative
             return self.value - jd
         raise TypeError('jd parameter must be an int or float type')
 
     def date(self, timezone: float = None) -> str:
-        """Converts the Julian date to a Gregorian date and returns as a string"""
-
         if timezone is None:
             timezone = self._timezone
-        elif not isinstance(timezone, (int, float)):
-            raise TypeError('timezone parameter must be an int or float type')
+        else:
+            _check_timezone(timezone)
 
         m, d, y, h, mi, s = _jd_to_gregorian(self.value, timezone)
+        secondRound = round(s, 3)
+        # force a leading zero in values < 0
+        dayString = str(d) if d >= 10 else '0' + str(d)
+        hourString = str(h) if h >= 10 else '0' + str(h)
+        minuteString = str(mi) if mi >= 10 else '0' + str(mi)
+        secondString = str(secondRound) if secondRound >= 10 else '0' + str(secondRound)
+        # force a leading + on positive timezone offsets
+        timezoneString = str(timezone) if timezone < 0 else '+' + str(timezone)
 
-        return ('{}/{}/{} {}:{}:{} {} UTC'
-                .format(m, int(d) if d >= 10 else '0' + str(int(d)),
-                        y, h if h >= 10 else '0' + str(h),
-                        mi if mi >= 10 else '0' + str(mi),
-                        str(round(s, 3)) if s >= 10 else '0' + str(round(s, 3)),
-                        str(timezone) if timezone < 0 else '+' + str(timezone)
-                        ))
+        return f'{m}/{dayString}/{y} {hourString}:{minuteString}:{secondString} {timezoneString} UTC'
 
     def day(self, timezone: float = None) -> str:
-        """Returns the day portion fo the date as a string"""
-        if timezone is None:
-            timezone = self._timezone
-        elif not isinstance(timezone, (int, float)):
-            raise TypeError('timezone parameter must be an int or float type')
+        # day of the date is first chunk returned by date
         return self.date(timezone).split(' ')[0]
 
     def time(self, timezone: float = None) -> str:
-        """Returns the time portion of the date as a string"""
-        if timezone is None:
-            timezone = self._timezone
-        elif not isinstance(timezone, (int, float)):
-            raise TypeError('timezone parameter must be an int or float type')
-        return self.date(timezone).split(' ')[1]
+        # time of the date is second chunk returned by date
+        return self.date(timezone).split(' ')[0]
 
     def toDatetime(self):
         month, day, year, hour, minutes, secondsFloat = _jd_to_gregorian(self.value, self._timezone)
@@ -310,13 +277,33 @@ class JulianDate:
         timezone = _datetime.timezone(_datetime.timedelta(hours=self._timezone))
         return _datetime.datetime(year, month, day, hour, minutes, secondsInt, microSeconds, timezone)
 
+    def _date_to_jd(self, month: int, day: int, year: int, hour: int, minute: int, second: float, timezone: int = 0):
+        # month, day, year, hour, minute, second = _check_args(month, day, year, hour, minute, second)
+        # if not isinstance(timezone, (int, float)):
+        #     raise TypeError('timezone parameter must be an int or float type')
+
+        # use methodology from the Julian date wiki to convert from Gregorian date
+        term0 = int((1461 * (year + 4800 + int((month - 14) / 12))) / 4)
+        term1 = int((367 * (month - 2 - (12 * int((month - 14) / 12)))) / 12)
+        term2 = int((3 * int((year + 4900 + int((month - 14) / 12)) / 100)) / 4)
+        self._dayNumber = term0 + term1 - term2 + day - 32075
+        self._dayFraction = ((hour - 12) / 24.0) + (minute / 1440.0) + (second / 86400.0) - (timezone / 24.0)
+        if self._dayFraction >= 1.0:
+            self._dayNumber += 1
+            self._dayFraction -= 1.0
+        elif self._dayFraction < 0:
+            self._dayNumber -= 1
+            self._dayFraction += 1.0
+        self._timezone = timezone
+
 
 def now(timezone=None) -> JulianDate:
     if timezone is None:
         tz = _time.localtime().tm_gmtoff / 3600.0
-    elif isinstance(timezone, (int, float)):
-        raise TypeError('timezone parameter must be int or float type')
+    # elif isinstance(timezone, (int, float)):
+        # raise TypeError('timezone parameter must be int or float type')
     else:
+        _check_timezone(timezone)
         tz = timezone
     tm = _datetime.datetime.now(_datetime.timezone(_datetime.timedelta(hours=tz)))
     return JulianDate.fromDatetime(tm)
