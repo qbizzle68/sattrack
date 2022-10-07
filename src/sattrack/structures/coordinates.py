@@ -195,7 +195,7 @@ def geodeticToGeocentric(geodeticLatitude: float) -> float:
 
 
 def _radius_at_lat(latitude):
-    # returns radius in kilometers
+    # latitude refers to geodetic latitude, returns radius in kilometers
     if latitude == 0:
         return EARTH_EQUITORIAL_RADIUS
     elif latitude == 90 or latitude == -90:
