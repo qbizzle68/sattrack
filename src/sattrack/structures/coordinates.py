@@ -90,6 +90,8 @@ class GeoPosition(Coordinates):
             elevation: The elevation of the GeoPosition in km (Default = 0).
         """
         super().__init__(latitude, longitude)
+        if not isinstance(elevation, (int, float)):
+            raise TypeError('elevation parameter must be an int or float type')
         self._elevation = elevation
 
     def __iter__(self):
