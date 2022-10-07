@@ -2,7 +2,7 @@ import json as _json
 import abc as _abc
 import math as _math
 from sattrack.util.constants import EARTH_FLATTENING, EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS
-from pyevspace import EVector
+from pyevspace import EVector, norm
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.util.conversions import atan3
@@ -137,12 +137,12 @@ class GeoPosition(Coordinates):
     def getZenithVector(self, jd: JulianDate = None) -> EVector:
         if jd is not None and not isinstance(jd, JulianDate):
             raise TypeError('jd parameter must be a JulianDate type')
-        return _compute_normal_vector(
+        zenithVector = _compute_normal_vector(
             self._lat,
             self._lng,
             _radius_at_lat(self._lat) + self._elevation,
-            jd
-        )
+            jd)
+        return norm(zenithVector)
 
     def _fmod(self, value: float) -> float:
         # find the equivalent angle from -180 to 180
