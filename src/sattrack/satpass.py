@@ -555,6 +555,10 @@ class PassController:
         riseTime, setTime = riseSetTimes(self._sat, self._geo, nextPassTime)
         self._shadowController.computeValues(riseTime)
         enterTime, exitTime = self._shadowController.getTimes()
+        # todo: if timezone of riseTime is different than the timezone of geo, then the rise/set times may be for the
+        #   wrong day and the unobscured values may be wrong.
+        # todo: idea: check sun altitude and always find the next sunset based on the angle, then find the previous rise,
+        #   then the above issue shouldn't exist
         sunRiseTime, sunSetTime = getSunRiseSetTimes2(riseTime, self._geo)
 
         firstIlluminatedTime = riseTime
