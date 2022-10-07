@@ -1207,7 +1207,7 @@ def riseSetGuess(sat: Satellite, geo: GeoPosition, time: JulianDate) -> tuple[Ju
     ce = -norm(u) * c
 
     # zeta = norm(zenithVector(geo, time))
-    zeta = norm(geo.getZenithVector(time))
+    zeta = geo.getZenithVector(time)
     # gamma = geoPositionVector(geo, time)
     gamma = geo.getPositionVector(time)
 
@@ -1330,12 +1330,12 @@ def orbitAltitude(sat: Satellite, geo: GeoPosition, time: JulianDate) -> float:
 
     # zenith vector for the GeoPosition
     # zeta = norm(zenithVector(geo, time))
-    zeta = norm(geo.getZenithVector(time))
+    zeta = geo.getZenithVector(time)
     # GeoPosition vector in geocentric reference frame
     # gamma = geoPositionVector(geo, time)
     gamma = geo.getPositionVector(time)
     # normalized angular momentum, vector equation for orbital plane
-    lamb = norm(cross(state[0], state[1]))
+    lamb = cross(state[0], state[1])
 
     # compute intermediate values to find solution to parameterized vector intersection
     if lamb[1] != 0:

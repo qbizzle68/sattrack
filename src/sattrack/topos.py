@@ -81,7 +81,7 @@ def getPVector(geo: GeoPosition, position: EVector, velocity: EVector, jd: Julia
     """
 
     # zeta = norm(zenithVector(geo, jd))
-    zeta = norm(geo.getZenithVector(jd))
+    zeta = geo.getZenithVector(jd)
     # gamma = geoPositionVector(geo, jd)
     gamma = geo.getPositionVector(jd)
     lamb = norm(cross(position, velocity))
