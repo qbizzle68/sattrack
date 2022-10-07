@@ -113,6 +113,8 @@ class GeoPosition(Coordinates):
 
     @elevation.setter
     def elevation(self, value):
+        if not isinstance(value, (int, float)):
+            raise TypeError('value must be an int or float type')
         self._elevation = value
 
     def getRadius(self) -> float:
