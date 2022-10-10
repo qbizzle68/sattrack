@@ -1,6 +1,5 @@
 # Coordinate module documentation
-
-The `coordinates` module supplies classes for representing coordinates for both Earth and celestial positions.
+The `coordinates` module supplies classes for representing coordinates for Earth and celestial reference frames.
 
 ## Types
 *class* `coordinates.Coordinates`
@@ -32,7 +31,7 @@ the geodetic latitude in degrees and the return value is in kilometers.
 
 *method* `coordinates.`**getSubPoint(position, jd)**
 - Return the geo-position directly underneath a satellites position at a given time.
-- The magnitude of the position vector does not matter, only its direction.
+- Only the direction of the position vector is significant, not its magnitude.
 - The elevation of the returned GeoPosition object is always 0.
 
 ## Coordinates objects
@@ -40,8 +39,7 @@ An abstract base class for deriving coordinate like objects for the module.
 
 ### Constructor:
 *class* `coordinates.`**Coordinates(latitude, longitude)**
-- Constructs an object with the given latitude and longitude.
-- Latitude must be a numeric value between -90 and 90, otherwise a TypeError or ValueError is raised respectively.
+- Latitude must be a numeric value between -90 and 90 degrees, otherwise a TypeError or ValueError is raised.
 - Longitude must be a numeric value otherwise a TypeError is raised. 
 - The longitude value is modulated into its valid ranges automatically.
 
@@ -55,20 +53,23 @@ An abstract base class for deriving coordinate like objects for the module.
 ### Instance Methods:
 
 `Coordinates.`**\_\_repr__()**
-- Returns a JSON string representation of the coordinate. The \_\_iter__() method is not implemented yet, so for this
+- Returns a JSON string representation of the coordinate. The \_\_iter__() method is not implemented, so for this
 method to work for subclasses, the \_\_iter__() method must be overwritten.
-
-## GeoPosition
+  
+## GeoPosition objects
 - The `GeoPosition` class is a subclass of the `Coordinates` class, whose valid ranges of values are -90 to 90 degrees 
 for latitude and -180 to 180 for longitude. Longitude values will automatically be modulated to values in their valid
 range.
+- Due to the oblate spheroid shape of earth, each point's latitude angle can be described as geodetic or geocentric.
+Unless otherwise stated, when describing latitude, geodetic latitude is to be assumed.
 - This class also contains an elevation value, which is used to derive more precise position vectors for a position if
 the elevation is known.
 
 ### Constructor:
 *class* `coordinates.`**GeoPosition(latitude, longitude, elevation)**
 - All parameters must be numeric types otherwise raises a TypeError.
-- latitude must be in the range -90 to 90 and longitude is modulated into a range of -180 to 180 if not in that range.
+- latitude must be in the range of -90 to 90 otherwise a ValueError is raised, and longitude is modulated into a range 
+of -180 to 180 if outside it.
 - elevation is in kilometers.
 
 ### Instance attributes:
