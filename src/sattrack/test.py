@@ -19,7 +19,7 @@ from sattrack.util.conversions import smaToMeanMotion
 from sattrack.spacetime.juliandate import now
 from sattrack.structures.tle import getTle
 
-tle = getTle('zarya')
+# tle = getTle('zarya')
 # tle = TwoLineElemen
 # t("""ISS (ZARYA)
 # 1 25544U 98067A   22266.84431519  .00008111  00000+0  14870-3 0  9996
@@ -29,12 +29,12 @@ tle = getTle('zarya')
 # 2 45579  53.0552 303.3671 0001112  89.5038 270.6079 15.06396587135812"""
 # tle = TwoLineElement(tleStr)
 time = JulianDate(9, 25, 2022, 11, 47, 15.468)
-iss = Satellite(tle)
+# iss = Satellite(tle)
 jd = now()
 geo = GeoPosition(38.0608, -97.9298)
-pc = PassController(iss, geo, jd)
-np = pc.getNextPass()
-plist = pc.getPassList(1)
+# pc = PassController(iss, geo, jd)
+# np = pc.getNextPass()
+# plist = pc.getPassList(1)
 # elements = OrbitalElements.fromTle(tle, jd)
 
 # def foo(time: JulianDate):
