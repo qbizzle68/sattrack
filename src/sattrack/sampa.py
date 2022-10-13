@@ -1,6 +1,7 @@
 from math import sin, cos, radians, atan2, tan, asin, atan, pi
 
 from sattrack.spacetime.juliandate import JulianDate
+from sattrack.structures.coordinates import GeoPosition
 from sattrack.util.constants import TWOPI
 
 DELTAT = 72.6
@@ -38,13 +39,14 @@ class Constant:
 
 class Register:
 
-    def __init__(self, jd, geo):
+    def __init__(self, jd, geo = None):
+        self._geo = geo
         JD, JDE, JC, JCE, JME = _generate_times(jd)
         # list all variables involved in the sampa
         self._internalState = {
             'JD': JD, 'JDE': JDE, 'JC': JC, 'JCE': JCE, 'JME': JME,
-            'geoLatitude': Constant(radians(geo.latitude)), 'geoLongitude': Constant(radians(geo.longitude)),
-            'elevation': Constant(geo.elevation),
+            # 'geoLatitude': Constant(radians(geo.latitude)), 'geoLongitude': Constant(radians(geo.longitude)),
+            # 'elevation': Constant(geo.elevation),
             # MPA: 3.2
             'moonMeanLongitude': Variable(_mpa_moon_mean_longitude, ('JCE',), self),
             'moonMeanElongation': Variable(_mpa_moon_mean_elongation, ('JCE',), self),
@@ -117,11 +119,148 @@ class Register:
             'sunTopocentricDeclination': Variable(_topocentric_declination,
                                                   ('yTerm', 'sunDeclination', 'sunParallax',
                                                    'sunParallaxRightAscension', 'sunLocalHourAngle'), self),
-
         }
+        if geo is not None:
+            self._internalState['geoLatitude'] = Constant(radians(geo.latitude))
+            self._internalState['geoLongitude'] = Constant(radians(geo.longitude))
+            self._internalState['elevation'] = Constant(radians(geo.elevation))
+
 
     def __getitem__(self, item):
         return self._internalState[item].value
+
+    @property
+    def geo(self):
+        return self._geo
+
+    @geo.setter
+    def geo(self, value):
+        if self._geo is None and isinstance(value, GeoPosition):
+            self._geo = value
+            self._internalState['geoLatitude'] = Constant(radians(value.latitude))
+            self._internalState['geoLongitude'] = Constant(radians(value.longitude))
+            self._internalState['elevation'] = Constant(radians(value.elevation))
+
+
+'''
+     ------------------------------------------------------------------------------------
+    |       description of the variable names and their relation to the SPA and MPA      |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |     Register Variable Name    | Symbol | Algorithm |    Section     |    Units     |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |     moonMeanLongitude         |   L'   |    MPA    |     3.2.1      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |     moonMeanElongation        |   D    |    MPA    |     3.2.2      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |       sunMeanAnomaly          |   M    |    MPA    |     3.2.3      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |       moonMeanAnomaly         |   M'   |    MPA    |     3.2.4      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |    moonArgumentLatitude       |   F    |    MPA    |     3.2.5      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |           ETerm               |   E    |    MPA    |    3.2.[6-8]   |   unit-less  |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |       lrProductTable          |  ----  |    MPA    |    3.2.[6-7]   |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |           lTerm               |   l    |    MPA    |     3.2.6      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |           rTerm               |   r    |    MPA    |     3.2.7      |  kilometers  |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |           bTerm               |   b    |    MPA    |     3.2.8      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |           a1Term              |   a1   |    MPA    |     3.2.8*     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |           a2Term              |   a2   |    MPA    |     3.2.9      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |           a3Term              |   a3   |    MPA    |     3.2.10     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |           deltal              |   Δl   |    MPA    |     3.2.11     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |           deltab              |   Δb   |    MPA    |     3.2.12     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |        moonLongitude          |   λ'   |    MPA    |     3.2.13     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |        moonLatitude           |   β    |    MPA    |     3.2.14     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |        moonDistance           |   Δ    |    MPA    |     3.2.15     |  kilometers  |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |        moonParallax           |   π    |    MPA    |      3.3       |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |           xValues             |   Xi   |  MPA, SPA |    3.4[1-5]    |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |        xyProductTable         | Xi*Yij |  MPA, SPA |     3.4.6      | 1e-6 radians |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |       nutationLongitude       |   Δψ   |  MPA, SPA |     3.4.7      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |       nutationObliquity       |   Δε   |  MPA, SPA |     3.4.8      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |         meanObliquity         |   ε0   |  MPA, SPA |     3.5.1      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |         trueObliquity         |   ε    |  MPA, SPA |     3.5.2      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |     apparentMoonLongitude     |   λ    |    MPA    |      3.6       |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |       meanSiderealTime        |   ν0   |    MPA    |     3.7.1      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |     apparentSiderealTime      |   ν    |    MPA    |     3.7.2      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |      moonRightAscension       |   α    |    MPA    |      3.8       |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |       moonDeclination         |   δ    |    MPA    |      3.9       |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |      moonLocalHourAngle       |   H    |    MPA    |      3.10      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |            uTerm              |   u    |  MPA, SPA | 3.11.1, 3.12.2 |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |            xTerm              |   x    |  MPA, SPA | 3.11.2, 3.12.3 |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |            yTerm              |   y    |  MPA, SPA | 3.11.3, 3.12.4 |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |   moonParallaxRightAscension  |   Δα   |    MPA    |     3.11.4     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    | moonTopocentricRightAscension |   α'   |    MPA    |     3.11.5     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |  moonTopocentricDeclination   |   δ'   |    MPA    |     3.11.6     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |  earthHeliocentricLongitude   |   L    |    SPA    |    3.2.[4-6]   |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |   earthHeliocentricLatitude   |   B    |    SPA    |     3.2.7      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |         sunDistance           |   R    |    SPA    |     3.2.8      |      AU      |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |         sunLongitude          |   Θ    |    SPA    |     3.3.1      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |         sunLatitude           |   β    |    SPA    |     3.3.3      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |    sunAberrationCorrection    |   Δτ   |    SPA    |      3.6       |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |      apparentSunLongitude     |   λ    |    SPA    |      3.7       |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |       sunRightAscension       |   α    |    SPA    |      3.9       |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |        sunDeclination         |   δ    |    SPA    |      3.10      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |       sunLocalHourAngle       |   H    |    SPA    |      3.11      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |          sunParallax          |   ξ    |    SPA    |     3.12.1     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |   sunParallaxRightAscension   |   Δα   |    SPA    |     3.12.5     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |  sunTopocentricRightAscension |   α'   |    SPA    |     3.12.6     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |   sunTopocentricDeclination   |   δ'   |    SPA    |     3.12.7     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+'''
+
+
+class SampaComputer:
+    __slots__ = '_registry'
+
+    def __init__(self, jd: JulianDate, geo = None):
+        self._registry = {jd.value: Register(jd)}
+        self._registry[jd.value].geo = geo
+
+
 
 
 def _generate_times(jd: JulianDate):
