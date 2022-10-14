@@ -663,7 +663,7 @@ class PassController:
         maxIlluminated = not (enterTime.value <= nextPassTime.value <= exitTime.value)
         maxUnobscured = nextPassTime.value < sunRiseTime.value or nextPassTime.value >= sunSetTime.value
         maxInfo = PositionInfo(maxAlt,
-                               degrees(atan3(maxPosSez[1], -maxPosSez.mag())),
+                               degrees(atan3(maxPosSez[1], -maxPosSez[0])),
                                nextPassTime,
                                maxIlluminated,
                                maxUnobscured)
