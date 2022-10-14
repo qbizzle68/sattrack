@@ -1,8 +1,9 @@
-from math import sin, cos, radians, atan2, tan, asin, atan, pi
+from math import sin, cos, radians, atan2, tan, asin, atan, pi, acos
 
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.structures.coordinates import GeoPosition
 from sattrack.util.constants import TWOPI
+from sattrack.util.conversions import atan3
 
 DELTAT = 72.6
 
@@ -38,9 +39,10 @@ class Constant:
 
 
 class Register:
+    __slots__ = '_internalState'
 
-    def __init__(self, jd, geo = None):
-        self._geo = geo
+    def __init__(self, jd):
+        # self._geo = geo
         JD, JDE, JC, JCE, JME = _generate_times(jd)
         # list all variables involved in the sampa
         self._internalState = {
@@ -85,19 +87,6 @@ class Register:
                                                               'trueObliquity'), self),
             'moonDeclination': Variable(_declination, ('moonLongitude', 'moonLatitude', 'trueObliquity'),
                                         self),
-            'moonLocalHourAngle': Variable(_local_hour_angle, ('apparentSiderealTime', 'geoLongitude',
-                                                               'moonRightAscension'), self),
-            'uTerm': Variable(_u_term, ('geoLatitude',), self),
-            'xTerm': Variable(_x_term, ('uTerm', 'geoLatitude', 'elevation'), self),
-            'yTerm': Variable(_y_term, ('uTerm', 'geoLatitude', 'elevation'), self),
-            'moonParallaxRightAscension': Variable(_parallax_right_ascension,
-                                                   ('xTerm', 'moonParallax', 'moonLocalHourAngle', 'moonDeclination'),
-                                                   self),
-            'moonTopocentricRightAscension': Variable(_topocentric_right_ascension,
-                                                      ('moonRightAscension', 'moonParallaxRightAscension'), self),
-            'moonTopocentricDeclination': Variable(_topocentric_declination,
-                                                   ('yTerm', 'moonDeclination', 'moonParallax',
-                                                    'moonParallaxRightAscension', 'moonLocalHourAngle'), self),
             'earthHeliocentricLongitude': Variable(_spa_earth_heliocentric_longitude, ('JME',), self),
             'earthHeliocentricLatitude': Variable(_spa_earth_heliocentric_latitude, ('JME',), self),
             'sunDistance': Variable(_spa_earth_heliocentric_radius, ('JME',), self),
@@ -108,38 +97,93 @@ class Register:
                                                                            'sunAberrationCorrection'), self),
             'sunRightAscension': Variable(_right_ascension, ('sunLongitude', 'sunLatitude', 'trueObliquity'), self),
             'sunDeclination': Variable(_declination, ('sunLongitude', 'sunLatitude', 'trueObliquity'), self),
-            'sunLocalHourAngle': Variable(_local_hour_angle, ('apparentSiderealTime', 'geoLongitude',
-                                                              'sunRightAscension'), self),
-            'sunParallax': Variable(_spa_equitorial_parallax_sun, ('sunDistance',), self),
-            'sunParallaxRightAscension': Variable(_parallax_right_ascension,
-                                                  ('xTerm', 'sunParallax', 'sunLocalHourAngle', 'sunDeclination'),
-                                                  self),
-            'sunTopocentricRightAscension': Variable(_topocentric_right_ascension,
-                                                     ('sunRightAscension', 'sunParallaxRightAscension'), self),
-            'sunTopocentricDeclination': Variable(_topocentric_declination,
-                                                  ('yTerm', 'sunDeclination', 'sunParallax',
-                                                   'sunParallaxRightAscension', 'sunLocalHourAngle'), self),
+            'equationOfTime': Variable(_equation_of_time,
+                                       ('JME', 'sunRightAscension', 'nutationLongitude', 'nutationObliquity'), self),
         }
-        if geo is not None:
-            self._internalState['geoLatitude'] = Constant(radians(geo.latitude))
-            self._internalState['geoLongitude'] = Constant(radians(geo.longitude))
-            self._internalState['elevation'] = Constant(radians(geo.elevation))
-
 
     def __getitem__(self, item):
         return self._internalState[item].value
 
-    @property
-    def geo(self):
-        return self._geo
 
-    @geo.setter
-    def geo(self, value):
-        if self._geo is None and isinstance(value, GeoPosition):
-            self._geo = value
-            self._internalState['geoLatitude'] = Constant(radians(value.latitude))
-            self._internalState['geoLongitude'] = Constant(radians(value.longitude))
-            self._internalState['elevation'] = Constant(radians(value.elevation))
+class RegisterTopocentric(Register):
+
+    def __init__(self, jd, geo):
+        super().__init__(jd)
+        self._internalState['geoLatitude'] = Constant(radians(geo.latitude))
+        self._internalState['geoLongitude'] = Constant(radians(geo.longitude))
+        self._internalState['elevation'] = Constant(geo.elevation)
+        # todo: implement these correctly when able to
+        self._internalState['pressure'] = Constant(0)
+        self._internalState['temperature'] = Constant(10)
+        self._internalState['slopeSurface'] = Constant(0)
+        self._internalState['surfaceAzimuth'] = Constant(0)
+        self._internalState['moonLocalHourAngle'] = Variable(_local_hour_angle, ('apparentSiderealTime', 'geoLongitude',
+                                                                                 'moonRightAscension'), self)
+        self._internalState['uTerm'] = Variable(_u_term, ('geoLatitude',), self)
+        self._internalState['xTerm'] = Variable(_x_term, ('uTerm', 'geoLatitude', 'elevation'), self)
+        self._internalState['yTerm'] = Variable(_y_term, ('uTerm', 'geoLatitude', 'elevation'), self)
+        self._internalState['moonParallaxRightAscension'] = Variable(_parallax_right_ascension,
+                                                                     ('xTerm', 'moonParallax', 'moonLocalHourAngle',
+                                                                      'moonDeclination'), self)
+        self._internalState['moonTopocentricRightAscension'] = Variable(_topocentric_right_ascension,
+                                                                        ('moonRightAscension',
+                                                                         'moonParallaxRightAscension'), self)
+        self._internalState['moonTopocentricDeclination'] = Variable(_topocentric_declination,
+                                                                     ('yTerm', 'moonDeclination', 'moonParallax',
+                                                                      'moonParallaxRightAscension',
+                                                                      'moonLocalHourAngle'), self)
+        self._internalState['sunLocalHourAngle'] = Variable(_local_hour_angle, ('apparentSiderealTime', 'geoLongitude',
+                                                                                'sunRightAscension'), self)
+        self._internalState['sunParallax'] = Variable(_spa_equitorial_parallax_sun, ('sunDistance',), self)
+        self._internalState['sunParallaxRightAscension'] = Variable(_parallax_right_ascension,
+                                                                    ('xTerm', 'sunParallax', 'sunLocalHourAngle',
+                                                                     'sunDeclination'), self)
+        self._internalState['sunTopocentricRightAscension'] = Variable(_topocentric_right_ascension,
+                                                                       ('sunRightAscension',
+                                                                        'sunParallaxRightAscension'), self)
+        self._internalState['sunTopocentricDeclination'] = Variable(_topocentric_declination,
+                                                                    ('yTerm', 'sunDeclination', 'sunParallax',
+                                                                     'sunParallaxRightAscension', 'sunLocalHourAngle'),
+                                                                    self)
+        self._internalState['moonTopocentricHourAngle'] = Variable(_topocentric_local_hour_angle,
+                                                                   ('moonLocalHourAngle', 'moonParallaxRightAscension'),
+                                                                   self)
+        self._internalState['sunTopocentricHourAngle'] = Variable(_topocentric_local_hour_angle,
+                                                                  ('sunLocalHourAngle', 'sunParallaxRightAscension'),
+                                                                  self)
+        self._internalState['moonElevationAngleWithout'] = Variable(_topocentric_elevation_angle_without,
+                                                                    ('geoLatitude', 'moonTopocentricDeclination',
+                                                                     'moonTopocentricLocalHour'), self)
+        self._internalState['sunElevationAngleWithout'] = Variable(_topocentric_elevation_angle_without,
+                                                                   ('geoLatitude', 'sunTopocentricDeclination',
+                                                                    'sunTopocentricHourAngle'), self)
+        self._internalState['moonAtmosphericRefraction'] = Variable(_atmospheric_refraction_correction,
+                                                                    ('pressure', 'temperature',
+                                                                     'moonElevationAngleWithout'), self)
+        self._internalState['sunAtmosphericRefraction'] = Variable(_atmospheric_refraction_correction,
+                                                                   ('pressure', 'temperature',
+                                                                    'sunElevationAngleWithout'), self)
+        self._internalState['moonElevationAngle'] = Variable(_topocentric_elevation_angle,
+                                                             ('moonElevationAngleWithout', 'moonAtmosphericRefraction'),
+                                                             self)
+        self._internalState['sunElevationAngle'] = Variable(_topocentric_elevation_angle,
+                                                            ('sunElevationAngleWithout', 'sunAtmosphericRefraction'),
+                                                            self)
+        self._internalState['moonZenithAngle'] = Variable(_topocentric_zenith_angle, ('moonElevationAngle',), self)
+        self._internalState['sunZenithAngle'] = Variable(_topocentric_zenith_angle, ('sunElevationAngle',), self)
+        self._internalState['moonAstronomersAzimuth'] = Variable(_topocentric_astronomers_azimuth_angle,
+                                                                 ('moonTopocentricHourAngle', 'geoLatitude',
+                                                                  'moonTopocentricDeclination'), self)
+        self._internalState['sunAstronomersAzimuth'] = Variable(_topocentric_astronomers_azimuth_angle,
+                                                                ('sunTopocentricHourAngle', 'geoLatitude',
+                                                                 'sunTopocentricDeclination'), self)
+        self._internalState['moonAzimuthAngle'] = Variable(_topocentric_azimuth_angle, ('moonAstronomersAzimuth',),
+                                                           self)
+        self._internalState['sunAzimuthAngle'] = Variable(_topocentric_azimuth_angle, ('sunAstronomersAzimuth',),
+                                                          self)
+        self._internalState['sunIncidenceAngle'] = Variable(_spa_incidence_angle,
+                                                            ('sunZenithAngle', 'sunAstronomersAzimuth', 'slopeSurface',
+                                                             'surfaceAzimuth'), self)
 
 
 '''
@@ -148,11 +192,11 @@ class Register:
      ------------------------------- -------- ----------- ---------------- --------------
     |     Register Variable Name    | Symbol | Algorithm |    Section     |    Units     |
      ------------------------------- -------- ----------- ---------------- --------------
-    |     moonMeanLongitude         |   L'   |    MPA    |     3.2.1      |   radians    |
+    |      moonMeanLongitude        |   L'   |    MPA    |     3.2.1      |   radians    |
      ------------------------------- -------- ----------- ---------------- --------------
-    |     moonMeanElongation        |   D    |    MPA    |     3.2.2      |   radians    |
+    |      moonMeanElongation       |   D    |    MPA    |     3.2.2      |   radians    |
      ------------------------------- -------- ----------- ---------------- --------------
-    |       sunMeanAnomaly          |   M    |    MPA    |     3.2.3      |   radians    |
+    |        sunMeanAnomaly         |   M    |    MPA    |     3.2.3      |   radians    |
      ------------------------------- -------- ----------- ---------------- --------------
     |       moonMeanAnomaly         |   M'   |    MPA    |     3.2.4      |   radians    |
      ------------------------------- -------- ----------- ---------------- --------------
@@ -162,29 +206,29 @@ class Register:
      ------------------------------- -------- ----------- ---------------- --------------
     |       lrProductTable          |  ----  |    MPA    |    3.2.[6-7]   |   radians    |
      ------------------------------- -------- ----------- ---------------- --------------
-    |           lTerm               |   l    |    MPA    |     3.2.6      |   radians    |
+    |            lTerm              |   l    |    MPA    |     3.2.6      |   radians    |
      ------------------------------- -------- ----------- ---------------- --------------
-    |           rTerm               |   r    |    MPA    |     3.2.7      |  kilometers  |
+    |            rTerm              |   r    |    MPA    |     3.2.7      |  kilometers  |
      ------------------------------- -------- ----------- ---------------- --------------
-    |           bTerm               |   b    |    MPA    |     3.2.8      |   radians    |
+    |            bTerm              |   b    |    MPA    |     3.2.8      |   radians    |
      ------------------------------- -------- ----------- ---------------- --------------
-    |           a1Term              |   a1   |    MPA    |     3.2.8*     |   radians    |
+    |            a1Term             |   a1   |    MPA    |     3.2.8*     |   radians    |
      ------------------------------- -------- ----------- ---------------- --------------
-    |           a2Term              |   a2   |    MPA    |     3.2.9      |   radians    |
+    |            a2Term             |   a2   |    MPA    |     3.2.9      |   radians    |
      ------------------------------- -------- ----------- ---------------- --------------
-    |           a3Term              |   a3   |    MPA    |     3.2.10     |   radians    |
+    |            a3Term             |   a3   |    MPA    |     3.2.10     |   radians    |
      ------------------------------- -------- ----------- ---------------- --------------
-    |           deltal              |   Δl   |    MPA    |     3.2.11     |   radians    |
+    |            deltal             |   Δl   |    MPA    |     3.2.11     |   radians    |
      ------------------------------- -------- ----------- ---------------- --------------
-    |           deltab              |   Δb   |    MPA    |     3.2.12     |   radians    |
+    |            deltab             |   Δb   |    MPA    |     3.2.12     |   radians    |
      ------------------------------- -------- ----------- ---------------- --------------
     |        moonLongitude          |   λ'   |    MPA    |     3.2.13     |   radians    |
      ------------------------------- -------- ----------- ---------------- --------------
-    |        moonLatitude           |   β    |    MPA    |     3.2.14     |   radians    |
+    |         moonLatitude          |   β    |    MPA    |     3.2.14     |   radians    |
      ------------------------------- -------- ----------- ---------------- --------------
-    |        moonDistance           |   Δ    |    MPA    |     3.2.15     |  kilometers  |
+    |         moonDistance          |   Δ    |    MPA    |     3.2.15     |  kilometers  |
      ------------------------------- -------- ----------- ---------------- --------------
-    |        moonParallax           |   π    |    MPA    |      3.3       |   radians    |
+    |         moonParallax          |   π    |    MPA    |      3.3       |   radians    |
      ------------------------------- -------- ----------- ---------------- --------------
     |           xValues             |   Xi   |  MPA, SPA |    3.4[1-5]    |   radians    |
      ------------------------------- -------- ----------- ---------------- --------------
@@ -250,17 +294,44 @@ class Register:
      ------------------------------- -------- ----------- ---------------- --------------
     |   sunTopocentricDeclination   |   δ'   |    SPA    |     3.12.7     |   radians    |
      ------------------------------- -------- ----------- ---------------- --------------
+    |    moonTopocentricHourAngle   |   H'   |    MPA    |      3.12      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |   moonElevationAngleWithout   |   e0   |    MPA    |     3.13.1     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |   moonAtmosphericRefraction   |   Δe   |    MPA    |     3.13.2     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |      moonElevationAngle       |   e    |    MPA    |     3.13.3     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |        moonZenithAngle        |   θm   |    MPA    |     3.13.4     |   radians    
+     ------------------------------- -------- ----------- ---------------- --------------
+    |    moonAstronomersAzimuth     |   Γ    |    MPA    |     3.14.1     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |       moonAzimuthAngle        |   Φm   |    MPA    |     3.14.2     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |    sunTopocentricHourAngle    |   H'   |    SPA    |      3.13      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |    sunElevationAngleWithout   |   e0   |    SPA    |     3.14.1     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |    sunAtmosphericRefraction   |   Δe   |    SPA    |     3.14.2     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |       sunElevationAngle       |   e    |    SPA    |     3.14.3     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |         sunZenithAngle        |   θ    |    SPA    |     3.14.4     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |     sunAstronomersAzimuth     |   Γ    |    SPA    |     3.15.1     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |         sunAzimuthAngle       |   Φ    |    SPA    |     3.15.2     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |        sunIncidenceAngle      |   I    |    SPA    |      3.16      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
 '''
 
 
 class SampaComputer:
     __slots__ = '_registry'
 
-    def __init__(self, jd: JulianDate, geo = None):
+    def __init__(self, jd: JulianDate, geo=None):
         self._registry = {jd.value: Register(jd)}
-        self._registry[jd.value].geo = geo
-
-
 
 
 def _generate_times(jd: JulianDate):
@@ -440,13 +511,13 @@ def _mean_obliquity(JME):
     U = JME / 10
     return 0.4090928042223 + U \
         * (-0.022693789043 + U
-            * (-7.5146120571978e-6 + U
-                * (0.00969263751958 + U
-                    * (-0.00024909726935 + U
-                       * (-0.0012104343176 + U
-                          * (-0.00018931974247 + U
-                             * (3.4518734095e-5 + U
-                                * (0.0001351175729 + U * (2.80707121362e-5 + U * 1.187793518718e-5)))))))))
+           * (-7.5146120571978e-6 + U
+              * (0.00969263751958 + U
+                 * (-0.00024909726935 + U
+                    * (-0.0012104343176 + U
+                       * (-0.00018931974247 + U
+                          * (3.4518734095e-5 + U
+                             * (0.0001351175729 + U * (2.80707121362e-5 + U * 1.187793518718e-5)))))))))
 
 
 def _true_obliquity(meanObliquity, nutationObliquity):
@@ -537,7 +608,7 @@ def _spa_sum_expanded_table(table, JME):
     expandedTable = _spa_expand_tables(table, JME)
     rowSum = 0
     for power, i in enumerate(expandedTable):
-        rowSum += i * JME**power
+        rowSum += i * JME ** power
     return rowSum
 
 
@@ -580,6 +651,59 @@ def _spa_apparent_sun_longitude(geocentricLongitude, nutationLongitude, aberrati
 def _spa_equitorial_parallax_sun(sunDistance):
     # 3.12.1 (ksi), in radians
     return 0.15348425442038 / (3600 * sunDistance)
+
+
+def _topocentric_local_hour_angle(hourAngle, parallaxRightAscension):
+    # 3.12, 3.12.5 (H'), in radians
+    # todo: valid range here?
+    return hourAngle - parallaxRightAscension
+
+
+def _topocentric_elevation_angle_without(geoLatitude, topoDeclination, topoHourAngle):
+    # 3.13.1, 3.14.1 (e0), in radians
+    return asin(sin(geoLatitude)*sin(topoDeclination) + cos(geoLatitude)*cos(topoDeclination)*cos(topoHourAngle))
+
+
+def _atmospheric_refraction_correction(pressure, temperature, e0):
+    # 3.13.2, 3.14.2 (deltae), in radians
+    denominator = 60 * tan(e0 + (10.3 / (e0 + 5.11)))
+    return (pressure / 1010) * (283 / (273 + temperature)) * (0.01780235837034 / denominator)
+
+
+def _topocentric_elevation_angle(e0, atmosphericCorrection):
+    # 3.13.3, 3.14.3 (e), in radians
+    return e0 + atmosphericCorrection
+
+
+def _topocentric_zenith_angle(elevationAngle):
+    # 3.13.4, 3.14.4 (THETAm), in radians
+    return pi/2 - elevationAngle
+
+
+def _topocentric_astronomers_azimuth_angle(topoHourAngle, geoLatitude, topoDeclination):
+    # 3.14.1, 3.15.1 (GAMMA), in radians
+    return atan3(sin(topoHourAngle), cos(topoHourAngle)*sin(geoLatitude) - tan(topoDeclination)*cos(geoLatitude))
+
+
+def _topocentric_azimuth_angle(astronomersAngle):
+    # 3.14.2, 3.15.2 (PHIm), in radians
+    return (astronomersAngle + pi) % TWOPI
+
+
+def _spa_incidence_angle(zenithAngle, astronomersAzimuth, slopeSurface, surfaceAzimuth):
+    # 3.16 (I), in radians
+    return acos(cos(zenithAngle)*cos(slopeSurface)
+                + sin(slopeSurface)*sin(zenithAngle)*cos(astronomersAzimuth-surfaceAzimuth))
+
+
+def _equation_of_time(JME, sunRightAscension, nutationLongitude, nutationObliquity):
+    # A.1 (E), in radians
+    sunMeanLongitude = 4.895063110817 + JME \
+                       * (6283.3196674757 + JME
+                          * (0.000529188716 + JME
+                             * (3.49548226952e-7 + JME * (-1.1407380731989e-6 + JME * -8.726646259972e-9))))
+    E = sunMeanLongitude - 9.980316262e-5 - sunRightAscension + nutationLongitude * cos(nutationObliquity)
+    return E % TWOPI
 
 
 _SPA_L_TABLE = [
@@ -820,8 +944,6 @@ _X_TABLE = [
     [2.1824385855759, -33.757045936662394, 3.614227815029857e-05, 3.8785094488762875e-08]
 ]
 
-# todo: split this into _Y_TABLE and _NUTATION_TABLE
-
 _Y_TABLE = [
     [0, 0, 0, 0, 1],
     [-2, 0, 0, 2, 2],
@@ -954,78 +1076,6 @@ _NUTATION_TABLE = [
     [-3, 0, 0, 0]
 ]
 
-# _Nutation_Table = [
-#     [0, 0, 0, 0, 1, -171996, -174.2, 92025, 8.9],
-#     [-2, 0, 0, 2, 2, -13187, -1.6, 5736, -3.1],
-#     [0, 0, 0, 2, 2, -2274, -0.2, 977, -0.5],
-#     [0, 0, 0, 0, 2, 2062, 0.2, -895, 0.5],
-#     [0, 1, 0, 0, 0, 1426, -3.4, 54, -0.1],
-#     [0, 0, 1, 0, 0, 712, 0.1, -7, 0],
-#     [-2, 1, 0, 2, 2, -517, 1.2, 224, -0.6],
-#     [0, 0, 0, 2, 1, -386, -0.4, 200, 0],
-#     [0, 0, 1, 2, 2, -301, 0, 129, -0.1],
-#     [-2, -1, 0, 2, 2, 217, -0.5, -95, 0.3],
-#     [-2, 0, 1, 0, 0, -158, 0, 0, 0],
-#     [-2, 0, 0, 2, 1, 129, 0.1, -70, 0],
-#     [0, 0, -1, 2, 2, 123, 0, -53, 0],
-#     [2, 0, 0, 0, 0, 63, 0, 0, 0],
-#     [0, 0, 1, 0, 1, 63, 0.1, -33, 0],
-#     [2, 0, -1, 2, 2, -59, 0, 26, 0],
-#     [0, 0, -1, 0, 1, -58, -0.1, 32, 0],
-#     [0, 0, 1, 2, 1, -51, 0, 27, 0],
-#     [-2, 0, 2, 0, 0, 48, 0, 0, 0],
-#     [0, 0, -2, 2, 1, 46, 0, -24, 0],
-#     [2, 0, 0, 2, 2, -38, 0, 16, 0],
-#     [0, 0, 2, 2, 2, -31, 0, 13, 0],
-#     [0, 0, 2, 0, 0, 29, 0, 0, 0],
-#     [-2, 0, 1, 2, 2, 29, 0, -12, 0],
-#     [0, 0, 0, 2, 0, 26, 0, 0, 0],
-#     [-2, 0, 0, 2, 0, -22, 0, 0, 0],
-#     [0, 0, -1, 2, 1, 21, 0, -10, 0],
-#     [0, 2, 0, 0, 0, 17, -0.1, 0, 0],
-#     [2, 0, -1, 0, 1, 16, 0, -8, 0],
-#     [-2, 2, 0, 2, 2, -16, 0.1, 7, 0],
-#     [0, 1, 0, 0, 1, -15, 0, 9, 0],
-#     [-2, 0, 1, 0, 1, -13, 0, 7, 0],
-#     [0, -1, 0, 0, 1, -12, 0, 6, 0],
-#     [0, 0, 2, -2, 0, 11, 0, 0, 0],
-#     [2, 0, -1, 2, 1, -10, 0, 5, 0],
-#     [2, 0, 1, 2, 2, -8, 0, 3, 0],
-#     [0, 1, 0, 2, 2, 7, 0, -3, 0],
-#     [-2, 1, 1, 0, 0, -7, 0, 0, 0],
-#     [0, -1, 0, 2, 2, -7, 0, 3, 0],
-#     [2, 0, 0, 2, 1, -7, 0, 3, 0],
-#     [2, 0, 1, 0, 0, 6, 0, 0, 0],
-#     [-2, 0, 2, 2, 2, 6, 0, -3, 0],
-#     [-2, 0, 1, 2, 1, 6, 0, -3, 0],
-#     [2, 0, -2, 0, 1, -6, 0, 3, 0],
-#     [2, 0, 0, 0, 1, -6, 0, 3, 0],
-#     [0, -1, 1, 0, 0, 5, 0, 0, 0],
-#     [-2, -1, 0, 2, 1, -5, 0, 3, 0],
-#     [-2, 0, 0, 0, 1, -5, 0, 3, 0],
-#     [0, 0, 2, 2, 1, -5, 0, 3, 0],
-#     [-2, 0, 2, 0, 1, 4, 0, 0, 0],
-#     [-2, 1, 0, 2, 1, 4, 0, 0, 0],
-#     [0, 0, 1, -2, 0, 4, 0, 0, 0],
-#     [-1, 0, 1, 0, 0, -4, 0, 0, 0],
-#     [-2, 1, 0, 0, 0, -4, 0, 0, 0],
-#     [1, 0, 0, 0, 0, -4, 0, 0, 0],
-#     [0, 0, 1, 2, 0, 3, 0, 0, 0],
-#     [0, 0, -2, 2, 2, -3, 0, 0, 0],
-#     [-1, -1, 1, 0, 0, -3, 0, 0, 0],
-#     [0, 1, 1, 0, 0, -3, 0, 0, 0],
-#     [0, -1, 1, 2, 2, -3, 0, 0, 0],
-#     [2, -1, -1, 2, 2, -3, 0, 0, 0],
-#     [0, 0, 3, 2, 2, -3, 0, 0, 0],
-#     [2, -1, 0, 2, 2, -3, 0, 0, 0]
-# ]
-
-# _U_Table = [
-#     84381.448, -4680.93, -1.55, 1999.25,
-#     51.38, -249.67, -39.05, 7.12,
-#     27.87, 5.79, 2.45
-# ]
-
 _MPA_LR_TERM_TABLE = [
     # d m  m' f      l         r
     [0, 0, 1, 0, 6288774, -20905355],
@@ -1090,69 +1140,6 @@ _MPA_LR_TERM_TABLE = [
     [2, 0, -1, -2, 0, 8752]
 ]
 
-# _R_TERM_TABLE = [
-#     [0, 0, 0, 1, 5128122],
-#     [0, 0, 1, 1, 280602],
-#     [0, 0, 1, -1, 277693],
-#     [2, 0, 0, -1, 173237],
-#     [2, 0, -1, 1, 55413],
-#     [2, 0, -1, -1, 46271],
-#     [2, 0, 0, 1, 32573],
-#     [0, 0, 2, 1, 17198],
-#     [2, 0, 1, -1, 9266],
-#     [0, 0, 2, -1, 8822],
-#     [2, -1, 0, -1, 8216],
-#     [2, 0, -2, -1, 4324],
-#     [2, 0, 1, 1, 4200],
-#     [2, 1, 0, -1, -3359],
-#     [2, -1, -1, 1, 2463],
-#     [2, -1, 0, 1, 2211],
-#     [2, -1, -1, -1, 2065],
-#     [0, 1, -1, -1, -1870],
-#     [4, 0, -1, -1, 1828],
-#     [0, 1, 0, 1, -1794],
-#     [0, 0, 0, 3, -1749],
-#     [0, 1, -1, 1, -1565],
-#     [1, 0, 0, 1, -1491],
-#     [0, 1, 1, 1, -1475],
-#     [0, 1, 1, -1, -1410],
-#     [0, 1, 0, -1, -1344],
-#     [1, 0, 0, -1, -1335],
-#     [0, 0, 3, 1, 1107],
-#     [4, 0, 0, -1, 1021],
-#     [4, 0, -1, 1, 833],
-#     [0, 0, 1, -3, 777],
-#     [4, 0, -2, 1, 671],
-#     [2, 0, 0, -3, 607],
-#     [2, 0, 2, -1, 596],
-#     [2, -1, 1, -1, 491],
-#     [2, 0, -2, 1, -451],
-#     [0, 0, 3, -1, 439],
-#     [2, 0, 2, 1, 422],
-#     [2, 0, -3, -1, 421],
-#     [2, 1, -1, 1, -366],
-#     [2, 1, 0, 1, -351],
-#     [4, 0, 0, 1, 331],
-#     [2, -1, 1, 1, 315],
-#     [2, -2, 0, -1, 302],
-#     [0, 0, 1, 3, -283],
-#     [2, 1, 1, -1, -229],
-#     [1, 1, 0, -1, 223],
-#     [1, 1, 0, 1, 223],
-#     [0, 1, -2, -1, -220],
-#     [2, 1, -1, -1, -220],
-#     [1, 0, 1, 1, -185],
-#     [2, -1, -2, -1, 181],
-#     [0, 1, 2, 1, -177],
-#     [4, 0, -2, -1, 176],
-#     [4, -1, -1, -1, 166],
-#     [1, 0, 1, -1, -164],
-#     [4, 0, 1, -1, 132],
-#     [1, 0, -1, -1, -119],
-#     [4, -1, 0, -1, 115],
-#     [2, -2, 0, 1, 107]
-# ]
-
 _MPA_B_TERM_TABLE = [
     # d  m  m' f     b
     [0, 0, 0, 1, 5128122],
@@ -1216,83 +1203,3 @@ _MPA_B_TERM_TABLE = [
     [4, -1, 0, -1, 115],
     [2, -2, 0, 1, 107]
 ]
-
-# _XTable = [
-#     [297.85036, 445267.111480, -0.0019142, 1.0 / 189474.0],
-#     [357.527772, 35999.050340, -0.0001603, 1.0 / -300000.0],
-#     [134.96298, 477198.867398, 0.0086972, 1.0 / 56250.0],
-#     [93.27191, 483202.017538, -0.0036825, 1.0 / 327270.0],
-#     [125.04452, -1934.136261, 0.0020708, 1.0 / 450000.0]
-# ]
-#
-# _NutationTable = [
-#     [0, 0, 0, 0, 1, -171996, -174.2, 92025, 8.9],
-#     [-2, 0, 0, 2, 2, -13187, -1.6, 5736, -3.1],
-#     [0, 0, 0, 2, 2, -2274, -0.2, 977, -0.5],
-#     [0, 0, 0, 0, 2, 2062, 0.2, -895, 0.5],
-#     [0, 1, 0, 0, 0, 1426, -3.4, 54, -0.1],
-#     [0, 0, 1, 0, 0, 712, 0.1, -7, 0],
-#     [-2, 1, 0, 2, 2, -517, 1.2, 224, -0.6],
-#     [0, 0, 0, 2, 1, -386, -0.4, 200, 0],
-#     [0, 0, 1, 2, 2, -301, 0, 129, -0.1],
-#     [-2, -1, 0, 2, 2, 217, -0.5, -95, 0.3],
-#     [-2, 0, 1, 0, 0, -158, 0, 0, 0],
-#     [-2, 0, 0, 2, 1, 129, 0.1, -70, 0],
-#     [0, 0, -1, 2, 2, 123, 0, -53, 0],
-#     [2, 0, 0, 0, 0, 63, 0, 0, 0],
-#     [0, 0, 1, 0, 1, 63, 0.1, -33, 0],
-#     [2, 0, -1, 2, 2, -59, 0, 26, 0],
-#     [0, 0, -1, 0, 1, -58, -0.1, 32, 0],
-#     [0, 0, 1, 2, 1, -51, 0, 27, 0],
-#     [-2, 0, 2, 0, 0, 48, 0, 0, 0],
-#     [0, 0, -2, 2, 1, 46, 0, -24, 0],
-#     [2, 0, 0, 2, 2, -38, 0, 16, 0],
-#     [0, 0, 2, 2, 2, -31, 0, 13, 0],
-#     [0, 0, 2, 0, 0, 29, 0, 0, 0],
-#     [-2, 0, 1, 2, 2, 29, 0, -12, 0],
-#     [0, 0, 0, 2, 0, 26, 0, 0, 0],
-#     [-2, 0, 0, 2, 0, -22, 0, 0, 0],
-#     [0, 0, -1, 2, 1, 21, 0, -10, 0],
-#     [0, 2, 0, 0, 0, 17, -0.1, 0, 0],
-#     [2, 0, -1, 0, 1, 16, 0, -8, 0],
-#     [-2, 2, 0, 2, 2, -16, 0.1, 7, 0],
-#     [0, 1, 0, 0, 1, -15, 0, 9, 0],
-#     [-2, 0, 1, 0, 1, -13, 0, 7, 0],
-#     [0, -1, 0, 0, 1, -12, 0, 6, 0],
-#     [0, 0, 2, -2, 0, 11, 0, 0, 0],
-#     [2, 0, -1, 2, 1, -10, 0, 5, 0],
-#     [2, 0, 1, 2, 2, -8, 0, 3, 0],
-#     [0, 1, 0, 2, 2, 7, 0, -3, 0],
-#     [-2, 1, 1, 0, 0, -7, 0, 0, 0],
-#     [0, -1, 0, 2, 2, -7, 0, 3, 0],
-#     [2, 0, 0, 2, 1, -7, 0, 3, 0],
-#     [2, 0, 1, 0, 0, 6, 0, 0, 0],
-#     [-2, 0, 2, 2, 2, 6, 0, -3, 0],
-#     [-2, 0, 1, 2, 1, 6, 0, -3, 0],
-#     [2, 0, -2, 0, 1, -6, 0, 3, 0],
-#     [2, 0, 0, 0, 1, -6, 0, 3, 0],
-#     [0, -1, 1, 0, 0, 5, 0, 0, 0],
-#     [-2, -1, 0, 2, 1, -5, 0, 3, 0],
-#     [-2, 0, 0, 0, 1, -5, 0, 3, 0],
-#     [0, 0, 2, 2, 1, -5, 0, 3, 0],
-#     [-2, 0, 2, 0, 1, 4, 0, 0, 0],
-#     [-2, 1, 0, 2, 1, 4, 0, 0, 0],
-#     [0, 0, 1, -2, 0, 4, 0, 0, 0],
-#     [-1, 0, 1, 0, 0, -4, 0, 0, 0],
-#     [-2, 1, 0, 0, 0, -4, 0, 0, 0],
-#     [1, 0, 0, 0, 0, -4, 0, 0, 0],
-#     [0, 0, 1, 2, 0, 3, 0, 0, 0],
-#     [0, 0, -2, 2, 2, -3, 0, 0, 0],
-#     [-1, -1, 1, 0, 0, -3, 0, 0, 0],
-#     [0, 1, 1, 0, 0, -3, 0, 0, 0],
-#     [0, -1, 1, 2, 2, -3, 0, 0, 0],
-#     [2, -1, -1, 2, 2, -3, 0, 0, 0],
-#     [0, 0, 3, 2, 2, -3, 0, 0, 0],
-#     [2, -1, 0, 2, 2, -3, 0, 0, 0]
-# ]
-#
-# _UTable = [
-#     84381.448, -4680.93, -1.55, 1999.25,
-#     51.38, -249.67, -39.05, 7.12,
-#     27.87, 5.79, 2.45
-# ]
