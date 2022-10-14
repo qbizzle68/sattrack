@@ -324,14 +324,199 @@ class RegisterTopocentric(Register):
      ------------------------------- -------- ----------- ---------------- --------------
     |        sunIncidenceAngle      |   I    |    SPA    |      3.16      |   radians    |
      ------------------------------- -------- ----------- ---------------- --------------
+    |         equationOfTime        |   E    |    SPA    |       A.1      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
 '''
 
 
 class SampaComputer:
     __slots__ = '_registry'
 
-    def __init__(self, jd: JulianDate, geo=None):
-        self._registry = {jd.value: Register(jd)}
+    def __init__(self, jd: JulianDate = None):
+        if not isinstance(jd, JulianDate):
+            raise TypeError('jd parameter must be a JulianDate type')
+
+        if jd is None:
+            self._registry = {}
+        else:
+            self._registry = {jd: Register(jd)}
+
+    def __call__(self, jd: JulianDate, variableStr: str):
+        if not isinstance(jd, JulianDate):
+            raise TypeError('jd parameter must be a JulianDate type')
+
+        if jd not in self._registry:
+            self._registry[jd] = Register(jd)
+
+        return self._registry[jd][variableStr]
+
+    def __len__(self):
+        return len(self._registry)
+
+    def clear(self, jd = None):
+        if jd is not None and _check_jd(jd):
+            if jd in self._registry:
+                self._registry.pop(jd)
+        else:
+            self._registry = {}
+
+    # broad getters here (position, rise/set time)
+
+    def nutationLongitude(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'nutationLongitude')
+
+    def nutationObliquity(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'nutationObliquity')
+
+    def meanObliquity(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'meanObliquity')
+
+    def trueObliquity(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'trueObliquity')
+
+    def meanSiderealTime(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'meanSiderealTime')
+
+    def apparentSiderealTime(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'apparentSiderealTime')
+
+    def moonLongitude(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'moonLongitude')
+
+    def moonLatitude(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'moonLatitude')
+
+    def moonDistance(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'moonDistance')
+
+    def moonParallax(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'moonParallax')
+
+    def moonApparentLongitude(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'apparentMoonLongitude')
+
+    def moonRightAscension(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'moonRightAscension')
+
+    def moonDeclination(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'moonDeclination')
+
+    def sunDistance(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunDistance')
+
+    def sunLongitude(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunLongitude')
+
+    def sunLatitude(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunLatitude')
+
+    def sunAberrationCorrection(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunAberrationCorrection')
+
+    def sunRightAscension(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunRightAscension')
+
+    def sunDeclination(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunDeclination')
+
+    def sunParallax(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunParallax')
+
+    def equationOfTime(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'equationOfTime')
+
+
+class SampaTopocentricComputer(SampaComputer):
+    __slots__ = '_geo'
+
+    def __init__(self, geo: GeoPosition, jd: JulianDate = None):
+        if not isinstance(geo, GeoPosition):
+            raise TypeError('geo parameter must be GeoPosition type')
+        self._geo = geo
+        super().__init__(jd)
+        if jd is not None:
+            self._registry = {jd: RegisterTopocentric(jd, geo)}
+
+    def moonLocalHourAngle(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'moonLocalHourAngle')
+
+    def moonTopocentricRightAscension(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'moonTopocentricRightAscension')
+
+    def moonTopocentricDeclination(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'moonTopocentricDeclination')
+
+    def moonTopocentricHourAngle(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'moonTopocentricHourAngle')
+
+    def moonElevationAngle(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'moonElevationAngle')
+
+    def moonZenithAngle(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'moonZenithAngle')
+
+    def moonAzimuthAngle(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'moonAzimuthAngle')
+
+    def sunLocalHourAngle(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunLocalHourAngle')
+
+    def sunTopocentricRightAscension(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunTopocentricRightAscension')
+
+    def sunTopocentricDeclination(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunTopocentricDeclination')
+
+    def sunTopocentricHourAngle(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunTopocentricHourAngle')
+
+    def sunElevationAngle(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunElevationAngle')
+
+    def sunZenithAngle(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunZenithAngle')
+
+    def sunAzimuthAngle(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunAzimuthAngle')
+
+    def sunIncidenceAngle(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunIncidenceAngle')
 
 
 def _generate_times(jd: JulianDate):
@@ -340,6 +525,12 @@ def _generate_times(jd: JulianDate):
     JC = Constant((JD.value - 2451545) / 36525)
     JCE = Constant((JDE.value - 2451545) / 36525)
     return JD, JDE, JC, JCE, Constant(JCE.value / 10)
+
+
+def _check_jd(jd):
+    if not isinstance(jd, JulianDate):
+        raise TypeError('jd parameter must be JulianDate type')
+    return True
 
 
 def _mpa_moon_mean_longitude(JCE):
