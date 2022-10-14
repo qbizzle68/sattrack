@@ -1,8 +1,10 @@
-from math import sin, cos, radians, atan2, tan, asin, atan, pi, acos
+from math import sin, cos, radians, atan2, tan, asin, atan, pi, acos, sqrt, degrees
+
+from pyevspace import EVector
 
 from sattrack.spacetime.juliandate import JulianDate
-from sattrack.structures.coordinates import GeoPosition
-from sattrack.util.constants import TWOPI
+from sattrack.structures.coordinates import GeoPosition, CelestialCoordinates
+from sattrack.util.constants import TWOPI, AU
 from sattrack.util.conversions import atan3
 
 DELTAT = 72.6
@@ -333,7 +335,7 @@ class SampaComputer:
     __slots__ = '_registry'
 
     def __init__(self, jd: JulianDate = None):
-        if not isinstance(jd, JulianDate):
+        if jd is not None and not isinstance(jd, JulianDate):
             raise TypeError('jd parameter must be a JulianDate type')
 
         if jd is None:
@@ -353,12 +355,45 @@ class SampaComputer:
     def __len__(self):
         return len(self._registry)
 
-    def clear(self, jd = None):
+    def clear(self, jd=None):
         if jd is not None and _check_jd(jd):
             if jd in self._registry:
                 self._registry.pop(jd)
         else:
             self._registry = {}
+
+    def getSunPosition(self, jd: JulianDate):
+        _check_jd(jd)
+        rightAscension = self.__call__(jd, 'sunRightAscension')
+        declination = self.__call__(jd, 'sunDeclination')
+        sunDistance = self.__call__(jd, 'sunDistance')
+
+        zComp = sin(declination)
+        xComp = sqrt((cos(declination) ** 2) / (1 + (tan(rightAscension) ** 2)))
+        if pi / 2 < rightAscension < 3 * pi / 2:
+            xComp = -xComp
+        yComp = xComp * tan(rightAscension)
+        yComp = abs(yComp) if rightAscension < pi else -abs(yComp)
+
+        return EVector(xComp, yComp, zComp) * sunDistance * AU
+
+    def getSunCoordinates(self, jd: JulianDate):
+        _check_jd(jd)
+        rightAscension = self.__call__(jd, 'sunRightAscension') * 12 / pi
+        declination = degrees(self.__call__(jd, 'sunDeclination'))
+        return CelestialCoordinates(rightAscension, declination)
+
+    def getSunTopocentricCoordinates(self, jd: JulianDate):
+        _check_jd(jd)
+        toposRightAscension = self.__call__(jd, 'sunTopocentricRightAscension') * 12 / pi
+        toposDeclination = degrees(self.__call__(jd, 'sunTopocentricDeclination'))
+        return CelestialCoordinates(toposRightAscension, toposDeclination)
+
+    def getSunPositionTimes(self, jd: JulianDate, target=None):
+        pass
+
+    def getPrecisePositionTimes(self, jd: JulianDate, target=None, epsilon=1e-5):
+        pass
 
     # broad getters here (position, rise/set time)
 
