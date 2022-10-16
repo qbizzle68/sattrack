@@ -14,4 +14,4 @@ from sattrack.exceptions import *
 from sattrack.satpass import *
 from sattrack.sun import *
 from sattrack.topos import *
-from sattrack.sampa import *
+from sattrack.sampa_funcs import *
