@@ -1,192 +1,411 @@
 from math import acos
+from operator import index
+from typing import Union
 
 from numpy import arange
 from pyevspace import norm, dot
 
-from sattrack.rotation.order import ZXZ
-from sattrack.rotation.rotation import rotateOrderTo
-from sattrack.satpass import nextPassMax, PassController
-from sattrack.structures.coordinates import *
-from sattrack.structures.elements import OrbitalElements
-from sattrack.structures.satellite import Satellite
-from sattrack.structures.tle import *
-from sattrack.sun import getSunPosition, SunPositionController2, getSunCoordinates, getSunAltAz
-from sattrack.topos import getAltitude
-from sattrack.util.anomalies import trueToMean
-from sattrack.util.constants import SUN_RADIUS, TWOPI
-from sattrack.util.conversions import smaToMeanMotion
+from sattrack.api import *
 
-from sattrack.spacetime.juliandate import now
-from sattrack.structures.tle import getTle
-
-tle = getTle('zarya')
+# tle = getTle('zarya')
 # tle = TwoLineElement("""ISS (ZARYA)
 # 1 25544U 98067A   22266.84431519  .00008111  00000+0  14870-3 0  9996
 # 2 25544  51.6423 207.8056 0002412 286.8120 181.5821 15.50238875360488""")
-# tleStr = """STARLINK-1332
-# 1 45579U 20025BA  22267.40990775  .00000340  00000+0  41736-4 0  9990
-# 2 45579  53.0552 303.3671 0001112  89.5038 270.6079 15.06396587135812"""
 # tle = TwoLineElement(tleStr)
-time = JulianDate(9, 25, 2022, 11, 47, 15.468)
-iss = Satellite(tle)
+# iss = Satellite(tle)
+from sattrack.util.anomalies import timeToNextTrueAnomaly
+
 jd = now()
 geo = GeoPosition(38.0608, -97.9298)
-pc = PassController(iss, geo, jd)
-np = pc.getNextPass()
-plist = pc.getPassList(2)
+# pc = PassController(iss, geo, jd)
+# np = pc.getNextPass()
+# plist = pc.getPassList(2)
 # elements = OrbitalElements.fromTle(tle, jd)
 
-# def foo(time: JulianDate):
-#     tzOffset = time.getTimeZone() / 24.0
-#     localVal = time.value() + tzOffset
-#     if localVal - int(localVal) < 0.5:
-#         # num = (int(localVal) - 0.5)
-#         num = int(localVal) - 1
-#     # elif localVal - int(localVal) > 0.5:
-#     else:
-#         # num = (int(localVal) + 0.5)
-#         num = int(localVal)
-#     return JulianDate.fromNumber(num, 0.5 - tzOffset, time.getTimeZone())
-#
-# time = JulianDate(10, 2, 2022, 0, 0, 0, -5)
-# target = -0.8333333333
-# DELTAT = 72.6
-#
-# sc = SunPositionController2(time, geo)
-# # figure the details here later, for now use middle of the day, not noon
-# # A.2.1
-# # jd = JulianDate.fromNumber(time.number())
-# jd = time
-# v = sc.getApparentSiderealTime()
-# # A.2.2
-# dt = DELTAT / 86400.0
-# time_m1 = jd.future(dt - 1)
-# time_0 = jd.future(dt)
-# time_p1 = jd.future(dt + 1)
-# # alpha_m1 = sc.getSolarRightAscension(time_m1)
-# # alpha_0 = sc.getSolarRightAscension(time_0)
-# # alpha_p1 = sc.getSolarRightAscension(time_p1)
-# # delta_m1 = sc.getSolarDeclination(time_m1)
-# # delta_0 = sc.getSolarDeclination(time_0)
-# # delta_p1 = sc.getSolarDeclination(time_p1)
-# m1vals = getSunCoordinates(time_m1)
-# alpha_m1 = m1vals[0] * pi / 12.0
-# delta_m1 = m1vals[1] * pi / 180.0
-# vals0 = getSunCoordinates(time_0)
-# alpha_0 = vals0[0] * pi / 12.0
-# delta_0 = vals0[1] * pi / 180.0
-# p1vals = getSunCoordinates(time_p1)
-# alpha_p1 = p1vals[0] * pi / 12.0
-# delta_p1 = p1vals[1] * pi / 180.0
-# # A.2.3
-# sigma = radians(geo.longitude)
-# m0 = (alpha_0 - sigma - v) / TWOPI
-# # A.2.4
-# hp0 = radians(target)
-# phi = radians(geo.latitude)
-# H0 = acos((sin(hp0) - sin(phi)*sin(delta_0)) / (cos(phi) * cos(delta_0))) % pi
-# # A.2.5
-# m1 = (m0 - (H0 / TWOPI)) % 1.0
-# # A.2.6
-# m2 = (m0 + (H0 / TWOPI)) % 1.0
-# # A.2.8
-# v0 = v + radians(360.985647) * m0
-# v1 = v + radians(360.985647) * m1
-# v2 = v + radians(360.985647) * m2
-# # A.2.9
-# n0 = m0 + dt
-# n1 = m1 + dt
-# n2 = m2 + dt
-# # A.2.10
-# a = degrees(alpha_0 - alpha_m1)
-# if abs(a) > 2:
-#     a %= 1.0
-# a = radians(a)
-# b = degrees(alpha_p1 - alpha_0)
-# if abs(b) > 2:
-#     b %= 1.0
-# b = radians(b)
-# ap = degrees(delta_0 - delta_m1)
-# if abs(ap) > 2:
-#     ap %= 1.0
-# ap = radians(ap)
-# bp = degrees(delta_p1 - delta_0)
-# if abs(bp) > 2:
-#     bp %= 1.0
-# bp = radians(bp)
-# c = b - a
-# cp = bp - ap
-# alphap0 = alpha_0 + ((n0 * (a + b + c * n0)) / 2.0)
-# alphap1 = alpha_0 + ((n1 * (a + b + c * n1)) / 2.0)
-# alphap2 = alpha_0 + ((n2 * (a + b + c * n2)) / 2.0)
-# deltap0 = delta_0 + ((n0 * (ap + bp + cp * n0)) / 2.0)
-# deltap1 = delta_0 + ((n1 * (ap + bp + cp * n1)) / 2.0)
-# deltap2 = delta_0 + ((n2 * (ap + bp + cp * n2)) / 2.0)
-# # A.2.11
-# Hp0 = (v0 + sigma - alphap0) % TWOPI
-# if Hp0 >= pi:
-#     Hp0 += -TWOPI
-# Hp1 = (v1 + sigma - alphap1) % TWOPI
-# if Hp1 >= pi:
-#     Hp1 += -TWOPI
-# Hp2 = (v2 + sigma - alphap2) % TWOPI
-# if Hp2 >= pi:
-#     Hp2 += -TWOPI
-# # A.2.12
-# h0 = asin(sin(phi)*sin(deltap0) + cos(phi)*cos(deltap0)*cos(Hp0)) # sun altitude at transit time
-# h1 = asin(sin(phi)*sin(deltap1) + cos(phi)*cos(deltap1)*cos(Hp1))
-# h2 = asin(sin(phi)*sin(deltap2) + cos(phi)*cos(deltap2)*cos(Hp2))
-# # A.2.13
-# T = m0 - (Hp0 / TWOPI)
-# # A.2.14
-# R = m1 + ((h1 - hp0) / (TWOPI*cos(deltap1)*cos(phi)*sin(Hp1)))
-# # A.2.15
-# S = m2 + ((h2 - hp0) / (TWOPI*cos(deltap2)*cos(phi)*sin(Hp2)))
-#
-# # riseAltAz = getSunAltAz(time.future(R), geo)
-# # count = 0
-# # while abs(riseAltAz[0]-hp0) > 1e-5:
-# #     print('count:', count)
-# #     print('riseAlt:', riseAltAz[0])
-# #     print('riseTime:', time.future(R))
-# #
-# #     # try setting this to T +/- H0/TWOPI
-# #     m0 = T
-# #     m1 = R
-# #     m2 = S
-# #
-# #     v0 = v + radians(360.985647) * m0
-# #     v1 = v + radians(360.985647) * m1
-# #     v2 = v + radians(360.985647) * m2
-# #
-# #     n0 = m0 + dt
-# #     n1 = m1 + dt
-# #     n2 = m2 + dt
-# #
-# #     alphap0 = alpha_0 + ((n0 * (a + b + c * n0)) / 2.0)
-# #     alphap1 = alpha_0 + ((n1 * (a + b + c * n1)) / 2.0)
-# #     alphap2 = alpha_0 + ((n2 * (a + b + c * n2)) / 2.0)
-# #     deltap0 = delta_0 + ((n0 * (ap + bp + cp * n0)) / 2.0)
-# #     deltap1 = delta_0 + ((n1 * (ap + bp + cp * n1)) / 2.0)
-# #     deltap2 = delta_0 + ((n2 * (ap + bp + cp * n2)) / 2.0)
-# #
-# #     Hp0 = (v0 + sigma - alphap0) % TWOPI
-# #     if Hp0 >= pi:
-# #         Hp0 += -TWOPI
-# #     Hp1 = (v1 + sigma - alphap1) % TWOPI
-# #     if Hp1 >= pi:
-# #         Hp1 += -TWOPI
-# #     Hp2 = (v2 + sigma - alphap2) % TWOPI
-# #     if Hp2 >= pi:
-# #         Hp2 += -TWOPI
-# #
-# #     h0 = asin(sin(phi) * sin(deltap0) + cos(phi) * cos(deltap0) * cos(Hp0))  # sun altitude at transit time
-# #     h1 = asin(sin(phi) * sin(deltap1) + cos(phi) * cos(deltap1) * cos(Hp1))
-# #     h2 = asin(sin(phi) * sin(deltap2) + cos(phi) * cos(deltap2) * cos(Hp2))
-# #
-# #     T = m0 - (Hp0 / TWOPI)
-# #     R = m1 + ((h1 - hp0) / (TWOPI * cos(deltap1) * cos(phi) * sin(Hp1)))
-# #     S = m2 + ((h2 - hp0) / (TWOPI * cos(deltap2) * cos(phi) * sin(Hp2)))
-# #
-# #     count += 1
-# #     riseAltAz = getSunAltAz(time.future(R), geo)
+def __compute_s_vector(sunPosition: EVector, raan: float, inclination: float, aop: float) -> EVector:
+    S = -norm(sunPosition)
+    return rotateOrderTo(ZXZ, EulerAngles(raan, inclination, aop), S)
+
+def __compute_gamma(sVector: EVector) -> float:
+    return atan2(sVector[1], -sVector[0])
+
+Shadow = Union[int]
+UMBRA = Shadow(0)
+PENUMBRA = Shadow(1)
+
+# todo: make a better name for this
+EnterExit = Union[int]
+ENTER = EnterExit(0)
+EXIT = EnterExit(1)
+
+def __escobal_method(R: float, sVector: EVector, phi: float, zeta: float, sma: float, ecc: float, shadow: Shadow) -> float:
+    eTerm = 1 + ecc * cos(phi)
+    aTerm = sma * (1 - ecc * ecc)
+    sTerm = -sVector[0] * cos(phi) - sVector[1] * sin(phi)
+
+    term1 = R * R * eTerm * eTerm
+    term2 = aTerm * aTerm * sTerm * sTerm
+    term3 = aTerm * aTerm * cos(zeta) * cos(zeta)
+    term4 = 2 * aTerm * R * sTerm * eTerm * sin(zeta)
+
+    if shadow is PENUMBRA:
+        term4 *= -1
+
+    return term1 + term2 - term3 + term4
+
+def __escobal_method_derivative(R: float, sVector: EVector, phi: float, zeta: float, sma: float, ecc: float, shadow: Shadow) -> float:
+    eTerm = 1 + ecc * cos(phi)
+    aTerm = sma * (1 - ecc * ecc)
+    sTerm = -sVector[0] * cos(phi) - sVector[1] * sin(phi)
+    eTermPrime = -ecc * sin(phi)
+    sTermPrime = sVector[0] * sin(phi) - sVector[1] * cos(phi)
+
+    term1 = 2 * R * R * eTerm * eTermPrime
+    term2 = 2 * aTerm * aTerm * sTerm * sTermPrime
+    term4 = 2 * R * aTerm * sin(zeta) * (sTerm * eTermPrime + sTermPrime * eTerm)
+
+    if shadow is PENUMBRA:
+        term4 *= -1
+
+    return term1 + term2 + term4
+
+# todo: geosynchronous satellites that are in sunlight during opposition don't have zeros to this method, need to check
+#  and make an exception for them
+def __find_zero_newton(R, sVector, guess, zeta, sma, ecc, shadow, epsilon = 1e-5):
+    phi = guess
+    gi = __escobal_method(R, sVector, phi, zeta, sma, ecc, shadow)
+    while abs(gi) > epsilon:
+        phi = phi - (gi / __escobal_method_derivative(R, sVector, phi, zeta, sma, ecc, shadow))
+        gi = __escobal_method(R, sVector, phi, zeta, sma, ecc, shadow)
+    return phi % TWOPI
+
+def __find_fast_zero(R, sVector, gamma, zeta, sma, ecc, shadow, enterOrExit, epsilon = 1e-5):
+    if index(enterOrExit) is ENTER:
+        return __find_zero_newton(R, sVector, 3*pi/4 - gamma, zeta, sma, ecc, shadow, epsilon)
+    elif index(enterOrExit) is EXIT:
+        return __find_zero_newton(R, sVector, 5*pi/4 - gamma, zeta, sma, ecc, shadow, epsilon)
+    else:
+        raise ValueError('enterOrExit parameter value must be ENTER or EXIT')
+
+def __find_certain_zeros(R, sVector, zeta, sma, ecc, shadow, epsilon = 1e-5):
+    zeros = []
+    frac = 0.5
+    while len(zeros) < 4:
+        guesses = [i * pi * frac for i in range(int(2 / frac))]
+        computed = [__find_zero_newton(R, sVector, guess, zeta, sma, ecc, shadow, epsilon) for guess in guesses]
+        # round to the place of an epsilon value to compare equivalent floating values
+        rounded = {round(c*1e5)/1e5 for c in computed}
+        zeros.clear()
+        for phi in computed:
+            roundedPhi = round(phi*1e5)/1e5
+            if roundedPhi in rounded:
+                zeros.append(phi)
+                rounded.remove(roundedPhi)
+        frac /= 2
+    return zeros
+
+def __check_zero(phi, sVector):
+    return (sVector[0] * cos(phi) + sVector[1] * sin(phi)) > 0
+
+def __check_range(psi, enterOrExit):
+    return (enterOrExit is ENTER and pi/2 <= psi <= pi) or (enterOrExit is EXIT and pi <= psi <= 3*pi/2)
+
+def _get_zero(R, sVector, zeta, sma, ecc, shadow, enterOrExit, *, guess=None, epsilon=1e-5):
+    # if guess is set use it first, then try __find_fast_zero, then use __find_certain_zeros
+    gamma = __compute_gamma(sVector)
+    if guess is not None:
+        phi = __find_zero_newton(R, sVector, guess, zeta, sma, ecc, shadow)
+        if __check_zero(phi, sVector):
+            psi = (gamma + phi) % TWOPI
+            # if (enterOrExit is ENTER and pi/2 <= psi <= pi) or (enterOrExit is EXIT and pi >= psi >= 3*pi/2):
+            if __check_range(psi, enterOrExit):
+                return phi
+    phi = __find_fast_zero(R, sVector, gamma, zeta, sma, ecc, shadow, enterOrExit, epsilon)
+    if __check_zero(phi, sVector):
+        psi = (gamma + phi) % TWOPI
+        # if (enterOrExit is ENTER and phi <= pi) or (enterOrExit is EXIT and phi >= pi):
+        if __check_range(psi, enterOrExit):
+            return phi
+    zeros = __find_certain_zeros(R, sVector, zeta, sma, ecc, shadow, epsilon)
+    for phi in zeros:
+        if __check_zero(phi, sVector):
+            psi = (gamma + phi) % TWOPI
+            # if (enterOrExit is ENTER and phi <= pi) or (enterOrExit is EXIT and phi >= pi):
+            if __check_range(psi, enterOrExit):
+                return phi
+    # todo: make this a custom exception type
+    raise Exception('unable to find a valid zero')
+
+def __get_radius_z_comp(sVector, sma, ecc, inc, aop, phi):
+    term1 = (sma * (1 - ecc*ecc)) / (1 + ecc * cos(phi))
+    term2 = sin(aop) * sin(inc) * cos(phi)
+    term3 = cos(aop) * sin(inc) * sin(phi)
+    term4 = sVector[2] * (sVector[0] * cos(phi) + sVector[1] * sin(phi))
+    return term1 * (term2 + term3 - term4)
+
+def __get_latitude_term(Rz):
+    ae = EARTH_EQUITORIAL_RADIUS
+    # f = EARTH_FLATTENING
+    # fTerm = -f * (2 -f)
+    # -f * (2 - f) where f is EARTH_FLATTENING
+    fTerm = -0.006694317778266723
+    aeTerm = ae * ae * (1 + fTerm)
+    return (aeTerm - Rz * Rz) / (aeTerm + (Rz * Rz * fTerm))
+
+def __get_radius_from_latitude(latitudeTerm):
+    ae = EARTH_EQUITORIAL_RADIUS
+    # f = EARTH_FLATTENING
+    # fTerm = f * (2 - f)
+    # f * (2 - f) where f is EARTH_FLATTENING
+    fTerm = 0.006694317778266723
+    return (ae * sqrt(1 - fTerm)) / sqrt(1 - fTerm * latitudeTerm)
+
+def __get_aperture_angle(rs, Re, shadow):
+    if shadow is UMBRA:
+        cosZeta = sqrt(rs * rs - (SUN_RADIUS - Re) ** 2) / rs
+    elif shadow is PENUMBRA:
+        cosZeta = sqrt(rs * rs - (SUN_RADIUS + Re) ** 2) / rs
+    else:
+        raise ValueError('shadow parameter must be either UMBRA or PENUMBRA')
+    return acos(cosZeta)
+
+def __get_refraction_angle(altitudeAngle):
+    numerator = 0.009928887226387075 + altitudeAngle * (0.06995 + altitudeAngle * 0.004087098938599872)
+    denominator = 1 + altitudeAngle * (28.934368654106574 + altitudeAngle * 277.39713657599236)
+    return numerator / denominator
+
+def __get_corrected_refraction_angle(rs, Re, shadow):
+    semiApertureAngle = __get_aperture_angle(rs, Re, shadow)
+    refractionAngle = __get_refraction_angle(semiApertureAngle)
+    if shadow is UMBRA:
+        correctedAngle = semiApertureAngle + refractionAngle
+    elif shadow is PENUMBRA:
+        correctedAngle = refractionAngle - semiApertureAngle
+    else:
+        raise ValueError('shadow parameter must be either UMBRA or PENUMBRA')
+    return correctedAngle
+
+# todo: make the sat parameter an object that an OrbitalElements object can be derived from
+# idea behind the interface, use an orbitable object as the parameter instead of a TLE, so we can
+# compute values from objects not constructed by a tle
+def _get_shadow_anomaly(jd: JulianDate, sat: Satellite, shadow: Shadow, zeroEpsilon=1e-5,
+                        radiusEpsilon=1e-5) -> (float, JulianDate):
+    Re = 6371 # average radius of the earth
+    tle = sat.getTle()
+    time = jd
+    sunPosition = getSunPosition(time)
+    elements = OrbitalElements.fromTle(tle, time)
+    sVector = __compute_s_vector(sunPosition, elements.raan, elements.inc, elements.aop)
+    apertureAngle = __get_corrected_refraction_angle(sunPosition.mag(), Re, shadow)
+
+    phi0 = elements.trueAnomalyAt(jd)
+    approxPhi1 = _get_zero(Re, sVector, apertureAngle, elements.sma, elements.ecc, shadow, ENTER, epsilon=zeroEpsilon)
+    approxPhi2 = _get_zero(Re, sVector, apertureAngle, elements.sma, elements.ecc, shadow, EXIT, epsilon=zeroEpsilon)
+
+    # maximum difference between the ranges of Re seems to be about 0.015, so take a very conservative value of 0.1 rad
+    errorBuffer = 0.1
+    # were close enough to the exit we don't know if we're before or after it with errors
+    if (abs(phi0 - approxPhi2) < errorBuffer) or (abs(phi0 + TWOPI - approxPhi2) < errorBuffer) \
+            or (abs(approxPhi2 + TWOPI - phi0) < errorBuffer):
+        dt = (jd - elements.timeToPrevTrueAnomaly(approxPhi1, jd)) / 2
+        referenceTime = jd.future(-dt)
+    else:
+        phi2Time = elements.timeToNextTrueAnomaly(approxPhi2, jd)
+        phi1Time = elements.timeToPrevTrueAnomaly(approxPhi1, phi2Time)
+        dt = (phi2Time - phi1Time) / 2
+        referenceTime = phi1Time.future(dt)
+
+    enterPhi, enterTime = __compute_anomaly_loop(jd, referenceTime, sat, shadow, ENTER, zeroEpsilon, radiusEpsilon)
+    exitPhi, exitTime = __compute_anomaly_loop(jd, referenceTime, sat, shadow, EXIT, zeroEpsilon, radiusEpsilon)
+
+    if enterTime < exitTime < jd:
+        gamma = __compute_gamma(sVector)
+        # todo: make sure this is at conjunction
+        updatedJd = elements.timeToNextTrueAnomaly(gamma, jd)
+        return _get_shadow_anomaly(updatedJd, sat, shadow, zeroEpsilon)
+
+    return (enterPhi, enterTime), (exitPhi, exitTime)
+
+def __compute_anomaly_loop(startTime, referenceTime, sat, shadow, enterOrExit, zeroEpsilon=1e-5,
+                           radiusEpsilon=1e-5):
+    Re = 6371
+    tle = sat.getTle()
+    time = startTime
+    sunPosition = getSunPosition(time)
+    elements = OrbitalElements.fromTle(tle, time)
+    sVector = __compute_s_vector(sunPosition, elements.raan, elements.inc, elements.aop)
+
+    # need a do-while structure here
+    while True:
+        apertureAngle = __get_corrected_refraction_angle(sunPosition.mag(), Re, shadow)
+        phi = _get_zero(Re, sVector, apertureAngle, elements.sma, elements.ecc, shadow, enterOrExit, epsilon=zeroEpsilon)
+        if enterOrExit is ENTER:
+            time = elements.timeToPrevTrueAnomaly(phi, referenceTime)
+        elif enterOrExit is EXIT:
+            time = elements.timeToNextTrueAnomaly(phi, referenceTime)
+        elements = OrbitalElements.fromTle(tle, time)
+        sunPosition = getSunPosition(time)
+        sVector = __compute_s_vector(sunPosition, elements.raan, elements.inc, elements.aop)
+        Rz = __get_radius_z_comp(sVector, elements.sma, elements.ecc, elements.inc, elements.aop, phi)
+        latitudeTerm = __get_latitude_term(Rz)
+        previousRe = Re
+        Re = __get_radius_from_latitude(latitudeTerm)
+        if (abs(Re - previousRe) > radiusEpsilon):
+            break
+
+    return phi, time
+
+if __name__ == "__main__":
+    starlink_numbers = [
+        1007, 1011, 1022, 1029,
+        1073, 1071, 1110, 1085,
+        1132, 1141, 1173, 1138,
+        1201, 1234, 1279, 1301,
+        1306, 1294, 1346, 1332,
+        1441, 1393, 1461, 1475,
+        1391, 1523, 1524, 1515,
+        1585, 1588, 1654, 1686,
+        1550, 1644, 1687, 1774
+    ]
+    R = 6371
+    zeta = 0.013609786618843114
+    passedCount = 0
+
+    if False:
+        printString = '{:^10}|{:^10}|{:^10}|{:^10}{:^32}'\
+            .format('phi1P', 'phi2P', 'phi1U', 'phi2U', 'range results')
+        print(printString)
+        for i, starlink in enumerate(starlink_numbers):
+            print(f'testing starlink-{starlink}', end='\r')
+            tle = getTle(f'starlink-{starlink}')
+            sat = Satellite(tle)
+            jd = now()
+            sunPos = getSunPosition(jd)
+            elements = OrbitalElements.fromTle(tle, jd)
+            sVector = __compute_s_vector(jd, elements.raan, elements.inc, elements.aop)
+            phi1P = __find_zero_newton(R, sVector, 3*pi/4, zeta, elements.sma, elements.ecc, PENUMBRA)
+            phi2P = __find_zero_newton(R, sVector, 5*pi/4, zeta, elements.sma, elements.ecc, PENUMBRA)
+            phi1U = __find_zero_newton(R, sVector, 3*pi/4, zeta, elements.sma, elements.ecc, UMBRA)
+            phi2U = __find_zero_newton(R, sVector, 5*pi/4, zeta, elements.sma, elements.ecc, UMBRA)
+            phi1PResult = pi/2 <= phi1P <= pi
+            phi1UResult = pi/2 <= phi1U <= pi
+            phi2PResult = pi <= phi2P <= 3*pi/2
+            phi2UResult = pi <= phi2U <= 3*pi/2
+            printString = '{:^{w}.{p}f}|{:^{w}.{p}f}|{:^{w}.{p}f}|{:^{w}.{p}f}|{:^8}{:^8}{:^8}{:^8}' \
+                .format(phi1P, phi2P, phi1U, phi2U, bool(phi1PResult), bool(phi2PResult), bool(phi1UResult),
+                        bool(phi2UResult), w=10, p=6)
+            print(printString)
+            if phi1PResult and phi1UResult and phi2PResult and phi2UResult:
+                passedCount += 1
+        print(f"RESULTS: {passedCount}/36")
+
+    if False:
+        printString = '{:^10}|{:^10}|{:^10}|{:^10}|{:^10}|{:^40}' \
+            .format('number', 'phi0', 'phi1', 'phi2', 'phi3', 'escobal method values')
+        print(printString)
+        for i, starlink in enumerate(starlink_numbers):
+            print(f'testing starlink-{starlink}', end='\r')
+            tle = getTle(f'starlink-{starlink}')
+            sat = Satellite(tle)
+            jd = now()
+            sunPos = getSunPosition(jd)
+            elements = OrbitalElements.fromTle(tle, jd)
+            sVector = __compute_s_vector(jd, elements.raan, elements.inc, elements.aop)
+            phis = __find_certain_zeros(R, sVector, zeta, elements.sma, elements.ecc, PENUMBRA)
+            phis.sort()
+            vals = [round(__escobal_method(R, sVector, phi, zeta, elements.sma, elements.ecc, PENUMBRA)*1e5)/1e5 for phi in phis]
+            printString = '{:^10}|{:^{w}.{p}f}|{:^{w}.{p}f}|{:^{w}.{p}f}|{:^{w}.{p}f}|{:^{w}.{p}f}|{:^{w}.{p}f}|{:^{w}.{p}f}|{:^{w}.{p}f}'\
+                .format(starlink, phis[0], phis[1], phis[2], phis[3], vals[0], vals[1], vals[2], vals[3], w=10, p=6)
+            print(printString)
+            if vals[0] <= 1e-5 and vals[1] <= 1e-5 and vals[2] <= 1e-5 and vals[3] <= 1e-5:
+                passedCount += 1
+        print(f'RESULTS: {passedCount}/36')
+
+    if True:
+        printString = '{:^10}|{:^10}|{:^10}|{:^10}|{:^10}'.format('number', 'phi1P', 'phi1U', 'phi2U', 'phi2P')
+        printString2 = '{:-^10} {:-^10} {:-^10} {:-^10} {:-^10}'.format('','','','','')
+        print(printString, printString2, sep='\n')
+        for i, starlink in enumerate(starlink_numbers):
+            print(f'testing starlink-{starlink}', end='\r')
+            tle = getTle(f'starlink-{starlink}')
+            sat = Satellite(tle)
+            jd = now()
+            sunPos = getSunPosition(jd)
+            elements = OrbitalElements.fromTle(tle, jd)
+            # todo: this interface changed
+            sVector = __compute_s_vector(jd, elements.raan, elements.inc, elements.aop)
+            phi1P = __get_zero(R, sVector, zeta, elements.sma, elements.ecc, PENUMBRA, ENTER)
+            phi1U = __get_zero(R, sVector, zeta, elements.sma, elements.ecc, UMBRA, ENTER)
+            phi2P = __get_zero(R, sVector, zeta, elements.sma, elements.ecc, PENUMBRA, EXIT)
+            phi2U = __get_zero(R, sVector, zeta, elements.sma, elements.ecc, UMBRA, EXIT)
+            printString = '{:^10}|{:^{w}.{p}f}|{:^{w}.{p}f}|{:^{w}.{p}f}|{:^{w}.{p}f}'\
+                .format(starlink, phi1P, phi1U, phi2U, phi2P, w=10, p=6)
+            print(printString)
+        print("FINISHED")
+
+
+class SatelliteShadow:
+
+    __slots__ = '_phi', '_elements', '_s', '_Re', '_cosTerm', '_zeta', '_'
+
+    def __init__(self, sat: Satellite, jd: JulianDate):
+        pass
+
+
+Rs = 6.957e8
+Re = 6371000
+rs = 149597870700
+
+def getRefractionAngle(apparentAltitude: float):
+    h = degrees(apparentAltitude)
+    return (0.009928887226387075 + 0.0012208578117700335*h + 1.2450015330892884e-06*h*h) \
+                      / (1 + 0.505*h + 0.0845*h*h)
+
+def getUmbraAperture(rs, Rs, Re):
+    zetaU = acos(sqrt(rs*rs - (Rs-Re)**2) / rs)
+    deltaZetaU = getRefractionAngle(zetaU)
+    return zetaU + deltaZetaU
+    # sinZeta = (Rs - Re) / rs
+
+def getPenumbraAperture(rs, Rs, Re):
+    zetaP = acos(sqrt(rs*rs - (Rs+Re)**2) / rs)
+    deltaZetaP = getRefractionAngle(zetaP)
+    return deltaZetaP - zetaP
+    # sinZeta = (Rs + Re) / rs
+
+# THIS ONLY WORKS FOR PENUMBRA
+def gPenumbra(Re, e, phi, a, sx, sy, z):
+    eTerm = 1 + e * cos(phi)
+    aTerm = a * (1 - e*e)
+    sTerm = -sx*cos(phi) - sy*sin(phi)
+    cosZeta = cos(z)
+
+    term1 = Re * Re * eTerm * eTerm
+    term2 = aTerm * aTerm * sTerm * sTerm
+    term3 = aTerm * aTerm * cosZeta * cosZeta
+    term4 = 2 * aTerm * Re * sTerm * eTerm * sin(z)
+
+    return term1 + term2 - term3 - term4
+
+def updateElements(sat, jd):
+    elements = OrbitalElements.fromTle(sat.getTle(), jd)
+    return elements.ecc, elements.sma, elements.raan, elements.inc, elements.aop
+
+def getSVector(jd, raan, inc, aop):
+    S = -norm(getSunPosition(jd))
+    return rotateOrderTo(ZXZ, EulerAngles(raan, inc, aop), S)
+
+def getRe(Re, phi, ecc, a, inc, aop, s):
+    f = EARTH_FLATTENING
+    ae = EARTH_EQUITORIAL_RADIUS
+
+    Rz = _getRz(a, ecc, inc, aop, phi, s)
+    fTerm = 2 * f - f * f
+    mainTerm = ae * ae * (1 - fTerm)
+    cosTerm = (mainTerm - Rz * Rz) / (mainTerm - Rz * Rz * fTerm)
+    return ae * sqrt(1 - fTerm) / sqrt(1 - fTerm * cosTerm)
+
+def _getRz(a, ecc, inc, aop, phi, s):
+    return (a * (1 - ecc * ecc) / (1 + ecc * cos(phi))) * (
+            sin(aop) * sin(inc) * cos(phi) + cos(aop) * sin(inc) * sin(phi) - s[2] * (
+            s[0] * cos(phi) + s[1] * sin(phi)))

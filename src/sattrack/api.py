@@ -15,3 +15,4 @@ from sattrack.satpass import *
 from sattrack.sun import *
 from sattrack.topos import *
 from sattrack.sampa import *
+from sattrack.eclipse import *
