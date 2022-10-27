@@ -367,7 +367,7 @@ class Orbitable(ABC):
         pass
 
     @abstractmethod
-    def timeToAnomaly(self, anomaly: float, time: JulianDate, anomalyType: Anomaly, direction: AnomalyDirection) \
+    def timeToAnomaly(self, anomaly: float, time: JulianDate, direction: AnomalyDirection, anomalyType: Anomaly) \
             -> JulianDate:
         pass
 
@@ -438,7 +438,7 @@ class Orbit(Orbitable):
             raise ValueError('anomalyType parameter must be MEAN or TRUE')
         return anomaly
 
-    def timeToAnomaly(self, anomaly: float, time: JulianDate, anomalyType: Anomaly, direction: AnomalyDirection) \
+    def timeToAnomaly(self, anomaly: float, time: JulianDate, direction: AnomalyDirection, anomalyType: Anomaly) \
             -> JulianDate:
         # anomaly - radians, time can be None if direction is NEAREST
         if not isinstance(anomalyType, Anomaly):
@@ -688,6 +688,7 @@ def _true_anomaly_at(meanMotion: float, eccentricity: float, t0: float, epoch0: 
 
 
 def _nearest_mean_anomaly(meanMotion: float, m0: float, epoch0: JulianDate, m1: float) -> JulianDate:
+    # meanMotion - rev / day; m0, m1 - radians
     if m1 < m0:
         if m0 - m1 < pi:
             dma = m1 - m0
@@ -698,7 +699,7 @@ def _nearest_mean_anomaly(meanMotion: float, m0: float, epoch0: JulianDate, m1: 
             dma = m1 - TWOPI - m0
         else:
             dma = m1 - m0
-    return epoch0.future(dma / (meanMotion * 86400))
+    return epoch0.future(dma / (meanMotion * TWOPI))
 
 
 def _nearest_true_anomaly(meanMotion: float, eccentricity: float, t0: float, epoch0: JulianDate, t1: float) \
@@ -750,7 +751,7 @@ class Satellite(Orbitable):
         else:
             raise ValueError('anomalyType must be TRUE or MEAN')
 
-    def timeToAnomaly(self, anomaly: float, time: JulianDate, anomalyType: Anomaly, direction: AnomalyDirection) \
+    def timeToAnomaly(self, anomaly: float, time: JulianDate, direction: AnomalyDirection, anomalyType: Anomaly) \
             -> JulianDate:
         if not isinstance(time, JulianDate):
             raise TypeError('time parameter must be JulianDate type')
@@ -771,7 +772,6 @@ class Satellite(Orbitable):
             elif direction is PREVIOUS:
                 return _previous_true_anomaly(meanMotion, elements.ecc, t0, time, anomaly, time)
             else:
-                # todo: why doesnt this work?
                 return _nearest_true_anomaly(meanMotion, elements.ecc, t0, time, anomaly)
         elif anomalyType is MEAN:
             if direction is NEXT:
