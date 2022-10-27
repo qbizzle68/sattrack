@@ -258,26 +258,6 @@ class Body:
         self._offsetFunc = offsetFunc
         _check_callable(positionFunc, 'positionFunc')
         self._positionFunc = positionFunc
-        # if isinstance(offsetFunc, Callable):
-        #     params = signature(offsetFunc).parameters
-        #     if len(params) != 1:
-        #         ls = [p for p in params.values() if p.default is Parameter.empty and p.kind in
-        #               (Parameter.POSITIONAL_ONLY, Parameter.POSITIONAL_OR_KEYWORD)]
-        #         if len(ls) != 1:
-        #             raise TypeError('offsetFunc must be a Callable with 1 non-default positional parameter')
-        #     self._offsetFunc = offsetFunc
-        # else:
-        #     raise TypeError('offsetFunc must be a Callable type')
-        # if isinstance(positionFunc, Callable):
-        #     params = signature(positionFunc).parameters
-        #     if len(params) != 1:
-        #         ls = [p for p in params.values() if p.default is Parameter.empty and p.kind in
-        #               (Parameter.POSITIONAL_ONLY, Parameter.POSITIONAL_OR_KEYWORD)]
-        #         if len(ls) != 1:
-        #             raise TypeError('positionFunc must be a Callable with 1 non-default positional parameter')
-        #     self._positionFunc = positionFunc
-        # else:
-        #     raise TypeError('positionFunc must be a Callable type')
 
     @property
     def name(self):
@@ -371,10 +351,6 @@ class Orbitable(ABC):
             -> JulianDate:
         pass
 
-    # @abstractmethod
-    # def timeToNearestAnomaly(self, anomaly: float, anomalyType: Anomaly) -> JulianDate:
-    #     pass
-
     @abstractmethod
     def getState(self, time: JulianDate) -> (EVector, EVector):
         pass
@@ -387,9 +363,17 @@ class Orbitable(ABC):
     def getReferenceFrame(self, time: JulianDate = None) -> ReferenceFrame:
         pass
 
+    @abstractmethod
+    def getPeriapsis(self, time: JulianDate = None) -> float:
+        pass
+
+    @abstractmethod
+    def getApoapsis(self, time: JulianDate = None) -> float:
+        pass
+
 
 class Orbit(Orbitable):
-    __slots__ = '_elements'  # , '_periapsis', '_apoapsis'
+    __slots__ = '_elements', '_periapsis', '_apoapsis'
 
     def __init__(self, elements: Elements, name: str = '', body: Body = EARTH_BODY):
         if not isinstance(elements, Elements):
@@ -400,27 +384,8 @@ class Orbit(Orbitable):
             raise TypeError('body parameter must be a Body type')
         super().__init__(name, body)
         self._elements = elements
-        # periapsis, apoapsis = self._get_apsides()
-        # self._periapsis = periapsis
-        # self._apoapsis = apoapsis
-
-    # @property
-    # def elements(self):
-    #     return self._elements
-    # 
-    # @elements.setter
-    # def elements(self, value):
-    #     if not isinstance(value, Elements):
-    #         raise TypeError('value parameter must be an Elements type')
-    #     self._elements = value
-
-    # @property
-    # def periapsis(self):
-    #     return self._periapsis
-    #
-    # @property
-    # def apoapsis(self):
-    #     return self._apoapsis
+        self._periapsis = _radius_at_periapsis(self._elements.sma, self._elements.ecc)
+        self._apoapsis = _radius_at_apoapsis(self._elements.sma, self._elements.ecc)
 
     def anomalyAt(self, time: JulianDate, anomalyType: Anomaly = TRUE) -> float:
         if not isinstance(time, JulianDate):
@@ -451,15 +416,6 @@ class Orbit(Orbitable):
         elif direction is not NEAREST:
             raise ValueError('direction parameter must be NEXT, PREVIOUS, or NEAREST')
 
-        # if not isinstance(time, JulianDate):
-        #     raise TypeError('time parameter must be a JulianDate type')
-        # if not isinstance(anomalyType, Anomaly):
-        #     raise TypeError('anomalyType parameter must be an Anomaly type')
-        # if not isinstance(direction, AnomalyDirection):
-        #     raise TypeError('direction parameter must be an AnomalyDirection type')
-        # if direction not in (NEXT, PREVIOUS, NEAREST):
-        #     raise ValueError('direction parameter must be NEXT or PREVIOUS')
-
         meanMotion = _sma_to_mean_motion(self._elements.sma, self._body.mu) * 86400 / TWOPI
         if anomalyType is TRUE:
             t0 = _mean_to_true_anomaly(self._elements.meanAnomaly, self._elements.ecc)
@@ -473,44 +429,12 @@ class Orbit(Orbitable):
             if direction is NEXT:
                 return _next_mean_anomaly(meanMotion, self._elements.meanAnomaly, self._elements.epoch, anomaly, time)
             elif direction is PREVIOUS:
-                return _previous_mean_anomaly(meanMotion, self._elements.meanAnomaly, self._elements.epoch, anomaly, time)
+                return _previous_mean_anomaly(meanMotion, self._elements.meanAnomaly, self._elements.epoch, anomaly,
+                                              time)
             else:
                 return _nearest_mean_anomaly(meanMotion, self._elements.meanAnomaly, self._elements.epoch, anomaly)
         else:
             raise ValueError('anomalyType must be TRUE or MEAN')
-
-        # meanMotion = _sma_to_mean_motion(self._elements.sma, self._body.mu)
-        # if anomalyType is TRUE:
-        #     t0 = _mean_to_true_anomaly_newton(self._elements.meanAnomaly, self._elements.ecc)
-        #     if direction is NEXT:
-        #         func = _next_true_anomaly
-        #     else:
-        #         func = _previous_true_anomaly
-        #     return func(meanMotion, self._elements.ecc, t0, self._elements.epoch, anomaly, time)
-        # elif anomalyType is MEAN:
-        #     if direction is NEXT:
-        #         func = _next_mean_anomaly
-        #     else:
-        #         func = _previous_mean_anomaly
-        #     return func(meanMotion, self._elements.meanAnomaly, self._elements.epoch, anomaly, time)
-        # else:
-        #     raise ValueError('anomalyType must be TRUE or MEAN')
-
-    # def timeToNearestAnomaly(self, anomaly: float, anomalyType: Anomaly) -> JulianDate:
-    #     # anomaly - radians
-    #     # if self._elements.epoch is None:
-    #     #     raise ValueError('epoch value in the elements field must be set to compute anomalies')
-    #     if not isinstance(anomalyType, Anomaly):
-    #         raise TypeError('anomalyType parameter must be an Anomaly type')
-    #
-    #     meanMotion = _sma_to_mean_motion(self._elements.sma, self._body.mu)
-    #     if anomalyType is TRUE:
-    #         t0 = _mean_to_true_anomaly_newton(self._elements.meanAnomaly, self._elements.ecc)
-    #         return _nearest_true_anomaly(meanMotion, self._elements.ecc, t0, self._elements.epoch, anomaly)
-    #     elif anomalyType is MEAN:
-    #         return _nearest_mean_anomaly(meanMotion, self._elements.meanAnomaly, self._elements.epoch, anomaly)
-    #     else:
-    #         raise ValueError('anomalyType must be TRUE or MEAN')
 
     def getState(self, time: JulianDate) -> (EVector, EVector):
         trueAnomaly = self._get_true_anomaly_at(time)
@@ -542,6 +466,12 @@ class Orbit(Orbitable):
         # todo: put getting reference frame into helper method?
         return ReferenceFrame(ZXZ, EulerAngles(self._elements.raan, self._elements.inc, self._elements.aop))
 
+    def getPeriapsis(self, time: JulianDate = None) -> float:
+        return self._periapsis
+
+    def getApoapsis(self, time: JulianDate = None) -> float:
+        return self._apoapsis
+
     # todo: test this
     def impulse(self, time: JulianDate, prograde: float, normal: float, radial: float):
         # prograde, normal and radial-out are positive
@@ -557,9 +487,8 @@ class Orbit(Orbitable):
 
         newVelocity = velocity + progradeVector * prograde + radialVector * radial + normalVector * normal
         self._elements = Elements.fromState(position, newVelocity, self._elements.epoch)
-        # periapsis, apoapsis = self._get_apsides()
-        # self._periapsis = periapsis
-        # self._apoapsis = apoapsis
+        self._periapsis = _radius_at_periapsis(self._elements.sma, self._elements.ecc)
+        self._apoapsis = _radius_at_apoapsis(self._elements.sma, self._elements.ecc)
 
     def _get_true_anomaly_at(self, time: JulianDate):
         if not isinstance(time, JulianDate):
@@ -568,10 +497,13 @@ class Orbit(Orbitable):
         trueAnomaly_0 = _mean_to_true_anomaly(self._elements.meanAnomaly, self._elements.ecc)
         return _true_anomaly_at(meanMotion, self._elements.ecc, trueAnomaly_0, self._elements.epoch, time)
 
-    # def _get_apsides(self):
-    #     periapsis = self._elements.sma * (1 - self._elements.ecc)
-    #     apoapsis = self._elements.sma * (1 + self._elements.ecc)
-    #     return periapsis, apoapsis
+
+def _radius_at_periapsis(semiMajorAxis: float, eccentricity: float) -> float:
+    return semiMajorAxis * (1 - eccentricity)
+
+
+def _radius_at_apoapsis(semiMajorAxis: float, eccentricity: float) -> float:
+    return semiMajorAxis * (1 + eccentricity)
 
 
 def _sma_to_mean_motion(semiMajorAxis: float, mu: float) -> float:
@@ -783,14 +715,6 @@ class Satellite(Orbitable):
         else:
             raise ValueError('anomalyType must be TRUE or MEAN')
 
-    # def timeToNearestAnomaly(self, anomaly: float, anomalyType: Anomaly) -> JulianDate:
-    #     if not isinstance(anomalyType, Anomaly):
-    #         raise TypeError('anomalyType parameter must be an Anomaly type')
-    #
-    #     # would really love to have a more up to date time here
-    #     elements = Elements.fromTle(self._tle,
-    #     meanMotion = _sma_to_mean_motion()
-
     def getState(self, time: JulianDate) -> (EVector, EVector):
         if not isinstance(time, JulianDate):
             raise TypeError('time parameter must be JulianDate type')
@@ -805,3 +729,15 @@ class Satellite(Orbitable):
     def getReferenceFrame(self, time: JulianDate = None) -> ReferenceFrame:
         elements = Elements.fromTle(self._tle, time)
         return ReferenceFrame(ZXZ, EulerAngles(elements.raan, elements.inc, elements.aop))
+
+    def getPeriapsis(self, time: JulianDate = None) -> float:
+        if not isinstance(time, JulianDate):
+            raise TypeError('time parameter must be JulianDate type')
+        elements = Elements.fromTle(self._tle, time)
+        return _radius_at_periapsis(elements.sma, elements.ecc)
+
+    def getApoapsis(self, time: JulianDate = None) -> float:
+        if not isinstance(time, JulianDate):
+            raise TypeError('time parameter must be JulianDate type')
+        elements = Elements.fromTle(self._tle, time)
+        return _radius_at_apoapsis(elements.sma, elements.ecc)
