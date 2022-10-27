@@ -4,15 +4,20 @@ from typing import Union
 
 from numpy import arange
 from pyevspace import norm, dot
+import matplotlib.pyplot as plt
+
+from sattrack.structures.orbit import _mean_to_true_anomaly_newton
 
 from sattrack.api import *
+from sattrack.structures.orbit import *
+import sattrack.structures.orbit as orbit
 
-# tle = getTle('zarya')
+tle = getTle('zarya')
 # tle = TwoLineElement("""ISS (ZARYA)
 # 1 25544U 98067A   22266.84431519  .00008111  00000+0  14870-3 0  9996
 # 2 25544  51.6423 207.8056 0002412 286.8120 181.5821 15.50238875360488""")
 # tle = TwoLineElement(tleStr)
-# iss = Satellite(tle)
+iss = Satellite(tle)
 from sattrack.util.anomalies import timeToNextTrueAnomaly
 
 jd = now()
@@ -321,7 +326,7 @@ if __name__ == "__main__":
                 passedCount += 1
         print(f'RESULTS: {passedCount}/36')
 
-    if True:
+    if False:
         printString = '{:^10}|{:^10}|{:^10}|{:^10}|{:^10}'.format('number', 'phi1P', 'phi1U', 'phi2U', 'phi2P')
         printString2 = '{:-^10} {:-^10} {:-^10} {:-^10} {:-^10}'.format('','','','','')
         print(printString, printString2, sep='\n')
@@ -342,6 +347,56 @@ if __name__ == "__main__":
                 .format(starlink, phi1P, phi1U, phi2U, phi2P, w=10, p=6)
             print(printString)
         print("FINISHED")
+
+    if False:
+        def approxTA(M, ecc):
+            return M + 2 * ecc * sin(M) + 1.25 * ecc * ecc * sin(2 * M)
+        ecc = 0.017
+        print('eccentricity: ', ecc)
+        printString = '{:^10}|{:^10}|{:^10}|{:^10}'.format('M', 'direct v', 'approx v', 'error')
+        printString2 = '{:-^10} {:-^10} {:-^10} {:-^10}'.format('', '', '', '')
+        print(printString, printString2, sep='\n')
+        ma = [i * 0.1 for i in range(62)]
+        for m in ma:
+            directV = _mean_to_true_anomaly_newton(m, ecc)
+            approxV = approxTA(m, ecc)
+            error = degrees(directV - approxV) * 60
+            printString = '{:^{w}.{p}f}|{:^{w}.{p}f}|{:^{w}.{p}f}|{:^{w}.{p}f}'.format(m, directV, approxV, error, w=10, p=6)
+            print(printString)
+        print("FINISHED")
+
+
+    if True:
+        def getConst(r, v):
+            return r*v*v/EARTH_MU
+
+        def getEcc(r, v, gamma):
+            c = getConst(r, v)
+            return sqrt(((c-1)**2) * (sin(gamma)**2) + (cos(gamma)**2))
+
+        x = [i for i in range(1440)]
+
+        # states = [iss.getState(jd.future(i/1440)) for i in x]
+        # r = [s[0].mag() for s in states]
+        # v = [s[1].mag() for s in states]
+        # gammas = [vang(s[0], s[1]) for s in states]
+        # y = [getEcc(r, v, gamma) for r, v, gamma in zip(r, v, gammas)]
+        y = [Elements.fromTle(tle, jd.future(i/1440)).ecc for i in x]
+
+        plt.plot(x, y)
+        plt.show()
+
+        # elements = Elements.fromTle(tle, jd)
+        # pos, vel = iss.getState(jd)
+        # gamma = vang(pos, vel)
+        # r = pos.mag()
+        # v = vel.mag()
+        # c = (r*v*v/EARTH_MU)
+        # ecc = sqrt((c-1)*(c-1)*sin(gamma)*sin(gamma) + cos(gamma)*cos(gamma))
+        # ta = atan3(c * sin(gamma) * cos(gamma), c * sin(gamma)*sin(gamma) - 1)
+
+        # print('from elements: e: ', elements.ecc, ' v: ', orbit._mean_to_true_anomaly(elements.meanAnomaly, elements.ecc))
+        # print('by hand: e: ', ecc, ' v: ', ta)
 
 
 class SatelliteShadow:
