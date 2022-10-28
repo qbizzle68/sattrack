@@ -1,8 +1,9 @@
 from abc import abstractmethod, ABC
 from copy import deepcopy
+from enum import Enum
 from inspect import Parameter, signature
 from math import radians, cos, sin, pi, acos, sqrt, atan2, floor
-from typing import Callable, Union
+from typing import Callable
 
 from pyevspace import EVector, norm, cross, dot
 from sattrack.rotation.order import ZXZ, Axis
@@ -303,17 +304,43 @@ SUN_BODY = Body('Sun', SUN_MU, SUN_RADIUS, 0, lambda time: 0, getSunPosition)
 EARTH_BODY = Body('Earth', EARTH_MU, EARTH_EQUITORIAL_RADIUS, 86164.090531, siderealTime,
                   lambda time: EVector(0, 0, 0), Rp=EARTH_POLAR_RADIUS, parent=SUN_BODY)
 
-AnomalyDirection = Union[int]
-NEXT = AnomalyDirection(0)
-PREVIOUS = AnomalyDirection(1)
-NEAREST = AnomalyDirection(2)
-Anomaly = Union[int]
-MEAN = Anomaly(0)
-TRUE = Anomaly(1)
+
+class _AnomalyDirection(Enum):
+    NEXT = 0
+    PREVIOUS = 1
+    NEAREST = 2
+
+
+_NEXT = _AnomalyDirection.NEXT
+_PREVIOUS = _AnomalyDirection.PREVIOUS
+_NEAREST = _AnomalyDirection.NEAREST
+
+
+class _Anomaly(Enum):
+    MEAN = 0
+    TRUE = 1
+
+
+_MEAN = _Anomaly.MEAN
+_TRUE = _Anomaly.TRUE
+
+# AnomalyDirection = Union[int]
+# NEXT = AnomalyDirection(0)
+# PREVIOUS = AnomalyDirection(1)
+# NEAREST = AnomalyDirection(2)
+# Anomaly = Union[int]
+# MEAN = Anomaly(0)
+# TRUE = Anomaly(1)
 
 
 class Orbitable(ABC):
     __slots__ = '_name', '_body'
+
+    NEXT = _NEXT
+    PREVIOUS = _PREVIOUS
+    NEAREST = _NEAREST
+    MEAN = _MEAN
+    TRUE = _TRUE
 
     def __init__(self, name: str, body: Body = EARTH_BODY):
         if not isinstance(name, str):
@@ -343,11 +370,11 @@ class Orbitable(ABC):
             raise TypeError('value parameter must be a Body type')
 
     @abstractmethod
-    def anomalyAt(self, time: JulianDate, anomalyType: Anomaly = True) -> float:
+    def anomalyAt(self, time: JulianDate, anomalyType: _Anomaly = True) -> float:
         pass
 
     @abstractmethod
-    def timeToAnomaly(self, anomaly: float, time: JulianDate, direction: AnomalyDirection, anomalyType: Anomaly) \
+    def timeToAnomaly(self, anomaly: float, time: JulianDate, direction: _AnomalyDirection, anomalyType: _Anomaly) \
             -> JulianDate:
         pass
 
@@ -387,48 +414,48 @@ class Orbit(Orbitable):
         self._periapsis = _radius_at_periapsis(self._elements.sma, self._elements.ecc)
         self._apoapsis = _radius_at_apoapsis(self._elements.sma, self._elements.ecc)
 
-    def anomalyAt(self, time: JulianDate, anomalyType: Anomaly = TRUE) -> float:
+    def anomalyAt(self, time: JulianDate, anomalyType: _Anomaly = _TRUE) -> float:
         if not isinstance(time, JulianDate):
             raise TypeError('time parameter must be a JulianDate type')
-        if not isinstance(anomalyType, Anomaly):
+        if not isinstance(anomalyType, _Anomaly):
             raise TypeError('anomalyType parameter must be an Anomaly type')
 
         meanMotion = _sma_to_mean_motion(self._elements.sma, self._body.mu)
-        if anomalyType is MEAN:
+        if anomalyType is _MEAN:
             anomaly = _mean_anomaly_at(meanMotion, self._elements.meanAnomaly, self._elements.epoch, time)
-        elif anomalyType is TRUE:
+        elif anomalyType is _TRUE:
             t0 = _mean_to_true_anomaly_newton(self._elements.meanAnomaly, self._elements.ecc)
             anomaly = _true_anomaly_at(meanMotion, self._elements.ecc, t0, self._elements.epoch, time)
         else:
             raise ValueError('anomalyType parameter must be MEAN or TRUE')
         return anomaly
 
-    def timeToAnomaly(self, anomaly: float, time: JulianDate, direction: AnomalyDirection, anomalyType: Anomaly) \
+    def timeToAnomaly(self, anomaly: float, time: JulianDate, direction: _AnomalyDirection, anomalyType: _Anomaly) \
             -> JulianDate:
         # anomaly - radians, time can be None if direction is NEAREST
-        if not isinstance(anomalyType, Anomaly):
+        if not isinstance(anomalyType, _Anomaly):
             raise TypeError('anomalyType parameter must be an Anomaly type')
-        if not isinstance(direction, AnomalyDirection):
+        if not isinstance(direction, _AnomalyDirection):
             raise TypeError('direction parameter must be an AnomalyDirection type')
-        if direction in (NEXT, PREVIOUS):
+        if direction in (_NEXT, _PREVIOUS):
             if not isinstance(time, JulianDate):
                 raise TypeError('time parameter must be a JulianDate type')
-        elif direction is not NEAREST:
+        elif direction is not _NEAREST:
             raise ValueError('direction parameter must be NEXT, PREVIOUS, or NEAREST')
 
         meanMotion = _sma_to_mean_motion(self._elements.sma, self._body.mu) * 86400 / TWOPI
-        if anomalyType is TRUE:
+        if anomalyType is _TRUE:
             t0 = _mean_to_true_anomaly(self._elements.meanAnomaly, self._elements.ecc)
-            if direction is NEXT:
+            if direction is _NEXT:
                 return _next_true_anomaly(meanMotion, self._elements.ecc, t0, self._elements.epoch, anomaly, time)
-            elif direction is PREVIOUS:
+            elif direction is _PREVIOUS:
                 return _previous_true_anomaly(meanMotion, self._elements.ecc, t0, self._elements.epoch, anomaly, time)
             else:
                 return _nearest_true_anomaly(meanMotion, self._elements.ecc, t0, self._elements.epoch, anomaly)
-        elif anomalyType is MEAN:
-            if direction is NEXT:
+        elif anomalyType is _MEAN:
+            if direction is _NEXT:
                 return _next_mean_anomaly(meanMotion, self._elements.meanAnomaly, self._elements.epoch, anomaly, time)
-            elif direction is PREVIOUS:
+            elif direction is _PREVIOUS:
                 return _previous_mean_anomaly(meanMotion, self._elements.meanAnomaly, self._elements.epoch, anomaly,
                                               time)
             else:
@@ -668,47 +695,47 @@ class Satellite(Orbitable):
         self._tle = tle
         self._propagator = SGP4_Propagator(tle)
 
-    def anomalyAt(self, time: JulianDate, anomalyType: Anomaly = True) -> float:
+    def anomalyAt(self, time: JulianDate, anomalyType: _Anomaly = True) -> float:
         if not isinstance(time, JulianDate):
             raise TypeError('time parameter must be JulianDate type')
-        if not isinstance(anomalyType, Anomaly):
+        if not isinstance(anomalyType, _Anomaly):
             raise TypeError('anomalyType parameter must be Anomaly type')
 
         # todo: if eccentricVector works, compute this with SGP4 position vector
         elements = Elements.fromTle(self._tle, time)
-        if anomalyType is TRUE:
+        if anomalyType is _TRUE:
             return _mean_to_true_anomaly(elements.meanAnomaly, elements.ecc)
-        elif anomalyType is MEAN:
+        elif anomalyType is _MEAN:
             return elements.meanAnomaly
         else:
             raise ValueError('anomalyType must be TRUE or MEAN')
 
-    def timeToAnomaly(self, anomaly: float, time: JulianDate, direction: AnomalyDirection, anomalyType: Anomaly) \
+    def timeToAnomaly(self, anomaly: float, time: JulianDate, direction: _AnomalyDirection, anomalyType: _Anomaly) \
             -> JulianDate:
         if not isinstance(time, JulianDate):
             raise TypeError('time parameter must be JulianDate type')
-        if not isinstance(anomalyType, Anomaly):
+        if not isinstance(anomalyType, _Anomaly):
             raise TypeError('anomalyType parameter must be an Anomaly type')
-        if not isinstance(direction, AnomalyDirection):
+        if not isinstance(direction, _AnomalyDirection):
             raise TypeError('direction parameter must be an AnomalyDirection type')
-        if direction not in (NEXT, PREVIOUS, NEAREST):
+        if direction not in (_NEXT, _PREVIOUS, _NEAREST):
             raise ValueError('direction parameter must be NEXT, PREVIOUS or NEAREST')
 
         # todo: determine if this is ideal using SGP4 states
         elements = Elements.fromTle(self._tle, time)
         meanMotion = _sma_to_mean_motion(elements.sma, self._body.mu) * 86400 / TWOPI
-        if anomalyType is TRUE:
+        if anomalyType is _TRUE:
             t0 = _mean_to_true_anomaly(elements.meanAnomaly, elements.ecc)
-            if direction is NEXT:
+            if direction is _NEXT:
                 return _next_true_anomaly(meanMotion, elements.ecc, t0, time, anomaly, time)
-            elif direction is PREVIOUS:
+            elif direction is _PREVIOUS:
                 return _previous_true_anomaly(meanMotion, elements.ecc, t0, time, anomaly, time)
             else:
                 return _nearest_true_anomaly(meanMotion, elements.ecc, t0, time, anomaly)
-        elif anomalyType is MEAN:
-            if direction is NEXT:
+        elif anomalyType is _MEAN:
+            if direction is _NEXT:
                 return _next_mean_anomaly(meanMotion, elements.meanAnomaly, time, anomaly, time)
-            elif direction is PREVIOUS:
+            elif direction is _PREVIOUS:
                 return _previous_mean_anomaly(meanMotion, elements.meanAnomaly, time, anomaly, time)
             else:
                 return _nearest_mean_anomaly(meanMotion, elements.meanAnomaly, time, anomaly)

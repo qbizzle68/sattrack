@@ -10,7 +10,7 @@ from sattrack.sampa import getSunPosition
 from sattrack.spacetime.juliandate import JulianDate
 # from sattrack.structures.elements import OrbitalElements
 # from sattrack.structures.satellite import Satellite
-from sattrack.structures.orbit import Orbitable, TRUE, PREVIOUS, NEXT
+from sattrack.structures.orbit import Orbitable
 from sattrack.util.constants import TWOPI, EARTH_EQUITORIAL_RADIUS, SUN_RADIUS
 
 # References:
@@ -221,7 +221,7 @@ def _get_shadow_positions(jd: JulianDate, sat: Orbitable, shadow: Shadow, zeroEp
     apertureAngle = __get_corrected_refraction_angle(sunPosition.mag(), Re, shadow)
 
     # phi0 = elements.trueAnomalyAt(jd)
-    phi0 = sat.anomalyAt(jd, TRUE)
+    phi0 = sat.anomalyAt(jd, Orbitable.TRUE)
     approxPhi1 = _get_zero(Re, sVector, apertureAngle, elements.sma, elements.ecc, shadow, ENTER, epsilon=zeroEpsilon)
     approxPhi2 = _get_zero(Re, sVector, apertureAngle, elements.sma, elements.ecc, shadow, EXIT, epsilon=zeroEpsilon)
 
@@ -231,11 +231,11 @@ def _get_shadow_positions(jd: JulianDate, sat: Orbitable, shadow: Shadow, zeroEp
     if (abs(phi0 - approxPhi2) < errorBuffer) or (abs(phi0 + TWOPI - approxPhi2) < errorBuffer) \
             or (abs(approxPhi2 + TWOPI - phi0) < errorBuffer):
         # dt = (jd - elements.timeToPrevTrueAnomaly(approxPhi1, jd)) / 2
-        dt = (jd - sat.timeToAnomaly(approxPhi1, jd, PREVIOUS, TRUE))
+        dt = (jd - sat.timeToAnomaly(approxPhi1, jd, Orbitable.PREVIOUS, Orbitable.TRUE))
         referenceTime = jd.future(-dt)
     else:
-        phi2Time = sat.timeToAnomaly(approxPhi2, jd, NEXT, TRUE)
-        phi1Time = sat.timeToAnomaly(approxPhi1, phi2Time, PREVIOUS, TRUE)
+        phi2Time = sat.timeToAnomaly(approxPhi2, jd, Orbitable.NEXT, Orbitable.TRUE)
+        phi1Time = sat.timeToAnomaly(approxPhi1, phi2Time, Orbitable.PREVIOUS, Orbitable.TRUE)
         # phi2Time = elements.timeToNextTrueAnomaly(approxPhi2, jd)
         # phi1Time = elements.timeToPrevTrueAnomaly(approxPhi1, phi2Time)
         dt = (phi2Time - phi1Time) / 2
@@ -249,7 +249,7 @@ def _get_shadow_positions(jd: JulianDate, sat: Orbitable, shadow: Shadow, zeroEp
         gamma = __compute_gamma(sVector)
         # todo: make sure this is at conjunction
         # updatedJd = elements.timeToNextTrueAnomaly(gamma, jd)
-        updatedJd = sat.timeToAnomaly(gamma, jd, NEXT, TRUE)
+        updatedJd = sat.timeToAnomaly(gamma, jd, Orbitable.NEXT, Orbitable.TRUE)
         return _get_shadow_positions(updatedJd, sat, shadow, zeroEpsilon)
 
     return (enterPhi, enterTime), (exitPhi, exitTime)
@@ -273,10 +273,10 @@ def __compute_anomaly_loop(startTime: JulianDate, referenceTime: JulianDate, sat
                         epsilon=zeroEpsilon)
         if enterOrExit is ENTER:
             # time = elements.timeToPrevTrueAnomaly(phi, referenceTime)
-            time = sat.timeToAnomaly(phi, referenceTime, PREVIOUS, TRUE)
+            time = sat.timeToAnomaly(phi, referenceTime, Orbitable.PREVIOUS, Orbitable.TRUE)
         elif enterOrExit is EXIT:
             # time = elements.timeToNextTrueAnomaly(phi, referenceTime)
-            time = sat.timeToAnomaly(phi, referenceTime, NEXT, TRUE)
+            time = sat.timeToAnomaly(phi, referenceTime, Orbitable.NEXT, Orbitable.TRUE)
         # elements = Elements.fromTle(tle, time)
         elements = sat.getElements(time)
         sunPosition = getSunPosition(time)
@@ -347,7 +347,7 @@ def isEclipsed(satellite: Orbitable, time: JulianDate, shadowType: Shadow = PENU
     elements = satellite.getElements(time)
     sVector = __compute_s_vector(sunPosition, elements.raan, elements.inc, elements.aop)
     # phi = elements.trueAnomalyAt(time)
-    phi = satellite.anomalyAt(time, TRUE)
+    phi = satellite.anomalyAt(time, Orbitable.TRUE)
     earthRadius = _get_perspective_radius(sVector, elements.sma, elements.ecc, elements.inc, elements.aop, phi)
 
     # semi-diameters of sun and earth relative to the satellite
