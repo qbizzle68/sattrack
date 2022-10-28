@@ -19,6 +19,74 @@ from sattrack.util.constants import TWOPI, EARTH_MU, EARTH_POLAR_RADIUS, EARTH_E
 from sattrack.util.conversions import atan3
 
 
+__all__ = ('Elements', 'Body', 'EARTH_BODY', 'SUN_BODY', 'Orbitable', 'Orbit', 'Satellite', 'smaToMeanMotion',
+           'meanMotionToSma', 'meanToTrueAnomaly', 'meanToEccentricAnomaly', 'eccentricToTrueAnomaly',
+           'trueToMeanAnomaly', 'trueToEccentricAnomaly', 'eccentricToMeanAnomaly')
+
+
+def _elements_from_tle(tle: TwoLineElement, time: JulianDate) -> (float, float, float, float, float, float):
+    dt = time - tle.getEpoch()
+    inc = radians(tle.getInc())
+    n0 = tle.getMeanMotion()
+    dM = (dt * (n0 + dt * (tle.getMeanMotionDot() + dt * tle.getMeanMotionDDot()))) * 360
+    meanAnomaly = radians(tle.getMeanAnomaly() + dM) % TWOPI
+    ecc0 = tle.getEcc()
+    n0dot = tle.getMeanMotionDot() * 2
+    a0 = tle.getSma()
+    aDot = -2 * a0 * n0dot / (3 * n0)
+    sma = a0 + aDot * dt
+    eDot = -2 * (1 - ecc0) * n0dot / (3 * n0)
+    ecc = ecc0 + eDot * dt
+    temp = (a0 ** -3.5) / ((1 - (ecc0 * ecc0)) ** 2)
+
+    # perturbations
+    # non-spherical earth
+    lanJ2Dot = -2.06474e14 * temp * cos(inc)
+    aopJ2Dot = 1.03237e14 * temp * (4 - 5 * (sin(inc) ** 2))
+    # third-body
+    lanMoon = -0.00338 * cos(inc) / n0
+    lanSun = -0.00154 * cos(inc) / n0
+    aopMoon = 0.00169 * (4 - (5 * sin(inc) ** 2)) / n0
+    aopSun = 0.00077 * (4 - (5 * sin(inc) ** 2)) / n0
+    raan = (tle.getRaan() + (lanJ2Dot + lanMoon + lanSun) * dt) % 360
+    aop = (tle.getAop() + (aopJ2Dot + aopMoon + aopSun) * dt) % 36
+
+    return radians(raan), inc, radians(aop), ecc, sma, meanAnomaly
+
+
+def _compute_eccentric_vector(position: EVector, velocity: EVector, MU: float) -> EVector:
+    lhs = position * ((velocity.mag2() / MU) - (1 / position.mag()))
+    rhs = velocity * (dot(position, velocity) / MU)
+    return lhs - rhs
+
+
+def _elements_from_state(position: EVector, velocity: EVector, MU: float) -> (float, float, float, float, float, float):
+    angularMomentum = cross(position, velocity)
+    lineOfNodes = norm(cross(EVector.e3, angularMomentum))
+    eccentricityVector = _compute_eccentric_vector(position, velocity, MU)
+
+    ecc = eccentricityVector.mag()
+    inc = acos(angularMomentum[2] / angularMomentum.mag())
+    raan = acos(lineOfNodes[0])
+    if lineOfNodes[1] < 0:
+        raan = TWOPI - raan
+    aop = acos(dot(lineOfNodes, eccentricityVector) / eccentricityVector.mag())
+    if eccentricityVector[2] < 0:
+        aop = TWOPI - aop
+    tAnom = acos(dot(eccentricityVector, position) / (eccentricityVector.mag() * position.mag()))
+    if dot(position, velocity) < 0:
+        tAnom = 2 * pi - tAnom
+    mAnom = trueToMean(tAnom, ecc)
+    sma = (angularMomentum.mag() ** 2) / ((1 - (ecc * ecc)) * MU)
+
+    return raan, inc, aop, ecc, sma, mAnom
+
+
+def _check_type(value, paramName):
+    if not isinstance(value, (int, float)):
+        raise TypeError(f'{paramName} parameter must be a real number')
+
+
 class Elements:
     __slots__ = '_raan', '_inc', '_aop', '_ecc', '_sma', '_meanAnomaly', '_epoch'
 
@@ -56,33 +124,34 @@ class Elements:
         if not isinstance(epoch, JulianDate):
             raise TypeError('time parameter must be a JulianDate type')
 
-        dt = epoch - tle.getEpoch()
-        inc = radians(tle.getInc())
-        n0 = tle.getMeanMotion()
-        dM = (dt * (n0 + dt * (tle.getMeanMotionDot() + dt * tle.getMeanMotionDDot()))) * 360
-        meanAnomaly = radians(tle.getMeanAnomaly() + dM) % TWOPI
-        ecc0 = tle.getEcc()
-        n0dot = tle.getMeanMotionDot() * 2
-        a0 = tle.getSma()
-        aDot = -2 * a0 * n0dot / (3 * n0)
-        sma = a0 + aDot * dt
-        eDot = -2 * (1 - ecc0) * n0dot / (3 * n0)
-        ecc = ecc0 + eDot * dt
-        temp = (a0 ** -3.5) / ((1 - (ecc0 * ecc0)) ** 2)
+        # dt = epoch - tle.getEpoch()
+        # inc = radians(tle.getInc())
+        # n0 = tle.getMeanMotion()
+        # dM = (dt * (n0 + dt * (tle.getMeanMotionDot() + dt * tle.getMeanMotionDDot()))) * 360
+        # meanAnomaly = radians(tle.getMeanAnomaly() + dM) % TWOPI
+        # ecc0 = tle.getEcc()
+        # n0dot = tle.getMeanMotionDot() * 2
+        # a0 = tle.getSma()
+        # aDot = -2 * a0 * n0dot / (3 * n0)
+        # sma = a0 + aDot * dt
+        # eDot = -2 * (1 - ecc0) * n0dot / (3 * n0)
+        # ecc = ecc0 + eDot * dt
+        # temp = (a0 ** -3.5) / ((1 - (ecc0 * ecc0)) ** 2)
+        #
+        # # perturbations
+        # # non-spherical earth
+        # lanJ2Dot = -2.06474e14 * temp * cos(inc)
+        # aopJ2Dot = 1.03237e14 * temp * (4 - 5 * (sin(inc) ** 2))
+        # # third-body
+        # lanMoon = -0.00338 * cos(inc) / n0
+        # lanSun = -0.00154 * cos(inc) / n0
+        # aopMoon = 0.00169 * (4 - (5 * sin(inc) ** 2)) / n0
+        # aopSun = 0.00077 * (4 - (5 * sin(inc) ** 2)) / n0
+        # raan = (tle.getRaan() + (lanJ2Dot + lanMoon + lanSun) * dt) % 360
+        # aop = (tle.getAop() + (aopJ2Dot + aopMoon + aopSun) * dt) % 36
 
-        # perturbations
-        # non-spherical earth
-        lanJ2Dot = -2.06474e14 * temp * cos(inc)
-        aopJ2Dot = 1.03237e14 * temp * (4 - 5 * (sin(inc) ** 2))
-        # third-body
-        lanMoon = -0.00338 * cos(inc) / n0
-        lanSun = -0.00154 * cos(inc) / n0
-        aopMoon = 0.00169 * (4 - (5 * sin(inc) ** 2)) / n0
-        aopSun = 0.00077 * (4 - (5 * sin(inc) ** 2)) / n0
-        raan = (tle.getRaan() + (lanJ2Dot + lanMoon + lanSun) * dt) % 360
-        aop = (tle.getAop() + (aopJ2Dot + aopMoon + aopSun) * dt) % 36
-
-        return cls(radians(raan), inc, radians(aop), ecc, sma, meanAnomaly, epoch)
+        raan, inc, aop, ecc, sma, meanAnomaly = _elements_from_tle(tle, epoch)
+        return cls(raan, inc, aop, ecc, sma, meanAnomaly, epoch)
 
     @classmethod
     def fromState(cls, position: EVector, velocity: EVector, epoch: JulianDate, MU: float = EARTH_MU):
@@ -95,25 +164,26 @@ class Elements:
         if not isinstance(MU, (int, float)):
             raise TypeError('MU parameter must be an int float type')
 
-        angularMomentum = cross(position, velocity)
-        lineOfNodes = norm(cross(EVector.e3, angularMomentum))
-        eccentricityVector = _compute_eccentric_vector(position, velocity, MU)
+        # angularMomentum = cross(position, velocity)
+        # lineOfNodes = norm(cross(EVector.e3, angularMomentum))
+        # eccentricityVector = _compute_eccentric_vector(position, velocity, MU)
+        #
+        # ecc = eccentricityVector.mag()
+        # inc = acos(angularMomentum[2] / angularMomentum.mag())
+        # raan = acos(lineOfNodes[0])
+        # if lineOfNodes[1] < 0:
+        #     raan = TWOPI - raan
+        # aop = acos(dot(lineOfNodes, eccentricityVector) / eccentricityVector.mag())
+        # if eccentricityVector[2] < 0:
+        #     aop = TWOPI - aop
+        # tAnom = acos(dot(eccentricityVector, position) / (eccentricityVector.mag() * position.mag()))
+        # if dot(position, velocity) < 0:
+        #     tAnom = 2 * pi - tAnom
+        # mAnom = trueToMean(tAnom, ecc)
+        # sma = (angularMomentum.mag() ** 2) / ((1 - (ecc * ecc)) * MU)
 
-        ecc = eccentricityVector.mag()
-        inc = acos(angularMomentum[2] / angularMomentum.mag())
-        raan = acos(lineOfNodes[0])
-        if lineOfNodes[1] < 0:
-            raan = TWOPI - raan
-        aop = acos(dot(lineOfNodes, eccentricityVector) / eccentricityVector.mag())
-        if eccentricityVector[2] < 0:
-            aop = TWOPI - aop
-        tAnom = acos(dot(eccentricityVector, position) / (eccentricityVector.mag() * position.mag()))
-        if dot(position, velocity) < 0:
-            tAnom = 2 * pi - tAnom
-        mAnom = trueToMean(tAnom, ecc)
-        sma = (angularMomentum.mag() ** 2) / ((1 - (ecc * ecc)) * MU)
-
-        return cls(raan, inc, aop, ecc, sma, mAnom, epoch)
+        raan, inc, aop, ecc, sma, meanAnomaly = _elements_from_state(position, velocity, MU)
+        return cls(raan, inc, aop, ecc, sma, meanAnomaly, epoch)
 
     def __reduce__(self):
         return self.__class__, (self._raan, self._inc, self._aop, self._ecc, self._sma, self._meanAnomaly, self._epoch)
@@ -189,34 +259,20 @@ class Elements:
         self.epoch = epoch
 
 
-def _check_type(value, paramName):
-    if not isinstance(value, (int, float)):
-        raise TypeError(f'{paramName} parameter must be an int or float type')
-
-
-def _check_elements(raan, inc, aop, ecc, sma, ma):
-    _check_type(raan, 'raan')
-    _check_type(inc, 'inclination')
-    if not 0 <= inc <= 180:
-        raise ValueError('inclination parameter must be between 0 and 180')
-    _check_type(aop, 'argumentOfPeriapsis')
-    _check_type(ecc, 'eccentricity')
-    _check_type(sma, 'semi-major axis')
-    _check_type(ma, 'mean anomaly')
-    raanRad = radians(raan) % TWOPI
-    incRad = radians(inc)
-    aopRad = radians(aop) % TWOPI
-    maRad = radians(ma) % TWOPI
-    return raanRad, incRad, aopRad, maRad
-
-
-def _compute_eccentric_vector(position: EVector, velocity: EVector, MU: float) -> EVector:
-    lhs = position * ((velocity.mag2() / MU) - (1 / position.mag()))
-    rhs = velocity * (dot(position, velocity) / MU)
-    return lhs - rhs
-
-
-Func = Callable[[JulianDate], float]
+# def _check_elements(raan, inc, aop, ecc, sma, ma):
+#     _check_type(raan, 'raan')
+#     _check_type(inc, 'inclination')
+#     if not 0 <= inc <= 180:
+#         raise ValueError('inclination parameter must be between 0 and 180')
+#     _check_type(aop, 'argumentOfPeriapsis')
+#     _check_type(ecc, 'eccentricity')
+#     _check_type(sma, 'semi-major axis')
+#     _check_type(ma, 'mean anomaly')
+#     raanRad = radians(raan) % TWOPI
+#     incRad = radians(inc)
+#     aopRad = radians(aop) % TWOPI
+#     maRad = radians(ma) % TWOPI
+#     return raanRad, incRad, aopRad, maRad
 
 
 def _check_callable(func, errorName):
@@ -235,7 +291,7 @@ class Body:
     __slots__ = '_name', '_MU', '_Re', '_Rp', '_flattening', '_revPeriod', '_orbit', '_parent', \
                 '_offsetFunc', '_positionFunc'
 
-    def __init__(self, name: str, MU: float, Re: float, revPeriod: float, offsetFunc: Func, positionFunc: Func,
+    def __init__(self, name: str, MU: float, Re: float, revPeriod: float, offsetFunc: Callable, positionFunc: Callable,
                  *, Rp: float = 0, orbit: 'Orbit' = None, parent: 'Body' = None):
         self._name = name
         self._MU = MU
@@ -399,6 +455,160 @@ class Orbitable(ABC):
         pass
 
 
+def _radius_at_periapsis(semiMajorAxis: float, eccentricity: float) -> float:
+    return semiMajorAxis * (1 - eccentricity)
+
+
+def _radius_at_apoapsis(semiMajorAxis: float, eccentricity: float) -> float:
+    return semiMajorAxis * (1 + eccentricity)
+
+
+def _sma_to_mean_motion(semiMajorAxis: float, mu: float) -> float:
+    # semiMajorAxis - km
+    return sqrt(mu / (semiMajorAxis * semiMajorAxis * semiMajorAxis))
+
+
+def _mean_to_eccentric_anomaly(meanAnomaly: float, eccentricity: float) -> float:
+    Ej = meanAnomaly
+    while True:
+        numerator = Ej - (eccentricity * sin(Ej)) - meanAnomaly
+        denominator = 1 - eccentricity * cos(Ej)
+        Ej1 = Ej - (numerator / denominator)
+        if abs(Ej1 - Ej) <= 1e-7:
+            return Ej1
+        else:
+            Ej = Ej1
+
+
+def _eccentric_to_true_anomaly(eccentricAnomaly: float, eccentricity: float) -> float:
+    beta = eccentricity / (1 + sqrt(1 - eccentricity * eccentricity))
+    return eccentricAnomaly + 2 * atan2(beta * sin(eccentricAnomaly), 1 - beta * cos(eccentricAnomaly))
+
+
+def _mean_to_true_anomaly_newton(meanAnomaly: float, eccentricity: float) -> float:
+    eccAnom = _mean_to_eccentric_anomaly(meanAnomaly, eccentricity)
+    return _eccentric_to_true_anomaly(eccAnom, eccentricity)
+
+
+def _mean_to_true_anomaly_fast(meanAnomaly: float, eccentricity: float) -> float:
+    return meanAnomaly + 2 * eccentricity * sin(meanAnomaly) \
+           + 1.25 * eccentricity * eccentricity * sin(2 * meanAnomaly)
+
+
+# todo: come up with an analytical rational for this number
+_MAXIMUM_ECCENTRICITY = 0.17
+
+
+def _mean_to_true_anomaly(meanAnomaly: float, eccentricity: float) -> float:
+    if eccentricity < _MAXIMUM_ECCENTRICITY:
+        return _mean_to_true_anomaly_fast(meanAnomaly, eccentricity)
+    return _mean_to_true_anomaly_newton(meanAnomaly, eccentricity)
+
+
+def _radius_at_anomaly(sma: float, eccentricity: float, trueAnomaly: float) -> float:
+    numerator = sma * (1 - eccentricity * eccentricity)
+    denominator = 1 + eccentricity * cos(trueAnomaly)
+    return numerator / denominator
+
+
+def _flight_angle_at_anomaly(eccentricity: float, trueAnomaly: float) -> float:
+    numerator = eccentricity * sin(trueAnomaly)
+    denominator = 1 + eccentricity * cos(trueAnomaly)
+    return atan2(numerator, denominator)
+
+
+def _velocity_at_anomaly(sma: float, radius: float, mu: float) -> float:
+    temp = (2 / radius) - (1 / sma)
+    return sqrt(mu * temp)
+
+
+def _true_to_eccentric_anomaly(trueAnomaly: float, eccentricity: float) -> float:
+    y = sqrt(1 - (eccentricity * eccentricity)) * sin(trueAnomaly)
+    return atan3(y, cos(trueAnomaly) + eccentricity)
+
+
+def _eccentric_to_mean_anomaly(eccentricAnomaly: float, eccentricity: float) -> float:
+    return eccentricAnomaly - eccentricity * sin(eccentricAnomaly)
+
+
+def _true_to_mean_anomaly(trueAnomaly: float, eccentricity: float) -> float:
+    eccentricAnomaly = _true_to_eccentric_anomaly(trueAnomaly, eccentricity)
+    return _eccentric_to_mean_anomaly(eccentricAnomaly, eccentricity)
+
+
+def _next_mean_anomaly(meanMotion: float, m0: float, epoch0: JulianDate, m1: float, time: JulianDate) -> JulianDate:
+    # meanMotion - rev / day; m0, m1 - radians
+    periapsisPass = epoch0.future(-m0 / (TWOPI * meanMotion))
+    revolutions = (time - periapsisPass) * meanMotion
+    m0 = (revolutions - floor(revolutions)) * TWOPI
+    dm = m1 - m0
+    if m1 < m0:
+        dm += TWOPI
+    return time.future((dm / meanMotion) / TWOPI)
+
+
+def _previous_mean_anomaly(meanMotion: float, m0: float, epoch0: JulianDate, m1: float, time: JulianDate) -> JulianDate:
+    # meanMotion - rev / day; m0, m1 - radians
+    periapsisPass = epoch0.future(-m0 / (TWOPI * meanMotion))
+    revolutions = (time - periapsisPass) * meanMotion
+    m0 = (revolutions - floor(revolutions)) * TWOPI
+    dm = m1 - m0
+    if m0 < m1:
+        dm -= TWOPI
+    return time.future((dm / meanMotion) / TWOPI)
+
+
+def _next_true_anomaly(meanMotion: float, eccentricity: float, t0: float, epoch0: JulianDate,
+                       t1: float, time: JulianDate) -> JulianDate:
+    # meanMotion - rev / day; m0, m1 - radians
+    m0 = _true_to_mean_anomaly(t0, eccentricity)
+    m1 = _true_to_mean_anomaly(t1, eccentricity)
+    return _next_mean_anomaly(meanMotion, m0, epoch0, m1, time)
+
+
+def _previous_true_anomaly(meanMotion: float, eccentricity: float, t0: float, epoch0: JulianDate,
+                           t1: float, time: JulianDate) -> JulianDate:
+    # meanMotion - rev / day; m0, m1 - radians
+    m0 = _true_to_mean_anomaly(t0, eccentricity)
+    m1 = _true_to_mean_anomaly(t1, eccentricity)
+    return _previous_mean_anomaly(meanMotion, m0, epoch0, m1, time)
+
+
+def _mean_anomaly_at(meanMotion: float, m0: float, epoch0: JulianDate, time: JulianDate) -> float:
+    # meanMotion - rev / day; m0 radians
+    dM = meanMotion * (time - epoch0) * 86400.0
+    return (m0 + dM) % TWOPI
+
+
+def _true_anomaly_at(meanMotion: float, eccentricity: float, t0: float, epoch0: JulianDate, time: JulianDate) -> float:
+    # meanMotion - rev / day; t0 - radians
+    m0 = _true_to_mean_anomaly(t0, eccentricity)
+    m1 = _mean_anomaly_at(meanMotion, m0, epoch0, time)
+    return _mean_to_true_anomaly(m1, eccentricity)
+
+
+def _nearest_mean_anomaly(meanMotion: float, m0: float, epoch0: JulianDate, m1: float) -> JulianDate:
+    # meanMotion - rev / day; m0, m1 - radians
+    if m1 < m0:
+        if m0 - m1 < pi:
+            dma = m1 - m0
+        else:
+            dma = m1 + TWOPI - m0
+    else:
+        if m1 - m0 > pi:
+            dma = m1 - TWOPI - m0
+        else:
+            dma = m1 - m0
+    return epoch0.future(dma / (meanMotion * TWOPI))
+
+
+def _nearest_true_anomaly(meanMotion: float, eccentricity: float, t0: float, epoch0: JulianDate, t1: float) \
+        -> JulianDate:
+    m0 = _true_to_mean_anomaly(t0, eccentricity)
+    m1 = _true_to_mean_anomaly(t1, eccentricity)
+    return _nearest_mean_anomaly(meanMotion, m0, epoch0, m1)
+
+
 class Orbit(Orbitable):
     __slots__ = '_elements', '_periapsis', '_apoapsis'
 
@@ -424,7 +634,7 @@ class Orbit(Orbitable):
         if anomalyType is _MEAN:
             anomaly = _mean_anomaly_at(meanMotion, self._elements.meanAnomaly, self._elements.epoch, time)
         elif anomalyType is _TRUE:
-            t0 = _mean_to_true_anomaly_newton(self._elements.meanAnomaly, self._elements.ecc)
+            t0 = _mean_to_true_anomaly(self._elements.meanAnomaly, self._elements.ecc)
             anomaly = _true_anomaly_at(meanMotion, self._elements.ecc, t0, self._elements.epoch, time)
         else:
             raise ValueError('anomalyType parameter must be MEAN or TRUE')
@@ -525,166 +735,6 @@ class Orbit(Orbitable):
         return _true_anomaly_at(meanMotion, self._elements.ecc, trueAnomaly_0, self._elements.epoch, time)
 
 
-def _radius_at_periapsis(semiMajorAxis: float, eccentricity: float) -> float:
-    return semiMajorAxis * (1 - eccentricity)
-
-
-def _radius_at_apoapsis(semiMajorAxis: float, eccentricity: float) -> float:
-    return semiMajorAxis * (1 + eccentricity)
-
-
-def _sma_to_mean_motion(semiMajorAxis: float, mu: float) -> float:
-    # semiMajorAxis - km
-    return sqrt(mu / (semiMajorAxis * semiMajorAxis * semiMajorAxis))
-
-
-def _mean_motion_to_sma(meanMotion: float, mu: float) -> float:
-    # meanMotion - rad / s
-    oneThird = 1 / 3
-    return (mu ** oneThird) / (meanMotion ** (oneThird * 2))
-
-
-def _mean_to_eccentric_anomaly(meanAnomaly: float, eccentricity: float) -> float:
-    Ej = meanAnomaly
-    while True:
-        numerator = Ej - (eccentricity * sin(Ej)) - meanAnomaly
-        denominator = 1 - eccentricity * cos(Ej)
-        Ej1 = Ej - (numerator / denominator)
-        if abs(Ej1 - Ej) <= 1e-7:
-            return Ej1
-        else:
-            Ej = Ej1
-
-
-def _eccentric_to_true_anomaly(eccentricAnomaly: float, eccentricity: float) -> float:
-    beta = eccentricity / (1 + sqrt(1 - eccentricity * eccentricity))
-    return eccentricAnomaly + 2 * atan2(beta * sin(eccentricAnomaly), 1 - beta * cos(eccentricAnomaly))
-
-
-def _mean_to_true_anomaly_newton(meanAnomaly: float, eccentricity: float) -> float:
-    eccAnom = _mean_to_eccentric_anomaly(meanAnomaly, eccentricity)
-    return _eccentric_to_true_anomaly(eccAnom, eccentricity)
-
-
-def _mean_to_true_anomaly_fast(meanAnomaly: float, eccentricity: float) -> float:
-    return meanAnomaly + 2 * eccentricity * sin(meanAnomaly) \
-           + 1.25 * eccentricity * eccentricity * sin(2 * meanAnomaly)
-
-
-# todo: come up with an analytical rational for this number
-_MAXIMUM_ECCENTRICITY = 0.17
-
-
-def _mean_to_true_anomaly(meanAnomaly: float, eccentricity: float) -> float:
-    if eccentricity < _MAXIMUM_ECCENTRICITY:
-        return _mean_to_true_anomaly_fast(meanAnomaly, eccentricity)
-    return _mean_to_true_anomaly_newton(meanAnomaly, eccentricity)
-
-
-def _true_to_eccentric_anomaly(trueAnomaly: float, eccentricity: float) -> float:
-    y = sqrt(1 - (eccentricity * eccentricity)) * sin(trueAnomaly)
-    return atan3(y, cos(trueAnomaly) + eccentricity)
-
-
-def _eccentric_to_mean_anomaly(eccentricAnomaly: float, eccentricity: float) -> float:
-    return eccentricAnomaly - eccentricity * sin(eccentricAnomaly)
-
-
-def _true_to_mean_anomaly(trueAnomaly: float, eccentricity: float) -> float:
-    eccentricAnomaly = _true_to_eccentric_anomaly(trueAnomaly, eccentricity)
-    return _eccentric_to_mean_anomaly(eccentricAnomaly, eccentricity)
-
-
-def _next_mean_anomaly(meanMotion: float, m0: float, epoch0: JulianDate, m1: float, time: JulianDate) -> JulianDate:
-    # meanMotion - rev / day; m0, m1 - radians
-    periapsisPass = epoch0.future(-m0 / (TWOPI * meanMotion))
-    revolutions = (time - periapsisPass) * meanMotion
-    m0 = (revolutions - floor(revolutions)) * TWOPI
-    dm = m1 - m0
-    if m1 < m0:
-        dm += TWOPI
-    return time.future((dm / meanMotion) / TWOPI)
-
-
-def _previous_mean_anomaly(meanMotion: float, m0: float, epoch0: JulianDate, m1: float, time: JulianDate) -> JulianDate:
-    # meanMotion - rev / day; m0, m1 - radians
-    periapsisPass = epoch0.future(-m0 / (TWOPI * meanMotion))
-    revolutions = (time - periapsisPass) * meanMotion
-    m0 = (revolutions - floor(revolutions)) * TWOPI
-    dm = m1 - m0
-    if m0 < m1:
-        dm -= TWOPI
-    return time.future((dm / meanMotion) / TWOPI)
-
-
-def _next_true_anomaly(meanMotion: float, eccentricity: float, t0: float, epoch0: JulianDate,
-                       t1: float, time: JulianDate) -> JulianDate:
-    # meanMotion - rev / day; m0, m1 - radians
-    m0 = _true_to_mean_anomaly(t0, eccentricity)
-    m1 = _true_to_mean_anomaly(t1, eccentricity)
-    return _next_mean_anomaly(meanMotion, m0, epoch0, m1, time)
-
-
-def _previous_true_anomaly(meanMotion: float, eccentricity: float, t0: float, epoch0: JulianDate,
-                           t1: float, time: JulianDate) -> JulianDate:
-    # meanMotion - rev / day; m0, m1 - radians
-    m0 = _true_to_mean_anomaly(t0, eccentricity)
-    m1 = _true_to_mean_anomaly(t1, eccentricity)
-    return _previous_mean_anomaly(meanMotion, m0, epoch0, m1, time)
-
-
-def _mean_anomaly_at(meanMotion: float, m0: float, epoch0: JulianDate, time: JulianDate) -> float:
-    # meanMotion - rev / day; m0 radians
-    dM = meanMotion * (time - epoch0) * 86400.0
-    return (m0 + dM) % TWOPI
-
-
-def _true_anomaly_at(meanMotion: float, eccentricity: float, t0: float, epoch0: JulianDate, time: JulianDate) -> float:
-    # meanMotion - rev / day; t0 - radians
-    m0 = _true_to_mean_anomaly(t0, eccentricity)
-    m1 = _mean_anomaly_at(meanMotion, m0, epoch0, time)
-    return _mean_to_true_anomaly_newton(m1, eccentricity)
-
-
-def _nearest_mean_anomaly(meanMotion: float, m0: float, epoch0: JulianDate, m1: float) -> JulianDate:
-    # meanMotion - rev / day; m0, m1 - radians
-    if m1 < m0:
-        if m0 - m1 < pi:
-            dma = m1 - m0
-        else:
-            dma = m1 + TWOPI - m0
-    else:
-        if m1 - m0 > pi:
-            dma = m1 - TWOPI - m0
-        else:
-            dma = m1 - m0
-    return epoch0.future(dma / (meanMotion * TWOPI))
-
-
-def _nearest_true_anomaly(meanMotion: float, eccentricity: float, t0: float, epoch0: JulianDate, t1: float) \
-        -> JulianDate:
-    m0 = _true_to_mean_anomaly(t0, eccentricity)
-    m1 = _true_to_mean_anomaly(t1, eccentricity)
-    return _nearest_mean_anomaly(meanMotion, m0, epoch0, m1)
-
-
-def _radius_at_anomaly(sma: float, eccentricity: float, trueAnomaly: float) -> float:
-    numerator = sma * (1 - eccentricity * eccentricity)
-    denominator = 1 + eccentricity * cos(trueAnomaly)
-    return numerator / denominator
-
-
-def _flight_angle_at_anomaly(eccentricity: float, trueAnomaly: float) -> float:
-    numerator = eccentricity * sin(trueAnomaly)
-    denominator = 1 + eccentricity * cos(trueAnomaly)
-    return atan2(numerator, denominator)
-
-
-def _velocity_at_anomaly(sma: float, radius: float, mu: float) -> float:
-    temp = (2 / radius) - (1 / sma)
-    return sqrt(mu * temp)
-
-
 class Satellite(Orbitable):
     __slots__ = '_tle', '_propagator'
 
@@ -702,11 +752,14 @@ class Satellite(Orbitable):
             raise TypeError('anomalyType parameter must be Anomaly type')
 
         # todo: if eccentricVector works, compute this with SGP4 position vector
-        elements = Elements.fromTle(self._tle, time)
+        # elements = Elements.fromTle(self._tle, time)
+        _, _, _, eccentricity, _, meanAnomaly = _elements_from_tle(self._tle, time)
         if anomalyType is _TRUE:
-            return _mean_to_true_anomaly(elements.meanAnomaly, elements.ecc)
+            # return _mean_to_true_anomaly(elements.meanAnomaly, elements.ecc)
+            return _mean_to_true_anomaly(meanAnomaly, eccentricity)
         elif anomalyType is _MEAN:
-            return elements.meanAnomaly
+            # return elements.meanAnomaly
+            return meanAnomaly
         else:
             raise ValueError('anomalyType must be TRUE or MEAN')
 
@@ -722,23 +775,32 @@ class Satellite(Orbitable):
             raise ValueError('direction parameter must be NEXT, PREVIOUS or NEAREST')
 
         # todo: determine if this is ideal using SGP4 states
-        elements = Elements.fromTle(self._tle, time)
-        meanMotion = _sma_to_mean_motion(elements.sma, self._body.mu) * 86400 / TWOPI
+        # elements = Elements.fromTle(self._tle, time)
+        _, _, _, eccentricity, sma, meanAnomaly = _elements_from_tle(self._tle, time)
+        # meanMotion = _sma_to_mean_motion(elements.sma, self._body.mu) * 86400 / TWOPI
+        meanMotion = _sma_to_mean_motion(sma, self._body.mu) * 86400 / TWOPI
         if anomalyType is _TRUE:
-            t0 = _mean_to_true_anomaly(elements.meanAnomaly, elements.ecc)
+            # t0 = _mean_to_true_anomaly(elements.meanAnomaly, elements.ecc)
+            t0 = _mean_to_true_anomaly(meanAnomaly, eccentricity)
             if direction is _NEXT:
-                return _next_true_anomaly(meanMotion, elements.ecc, t0, time, anomaly, time)
+                # return _next_true_anomaly(meanMotion, elements.ecc, t0, time, anomaly, time)
+                return _next_true_anomaly(meanMotion, eccentricity, t0, time, anomaly, time)
             elif direction is _PREVIOUS:
-                return _previous_true_anomaly(meanMotion, elements.ecc, t0, time, anomaly, time)
+                # return _previous_true_anomaly(meanMotion, elements.ecc, t0, time, anomaly, time)
+                return _previous_true_anomaly(meanMotion, eccentricity, t0, time, anomaly, time)
             else:
-                return _nearest_true_anomaly(meanMotion, elements.ecc, t0, time, anomaly)
+                # return _nearest_true_anomaly(meanMotion, elements.ecc, t0, time, anomaly)
+                return _nearest_true_anomaly(meanMotion, eccentricity, t0, time, anomaly)
         elif anomalyType is _MEAN:
             if direction is _NEXT:
-                return _next_mean_anomaly(meanMotion, elements.meanAnomaly, time, anomaly, time)
+                # return _next_mean_anomaly(meanMotion, elements.meanAnomaly, time, anomaly, time)
+                return _next_mean_anomaly(meanMotion, meanAnomaly, time, anomaly, time)
             elif direction is _PREVIOUS:
-                return _previous_mean_anomaly(meanMotion, elements.meanAnomaly, time, anomaly, time)
+                # return _previous_mean_anomaly(meanMotion, elements.meanAnomaly, time, anomaly, time)
+                return _previous_mean_anomaly(meanMotion, meanAnomaly, time, anomaly, time)
             else:
-                return _nearest_mean_anomaly(meanMotion, elements.meanAnomaly, time, anomaly)
+                # return _nearest_mean_anomaly(meanMotion, elements.meanAnomaly, time, anomaly)
+                return _nearest_mean_anomaly(meanMotion, meanAnomaly, time, anomaly)
         else:
             raise ValueError('anomalyType must be TRUE or MEAN')
 
@@ -754,17 +816,79 @@ class Satellite(Orbitable):
         return Elements.fromTle(self._tle, time)
 
     def getReferenceFrame(self, time: JulianDate = None) -> ReferenceFrame:
-        elements = Elements.fromTle(self._tle, time)
-        return ReferenceFrame(ZXZ, EulerAngles(elements.raan, elements.inc, elements.aop))
+        # elements = Elements.fromTle(self._tle, time)
+        raan, inc, aop, *_ = _elements_from_tle(self._tle, time)
+        return ReferenceFrame(ZXZ, EulerAngles(raan, inc, aop))
 
     def getPeriapsis(self, time: JulianDate = None) -> float:
         if not isinstance(time, JulianDate):
             raise TypeError('time parameter must be JulianDate type')
-        elements = Elements.fromTle(self._tle, time)
-        return _radius_at_periapsis(elements.sma, elements.ecc)
+        # elements = Elements.fromTle(self._tle, time)
+        _, _, _, eccentricity, sma, _ = _elements_from_tle(self._tle, time)
+        return _radius_at_periapsis(sma, eccentricity)
 
     def getApoapsis(self, time: JulianDate = None) -> float:
         if not isinstance(time, JulianDate):
             raise TypeError('time parameter must be JulianDate type')
-        elements = Elements.fromTle(self._tle, time)
-        return _radius_at_apoapsis(elements.sma, elements.ecc)
+        # elements = Elements.fromTle(self._tle, time)
+        _, _, _, eccentricity, sma, _ = _elements_from_tle(self._tle, time)
+        return _radius_at_apoapsis(sma, eccentricity)
+
+
+def _mean_motion_to_sma(meanMotion: float, mu: float) -> float:
+    # meanMotion - rad / s
+    oneThird = 1 / 3
+    return (mu ** oneThird) / (meanMotion ** (oneThird * 2))
+
+
+def _check_real_number(number: float, name: str):
+    if not isinstance(number, (int, float)):
+        raise TypeError(f'{name} parameter must be a real number')
+
+
+def meanMotionToSma(meanMotion: float, mu: float) -> float:
+    _check_real_number(meanMotion, 'meanMotion')
+    _check_real_number(mu, 'mu')
+    return _mean_motion_to_sma(meanMotion, mu)
+
+
+def smaToMeanMotion(semiMajorAxis: float, mu: float) -> float:
+    _check_real_number(semiMajorAxis, 'semiMajorAxis')
+    _check_real_number(mu, 'mu')
+    return _sma_to_mean_motion(semiMajorAxis, mu)
+
+
+def meanToTrueAnomaly(meanAnomaly: float, eccentricity: float) -> float:
+    _check_real_number(meanAnomaly, 'meanAnomaly')
+    _check_real_number(eccentricity, 'eccentricity')
+    return _mean_to_true_anomaly(meanAnomaly, eccentricity)
+
+
+def meanToEccentricAnomaly(meanAnomaly: float, eccentricity: float) -> float:
+    _check_real_number(meanAnomaly, 'meanAnomaly')
+    _check_real_number(eccentricity, 'eccentricity')
+    return _mean_to_eccentric_anomaly(meanAnomaly, eccentricity)
+
+
+def eccentricToTrueAnomaly(eccentricAnomaly: float, eccentricity: float) -> float:
+    _check_real_number(eccentricAnomaly, 'eccentricAnomaly')
+    _check_real_number(eccentricity, 'eccentricity')
+    return _eccentric_to_true_anomaly(eccentricAnomaly, eccentricity)
+
+
+def trueToMeanAnomaly(trueAnomaly: float, eccentricity: float) -> float:
+    _check_real_number(trueAnomaly, 'trueAnomaly')
+    _check_real_number(eccentricity, 'eccentricity')
+    return _true_to_mean_anomaly(trueAnomaly, eccentricity)
+
+
+def trueToEccentricAnomaly(trueAnomaly: float, eccentricity: float) -> float:
+    _check_real_number(trueAnomaly, 'trueAnomaly')
+    _check_real_number(eccentricity, 'eccentricity')
+    return _true_to_eccentric_anomaly(trueAnomaly, eccentricity)
+
+
+def eccentricToMeanAnomaly(eccentricAnomaly: float, eccentricity: float) -> float:
+    _check_real_number(eccentricAnomaly, 'eccentricAnomaly')
+    _check_real_number(eccentricity, 'eccentricity')
+    return _eccentric_to_mean_anomaly(eccentricAnomaly, eccentricity)
