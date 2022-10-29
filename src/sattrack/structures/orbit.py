@@ -2,10 +2,10 @@ from abc import abstractmethod, ABC
 from copy import deepcopy
 from enum import Enum
 from inspect import Parameter, signature
-from math import radians, cos, sin, pi, acos, sqrt, atan2, floor
+from math import radians, cos, sin, pi, sqrt, atan2, floor
 from typing import Callable
 
-from pyevspace import EVector, norm, cross, dot
+from pyevspace import EVector
 from sattrack.rotation.order import ZXZ, Axis
 from sattrack.rotation.rotation import EulerAngles, getEulerMatrix, rotateMatrixFrom, getMatrix, \
     ReferenceFrame
@@ -13,11 +13,10 @@ from sattrack.sampa import getSunPosition
 from sattrack.sgp4 import SGP4_Propagator
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import siderealTime
+from sattrack.structures._orbit import _true_to_mean_anomaly, _true_to_eccentric_anomaly, _eccentric_to_mean_anomaly, \
+    _elements_from_state, _sma_to_mean_motion, _nearest_true_anomaly, _nearest_mean_anomaly
 from sattrack.structures.tle import TwoLineElement
-from sattrack.util.anomalies import trueToMean
 from sattrack.util.constants import TWOPI, EARTH_MU, EARTH_POLAR_RADIUS, EARTH_EQUITORIAL_RADIUS, SUN_MU, SUN_RADIUS
-from sattrack.util.conversions import atan3
-
 
 __all__ = ('Elements', 'Body', 'EARTH_BODY', 'SUN_BODY', 'Orbitable', 'Orbit', 'Satellite', 'smaToMeanMotion',
            'meanMotionToSma', 'meanToTrueAnomaly', 'meanToEccentricAnomaly', 'eccentricToTrueAnomaly',
@@ -52,34 +51,6 @@ def _elements_from_tle(tle: TwoLineElement, time: JulianDate) -> (float, float, 
     aop = (tle.getAop() + (aopJ2Dot + aopMoon + aopSun) * dt) % 36
 
     return radians(raan), inc, radians(aop), ecc, sma, meanAnomaly
-
-
-def _compute_eccentric_vector(position: EVector, velocity: EVector, MU: float) -> EVector:
-    lhs = position * ((velocity.mag2() / MU) - (1 / position.mag()))
-    rhs = velocity * (dot(position, velocity) / MU)
-    return lhs - rhs
-
-
-def _elements_from_state(position: EVector, velocity: EVector, MU: float) -> (float, float, float, float, float, float):
-    angularMomentum = cross(position, velocity)
-    lineOfNodes = norm(cross(EVector.e3, angularMomentum))
-    eccentricityVector = _compute_eccentric_vector(position, velocity, MU)
-
-    ecc = eccentricityVector.mag()
-    inc = acos(angularMomentum[2] / angularMomentum.mag())
-    raan = acos(lineOfNodes[0])
-    if lineOfNodes[1] < 0:
-        raan = TWOPI - raan
-    aop = acos(dot(lineOfNodes, eccentricityVector) / eccentricityVector.mag())
-    if eccentricityVector[2] < 0:
-        aop = TWOPI - aop
-    tAnom = acos(dot(eccentricityVector, position) / (eccentricityVector.mag() * position.mag()))
-    if dot(position, velocity) < 0:
-        tAnom = 2 * pi - tAnom
-    mAnom = trueToMean(tAnom, ecc)
-    sma = (angularMomentum.mag() ** 2) / ((1 - (ecc * ecc)) * MU)
-
-    return raan, inc, aop, ecc, sma, mAnom
 
 
 def _check_type(value, paramName):
@@ -463,11 +434,6 @@ def _radius_at_apoapsis(semiMajorAxis: float, eccentricity: float) -> float:
     return semiMajorAxis * (1 + eccentricity)
 
 
-def _sma_to_mean_motion(semiMajorAxis: float, mu: float) -> float:
-    # semiMajorAxis - km
-    return sqrt(mu / (semiMajorAxis * semiMajorAxis * semiMajorAxis))
-
-
 def _mean_to_eccentric_anomaly(meanAnomaly: float, eccentricity: float) -> float:
     Ej = meanAnomaly
     while True:
@@ -522,20 +488,6 @@ def _velocity_at_anomaly(sma: float, radius: float, mu: float) -> float:
     return sqrt(mu * temp)
 
 
-def _true_to_eccentric_anomaly(trueAnomaly: float, eccentricity: float) -> float:
-    y = sqrt(1 - (eccentricity * eccentricity)) * sin(trueAnomaly)
-    return atan3(y, cos(trueAnomaly) + eccentricity)
-
-
-def _eccentric_to_mean_anomaly(eccentricAnomaly: float, eccentricity: float) -> float:
-    return eccentricAnomaly - eccentricity * sin(eccentricAnomaly)
-
-
-def _true_to_mean_anomaly(trueAnomaly: float, eccentricity: float) -> float:
-    eccentricAnomaly = _true_to_eccentric_anomaly(trueAnomaly, eccentricity)
-    return _eccentric_to_mean_anomaly(eccentricAnomaly, eccentricity)
-
-
 def _next_mean_anomaly(meanMotion: float, m0: float, epoch0: JulianDate, m1: float, time: JulianDate) -> JulianDate:
     # meanMotion - rev / day; m0, m1 - radians
     periapsisPass = epoch0.future(-m0 / (TWOPI * meanMotion))
@@ -585,28 +537,6 @@ def _true_anomaly_at(meanMotion: float, eccentricity: float, t0: float, epoch0: 
     m0 = _true_to_mean_anomaly(t0, eccentricity)
     m1 = _mean_anomaly_at(meanMotion, m0, epoch0, time)
     return _mean_to_true_anomaly(m1, eccentricity)
-
-
-def _nearest_mean_anomaly(meanMotion: float, m0: float, epoch0: JulianDate, m1: float) -> JulianDate:
-    # meanMotion - rev / day; m0, m1 - radians
-    if m1 < m0:
-        if m0 - m1 < pi:
-            dma = m1 - m0
-        else:
-            dma = m1 + TWOPI - m0
-    else:
-        if m1 - m0 > pi:
-            dma = m1 - TWOPI - m0
-        else:
-            dma = m1 - m0
-    return epoch0.future(dma / (meanMotion * TWOPI))
-
-
-def _nearest_true_anomaly(meanMotion: float, eccentricity: float, t0: float, epoch0: JulianDate, t1: float) \
-        -> JulianDate:
-    m0 = _true_to_mean_anomaly(t0, eccentricity)
-    m1 = _true_to_mean_anomaly(t1, eccentricity)
-    return _nearest_mean_anomaly(meanMotion, m0, epoch0, m1)
 
 
 class Orbit(Orbitable):
@@ -892,3 +822,4 @@ def eccentricToMeanAnomaly(eccentricAnomaly: float, eccentricity: float) -> floa
     _check_real_number(eccentricAnomaly, 'eccentricAnomaly')
     _check_real_number(eccentricity, 'eccentricity')
     return _eccentric_to_mean_anomaly(eccentricAnomaly, eccentricity)
+
