@@ -1,8 +1,11 @@
 import json as _json
 import abc as _abc
 import math as _math
-from sattrack.util.constants import EARTH_FLATTENING, EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS
-from pyevspace import EVector, norm
+
+from sattrack.structures._coordinates import _compute_zenith_vector, _compute_position_vector, _radius_at_lat, \
+    _geodetic_to_geocentric
+from sattrack.util.constants import EARTH_FLATTENING
+from pyevspace import EVector
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.util.conversions import atan3
@@ -124,25 +127,27 @@ class GeoPosition(Coordinates):
         return _geodetic_to_geocentric(self._lat)
 
     def getPositionVector(self, jd: JulianDate = None) -> EVector:
-        # if jd is not None and not isinstance(jd, JulianDate):
-        #     raise TypeError('jd parameter must be a JulianDate type')
+        if jd is not None and not isinstance(jd, JulianDate):
+            raise TypeError('jd parameter must be a JulianDate type')
+        return _compute_position_vector(self._lat, self._lng, self._elevation, jd)
         # position vector needs geocentric latitude
-        return _compute_normal_vector(
-            _geodetic_to_geocentric(self._lat),
-            self._lng,
-            _radius_at_lat(self._lat) + self._elevation,
-            jd
-        )
+        # return _compute_normal_vector(
+        #     _geodetic_to_geocentric(self._lat),
+        #     self._lng,
+        #     _radius_at_lat(self._lat) + self._elevation,
+        #     jd
+        # )
 
     def getZenithVector(self, jd: JulianDate = None) -> EVector:
         if jd is not None and not isinstance(jd, JulianDate):
             raise TypeError('jd parameter must be a JulianDate type')
-        zenithVector = _compute_normal_vector(
-            self._lat,
-            self._lng,
-            _radius_at_lat(self._lat) + self._elevation,
-            jd)
-        return norm(zenithVector)
+        return _compute_zenith_vector(self._lat, self._lng, self._elevation, jd)
+        # zenithVector = _compute_normal_vector(
+        #     self._lat,
+        #     self._lng,
+        #     _radius_at_lat(self._lat) + self._elevation,
+        #     jd)
+        # return norm(zenithVector)
 
     def _fmod(self, value: float) -> float:
         # find the equivalent angle from -180 to 180
@@ -181,13 +186,6 @@ def _geocentric_to_geodetic(geocentricLatitude):
     return _math.atan(_math.tan(geocentricLatitude) / ((1 - EARTH_FLATTENING) ** 2))
 
 
-def _geodetic_to_geocentric(geodeticLatitude):
-    # parameter and return value are in radians
-    if not -_math.pi / 2 <= geodeticLatitude <= _math.pi / 2:
-        raise ValueError('lat argument must be between -90 and 90 degrees')
-    return _math.atan(((1 - EARTH_FLATTENING) ** 2) * _math.tan(geodeticLatitude))
-
-
 def geocentricToGeodetic(geocentricLatitude: float) -> float:
     # parameter and return value are in degrees
     return _math.degrees(_geocentric_to_geodetic(_math.radians(geocentricLatitude)))
@@ -196,35 +194,6 @@ def geocentricToGeodetic(geocentricLatitude: float) -> float:
 def geodeticToGeocentric(geodeticLatitude: float) -> float:
     # parameter and return value are in degrees
     return _math.degrees(_geodetic_to_geocentric(_math.radians(geodeticLatitude)))
-
-
-def _radius_at_lat(latitude):
-    # latitude refers to geodetic latitude, returns radius in kilometers
-    if latitude == 0:
-        return EARTH_EQUITORIAL_RADIUS
-    elif latitude == 90 or latitude == -90:
-        return EARTH_POLAR_RADIUS
-
-    # _geodetic_to_geocentric() checks latitude range for us
-    geocentric = _geodetic_to_geocentric(latitude)
-    # radius = (Rp * Re) / sqrt((Rp*cos(geocentric))^2 + (Re*sin(geocentric))^2)
-    bcos2 = (EARTH_POLAR_RADIUS * _math.cos(geocentric)) ** 2
-    asin2 = (EARTH_EQUITORIAL_RADIUS * _math.sin(geocentric)) ** 2
-    return (EARTH_POLAR_RADIUS * EARTH_EQUITORIAL_RADIUS) / _math.sqrt(bcos2 + asin2)
-
-
-def _compute_normal_vector(latitude, longitude, radius, jd):
-    # only account for earth offset when jd is not None
-    if jd is not None:
-        if isinstance(jd, JulianDate):
-            longitude += earthOffsetAngle(jd)
-        else:
-            raise TypeError('jd parameter must be a JulianDate type')
-    return EVector(
-        radius * _math.cos(latitude) * _math.cos(longitude),
-        radius * _math.cos(latitude) * _math.sin(longitude),
-        radius * _math.sin(latitude)
-    )
 
 
 def radiusAtLatitude(latitude: float) -> float:
