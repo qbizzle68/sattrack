@@ -8,7 +8,7 @@ from pyevspace import EVector
 from sattrack.exceptions import SunRiseSetException
 from sattrack.spacetime.juliandate import JulianDate, J2000
 from sattrack.structures.coordinates import GeoPosition
-from sattrack.topos import toTopocentric
+from sattrack.topocentric import toTopocentric
 from sattrack.util.constants import AU, TWOPI
 from sattrack.util.conversions import atan3
 
@@ -110,7 +110,7 @@ def getSunTransitTime(time: JulianDate, geo: GeoPosition):
 def getSunAltAz(time: JulianDate, geo: GeoPosition):
     spc = SunPositionController2(time, geo)
     sunPos = spc.getSunPosition()
-    sunPosSez = toTopocentric(sunPos, time, geo)
+    sunPosSez = toTopocentric(sunPos, geo, time)
     return degrees(asin(sunPosSez[2] / sunPosSez.mag())), degrees(atan3(sunPosSez[1], -sunPosSez[0]))
 
 
@@ -324,7 +324,7 @@ def getTwilightType(time: JulianDate, geo: GeoPosition) -> TwilightType:
 
     spc = SunPositionController2(time, geo)
     # sunSEZPos = toTopocentric(getSunPosition2(time), time, geo)
-    sunSEZPos = toTopocentric(spc.getSunPosition(), time, geo)
+    sunSEZPos = toTopocentric(spc.getSunPosition(), geo, time)
     sunAngle = degrees(asin(sunSEZPos[2] / sunSEZPos.mag()))
     if sunAngle < -18:
         return TwilightType.Night

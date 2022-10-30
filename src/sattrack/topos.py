@@ -2,65 +2,11 @@ from math import degrees, asin, radians, sin, cos, tan, sqrt
 
 from pyevspace import EVector, cross, dot, norm
 
-from sattrack.rotation.order import ZYX
 from sattrack.structures.coordinates import GeoPosition
-from sattrack.rotation.rotation import getEulerMatrix, EulerAngles, rotateToThenOffset, undoRotateToThenOffset
 from sattrack.spacetime.juliandate import JulianDate
-from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.structures.satellite import Satellite
+from sattrack.topocentric import toTopocentric
 from sattrack.util.conversions import atan3
-
-
-def toTopocentric(vec: EVector, time: JulianDate, geo: GeoPosition) -> EVector:
-    """
-    Transform a vector from a geocentric equitorial reference frame to a topocentric horizontal reference frame.
-
-    Args:
-        vec: Vector to transform to the topocentric reference frame.
-        time: Time of the position, to accommodate for sidereal time.
-        geo: GeoPosition which will be the origin of the topocentric reference frame.
-
-    Returns:
-        The transformed vector.
-    """
-
-    # geoVector = geoPositionVector(geo, time)
-    geoVector = geo.getPositionVector(time)
-    mat = getEulerMatrix(
-        ZYX,
-        EulerAngles(
-            radians(geo.longitude) + earthOffsetAngle(time),
-            radians(90 - geo.latitude),
-            0.0
-        )
-    )
-    return rotateToThenOffset(mat, geoVector, vec)
-
-
-def fromTopocentric(vec: EVector, time: JulianDate, geo: GeoPosition) -> EVector:
-    """
-    Transform a vector from a topocentric horizontal reference frame to a geocentric equitorial reference frame.
-
-    Args:
-        vec: Vector to transform to the geocentric reference frame.
-        time: Time of the position, to accommodate for sidereal time.
-        geo: GeoPosition which is the origin of the topocentric reference frame.
-
-    Returns:
-        The transformed vector.
-    """
-
-    # geoVector = geoPositionVector(geo, time)
-    geoVector = geo.getPositionVector(time)
-    mat = getEulerMatrix(
-        ZYX,
-        EulerAngles(
-            radians(geo.longitude) + earthOffsetAngle(time),
-            radians(90 - geo.latitude),
-            0.0
-        )
-    )
-    return undoRotateToThenOffset(mat, geoVector, vec)
 
 
 def getPVector(geo: GeoPosition, position: EVector, velocity: EVector, jd: JulianDate) -> EVector:
@@ -105,7 +51,7 @@ def getToposPosition(satellite: Satellite, time: JulianDate, geo: GeoPosition) -
         The satellite position vector in SEZ coordinates.
     """
 
-    return toTopocentric(satellite.getState(time)[0], time, geo)
+    return toTopocentric(satellite.getState(time)[0], geo, time)
 
 
 def getAltitude(satellite: Satellite, time: JulianDate, geo: GeoPosition) -> float:
@@ -121,7 +67,7 @@ def getAltitude(satellite: Satellite, time: JulianDate, geo: GeoPosition) -> flo
         The satellite altitude above (or below) the horizon in degrees.
     """
 
-    sez = toTopocentric(satellite.getState(time)[0], time, geo)
+    sez = toTopocentric(satellite.getState(time)[0], geo, time)
     return degrees(asin(sez[2] / sez.mag()))
 
 
@@ -139,7 +85,7 @@ def getAzimuth(satellite: Satellite, time: JulianDate, geo: GeoPosition) -> floa
         The satellite azimuth measured clockwise from north in degrees.
     """
 
-    sez = toTopocentric(satellite.getState(time)[0], time, geo)
+    sez = toTopocentric(satellite.getState(time)[0], geo, time)
     return degrees(atan3(sez[1], -sez[0]))
 
 
