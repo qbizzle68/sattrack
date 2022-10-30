@@ -11,9 +11,10 @@ from sattrack.structures.satellite import *
 from sattrack.structures.tle import *
 
 from sattrack.exceptions import *
-from sattrack.satpass import *
+# from sattrack.satpass import *
 from sattrack.sun import *
-from sattrack.topos import *
+# from sattrack.topos import *
 from sattrack.sampa import *
 from sattrack.eclipse import *
 from sattrack.structures.orbit import *
+from sattrack.topocentric import *
