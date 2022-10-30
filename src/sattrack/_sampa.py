@@ -333,7 +333,7 @@ DELTAT = 72.6
 '''
 
 
-class SampaComputer:
+'''class SampaComputer:
     __slots__ = '_registry'
 
     def __init__(self, jd: JulianDate = None):
@@ -563,7 +563,7 @@ class SampaTopocentricComputer(SampaComputer):
 
     def sunIncidenceAngle(self, jd: JulianDate):
         _check_jd(jd)
-        return self.__call__(jd, 'sunIncidenceAngle')
+        return self.__call__(jd, 'sunIncidenceAngle')'''
 
 
 @total_ordering
@@ -585,9 +585,9 @@ class TwilightType(Enum):
         return NotImplemented
 
 
-def getTwilightType(jd: JulianDate, geo: GeoPosition):
-    # todo: get sun position in the most efficient way
-    computer = SampaComputer(jd)
+# def getTwilightType(jd: JulianDate, geo: GeoPosition):
+#     # todo: get sun position in the most efficient way
+#     computer = SampaComputer(jd)
 
 
 

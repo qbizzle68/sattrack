@@ -22,3 +22,7 @@ AU = 1.495978707e8  # km
 
 #   Math constants
 TWOPI = 2.0 * pi
+
+#   Time constants
+# as of 10/2022
+DELTAT = 72.6
