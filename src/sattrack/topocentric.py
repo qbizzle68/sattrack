@@ -21,7 +21,8 @@ from sattrack.util.constants import TWOPI
 from sattrack.util.conversions import atan3
 
 
-# __all__ = ('PositionInfo', 'SatellitePass', 'SatellitePassConstraints')
+__all__ = ('PositionInfo', 'SatellitePass', 'SatellitePassConstraints', 'getNextPass', 'getPassList', 'toTopocentric',
+           'fromTopocentric', 'getAzimuth', 'getAzimuth', 'azimuthAngleString')
 
 
 def _azimuth_angle_string(azimuth):
