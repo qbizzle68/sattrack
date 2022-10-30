@@ -823,3 +823,8 @@ def eccentricToMeanAnomaly(eccentricAnomaly: float, eccentricity: float) -> floa
     _check_real_number(eccentricity, 'eccentricity')
     return _eccentric_to_mean_anomaly(eccentricAnomaly, eccentricity)
 
+
+# meanAnomalyAt
+# trueAnomalyAt
+# computeMeanAnomaly
+# computeTrueAnomaly
