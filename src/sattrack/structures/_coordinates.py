@@ -1,18 +1,17 @@
 import math as _math
 
 from pyevspace import EVector
-from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.util.constants import EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS, EARTH_FLATTENING
 
 
-def _compute_zenith_vector(latitude: float, longitude: float, elevation: float, time: JulianDate) -> EVector:
+def _compute_zenith_vector(latitude: float, longitude: float, elevation: float, time) -> EVector:
     # geodetic latitude
     radius = _radius_at_lat(latitude)
     return _compute_normal_vector(latitude, longitude, radius + elevation, time)
 
 
-def _compute_position_vector(latitude: float, longitude: float, elevation: float, time: JulianDate) -> EVector:
+def _compute_position_vector(latitude: float, longitude: float, elevation: float, time) -> EVector:
     # geodetic latitude
     radius = _radius_at_lat(latitude)
     geocentricLatitude = _geodetic_to_geocentric(latitude)

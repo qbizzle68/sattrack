@@ -1,7 +1,6 @@
 from math import sqrt, sin, cos, acos, pi
 
 from pyevspace import EVector, dot, vang, norm, cross
-from sattrack.spacetime.juliandate import JulianDate
 from sattrack.util.constants import TWOPI
 from sattrack.util.conversions import atan3
 
@@ -62,14 +61,13 @@ def _sma_to_mean_motion(semiMajorAxis: float, mu: float) -> float:
     return sqrt(mu / (semiMajorAxis * semiMajorAxis * semiMajorAxis))
 
 
-def _nearest_true_anomaly(meanMotion: float, eccentricity: float, t0: float, epoch0: JulianDate, t1: float) \
-        -> JulianDate:
+def _nearest_true_anomaly(meanMotion: float, eccentricity: float, t0: float, epoch0, t1: float):
     m0 = _true_to_mean_anomaly(t0, eccentricity)
     m1 = _true_to_mean_anomaly(t1, eccentricity)
     return _nearest_mean_anomaly(meanMotion, m0, epoch0, m1)
 
 
-def _nearest_mean_anomaly(meanMotion: float, m0: float, epoch0: JulianDate, m1: float) -> JulianDate:
+def _nearest_mean_anomaly(meanMotion: float, m0: float, epoch0, m1: float):
     # meanMotion - rev / day; m0, m1 - radians
     if m1 < m0:
         if m0 - m1 < pi:
