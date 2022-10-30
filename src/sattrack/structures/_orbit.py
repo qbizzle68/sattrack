@@ -2,7 +2,6 @@ from math import sqrt, sin, cos, acos, pi
 
 from pyevspace import EVector, dot, vang, norm, cross
 from sattrack.spacetime.juliandate import JulianDate
-from sattrack.util.anomalies import trueToMean
 from sattrack.util.constants import TWOPI
 from sattrack.util.conversions import atan3
 
@@ -52,7 +51,7 @@ def _elements_from_state(position: EVector, velocity: EVector, MU: float) -> (fl
     tAnom = acos(dot(eccentricityVector, position) / (eccentricityVector.mag() * position.mag()))
     if dot(position, velocity) < 0:
         tAnom = 2 * pi - tAnom
-    mAnom = trueToMean(tAnom, ecc)
+    mAnom = _true_to_mean_anomaly(tAnom, ecc)
     sma = (angularMomentum.mag() ** 2) / ((1 - (ecc * ecc)) * MU)
 
     return raan, inc, aop, ecc, sma, mAnom
