@@ -267,7 +267,7 @@ class JulianDate:
 
     def time(self, timezone: float = None) -> str:
         # time of the date is second chunk returned by date
-        return self.date(timezone).split(' ')[0]
+        return self.date(timezone).split(' ')[1]
 
     def toDatetime(self):
         month, day, year, hour, minutes, secondsFloat = _jd_to_gregorian(self.value, self._timezone)
