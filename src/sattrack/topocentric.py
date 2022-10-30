@@ -531,9 +531,13 @@ def _max_pass_refine(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -
 
 
 def _next_pass_max(satellite: Orbitable, geo: GeoPosition, time: JulianDate, timeout: float) -> JulianDate:
+    print('time:', time)
+    print('timeout:', timeout)
     nextMax = _next_pass_max_approx(satellite, geo, time)
     altitude = _orbit_altitude(satellite, geo, nextMax)
     while altitude < 0:
+        print('nextMax', nextMax)
+        print('altitude', altitude)
         if nextMax - time < timeout:
             nextMax = _next_pass_max_approx(satellite, geo, nextMax.future(0.001))
             altitude = _orbit_altitude(satellite, geo, nextMax)
@@ -737,13 +741,15 @@ def getPassList(satellite: Orbitable, geo: GeoPosition, start: JulianDate, durat
     # offset the initial small step forward between computations
     nextTime = start.future(-0.001)
 
-    remainingTime = nextTime - start
-    while remainingTime < duration:
-        nextPass = getNextPass(satellite, geo, nextTime.future(0.001), remainingTime)
+    remainingTime = duration + 0.001
+    while remainingTime > 0:
+        try:
+            nextPass = getNextPass(satellite, geo, nextTime.future(0.001), remainingTime)
+        except NoPassException:
+            break
+        passList.append(nextPass)
         nextTime = nextPass.maxInfo.time
-        remainingTime = nextTime - start
-        if remainingTime < duration:
-            passList.append(nextPass)
+        remainingTime = duration - (nextTime - start)
     return tuple(passList)
 
 
@@ -756,30 +762,6 @@ def toTopocentric(vector: EVector, geo: GeoPosition, time: JulianDate) -> EVecto
         raise TypeError('time parameter must be JulianDate type')
 
     return _to_topocentric(vector, geo, time)
-
-    # """
-    # Transform a vector from a geocentric equitorial reference frame to a topocentric horizontal reference frame.
-    #
-    # Args:
-    #     vec: Vector to transform to the topocentric reference frame.
-    #     time: Time of the position, to accommodate for sidereal time.
-    #     geo: GeoPosition which will be the origin of the topocentric reference frame.
-    #
-    # Returns:
-    #     The transformed vector.
-    # """
-    #
-    # # geoVector = geoPositionVector(geo, time)
-    # geoVector = geo.getPositionVector(time)
-    # mat = getEulerMatrix(
-    #     ZYX,
-    #     EulerAngles(
-    #         radians(geo.longitude) + earthOffsetAngle(time),
-    #         radians(90 - geo.latitude),
-    #         0.0
-    #     )
-    # )
-    # return rotateToThenOffset(mat, geoVector, vec)
 
 
 def fromTopocentric(vector: EVector, time: JulianDate, geo: GeoPosition) -> EVector:
