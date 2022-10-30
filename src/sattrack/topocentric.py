@@ -137,10 +137,12 @@ def _check_info_type(param, paramName: str):
         raise TypeError(f'{paramName} parameter must be PositionInfo type')
     return param
 
+
 def _check_info_type_none(param, paramName: str):
     if param is not None:
         return _check_info_type(param, paramName)
     return param
+
 
 class SatellitePass:
 
@@ -451,7 +453,7 @@ def _time_to_plane(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> 
     if alt > 0:
         return jd
 
-    while abs(alt) > 2.7e-4: # one arc-second
+    while abs(alt) > 2.7e-4:  # one arc-second
         # todo: find an analytical guess of this dt
         dt = -alt / 360
         jd = jd.future(dt)
@@ -800,20 +802,6 @@ def fromTopocentric(vector: EVector, time: JulianDate, geo: GeoPosition) -> EVec
 
     return undoRotateToThenOffset(matrix, geoVector, vector)
 
-    """
-    Transform a vector from a topocentric horizontal reference frame to a geocentric equitorial reference frame.
-
-    Args:
-        vec: Vector to transform to the geocentric reference frame.
-        time: Time of the position, to accommodate for sidereal time.
-        geo: GeoPosition which is the origin of the topocentric reference frame.
-
-    Returns:
-        The transformed vector.
-    """
-
-    # geoVector = geoPositionVector(geo, time)
-
 
 def getAltitude(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> float:
     if not isinstance(satellite, Orbitable):
@@ -850,4 +838,4 @@ def azimuthAngleString(azimuth: float) -> str:
     return _azimuth_angle_string(azimuth)
 
 
-# todo: create altaz type and methods for it
+# todo: create alt-az type and methods for it
