@@ -22,7 +22,7 @@ setup(
     long_description_content_type = 'text/markdown',
     license= 'MIT',
     url = 'https://github.com/qbizzle68/sattrack',
-    install_requires=['pyevspace>=0.0.8'],
+    install_requires=['pyevspace>=0.0.8', 'requests'],
     classifiers = [
         'Development Status :: 2 - Pre-Alpha',
         'Environment :: Console',
