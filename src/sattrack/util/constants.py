@@ -1,5 +1,8 @@
 from math import pi
 
+__all__ = ('NEWTON_G', 'EARTH_MU', 'SUN_MU', 'EARTH_EQUITORIAL_RADIUS', 'EARTH_FLATTENING', 'EARTH_POLAR_RADIUS', 'CJ2',
+           'SUN_RADIUS', 'AU', 'TWOPI')
+
 # Mass constants
 NEWTON_G = 6.67408e-11
 EARTH_MU = 3.986004418e14 * 1e-9  # converted to km^3s^-2
