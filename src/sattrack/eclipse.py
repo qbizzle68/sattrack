@@ -8,8 +8,6 @@ from sattrack.rotation.rotation import EulerAngles, rotateOrderTo
 
 from sattrack.sampa import getSunPosition
 from sattrack.spacetime.juliandate import JulianDate
-# from sattrack.structures.elements import OrbitalElements
-# from sattrack.structures.satellite import Satellite
 from sattrack.structures.orbit import Orbitable
 from sattrack.util.constants import TWOPI, EARTH_EQUITORIAL_RADIUS, SUN_RADIUS
 
