@@ -1,4 +1,5 @@
 from sattrack._sampa import *
+from sattrack.spacetime.juliandate import JulianDate
 from sattrack.util.constants import DELTAT
 
 from ._sampa import _mpa_moon_mean_longitude, _mpa_moon_mean_elongation, _mpa_sun_mean_anomaly, \
