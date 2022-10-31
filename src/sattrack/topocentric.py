@@ -12,11 +12,11 @@ from sattrack.rotation.rotation import getEulerMatrix, EulerAngles, rotateOrderT
 from sattrack.sun import getSunTimes
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
-from sattrack.structures._coordinates import _compute_position_vector, _compute_zenith_vector
-from sattrack.structures._orbit import _compute_eccentric_vector, _true_anomaly_from_state, _true_to_mean_anomaly, \
+from sattrack._coordinates import _compute_position_vector, _compute_zenith_vector
+from sattrack._orbit import _compute_eccentric_vector, _true_anomaly_from_state, _true_to_mean_anomaly, \
     _sma_to_mean_motion, _nearest_true_anomaly
-from sattrack.structures.coordinates import GeoPosition
-from sattrack.structures.orbit import Orbitable
+from sattrack.coordinates import GeoPosition
+from sattrack.orbit import Orbitable
 from sattrack.util.constants import TWOPI
 from sattrack.util.conversions import atan3
 

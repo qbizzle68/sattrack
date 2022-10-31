@@ -13,9 +13,9 @@ from sattrack.sun import getSunPosition
 from sattrack.sgp4 import SGP4_Propagator
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import siderealTime
-from sattrack.structures._orbit import _true_to_mean_anomaly, _true_to_eccentric_anomaly, _eccentric_to_mean_anomaly, \
+from sattrack._orbit import _true_to_mean_anomaly, _true_to_eccentric_anomaly, _eccentric_to_mean_anomaly, \
     _elements_from_state, _sma_to_mean_motion, _nearest_true_anomaly, _nearest_mean_anomaly
-from sattrack.structures.tle import TwoLineElement
+from sattrack.tle import TwoLineElement
 from sattrack.util.constants import TWOPI, EARTH_MU, EARTH_POLAR_RADIUS, EARTH_EQUITORIAL_RADIUS, SUN_MU, SUN_RADIUS
 
 __all__ = ('Elements', 'Body', 'EARTH_BODY', 'SUN_BODY', 'Orbitable', 'Orbit', 'Satellite', 'smaToMeanMotion',

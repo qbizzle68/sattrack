@@ -2,7 +2,7 @@ import json as _json
 import abc as _abc
 import math as _math
 
-from sattrack.structures._coordinates import _compute_zenith_vector, _compute_position_vector, _radius_at_lat, \
+from sattrack._coordinates import _compute_zenith_vector, _compute_position_vector, _radius_at_lat, \
     _geodetic_to_geocentric
 from sattrack.util.constants import EARTH_FLATTENING
 from pyevspace import EVector

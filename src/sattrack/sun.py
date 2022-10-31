@@ -13,7 +13,7 @@ from sattrack._topocentric import _to_topocentric
 
 from sattrack.exceptions import SunRiseSetException
 from sattrack.spacetime.juliandate import JulianDate
-from sattrack.structures.coordinates import GeoPosition, CelestialCoordinates
+from sattrack.coordinates import GeoPosition, CelestialCoordinates
 from sattrack.util.constants import AU, TWOPI, DELTAT
 
 

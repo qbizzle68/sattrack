@@ -4,8 +4,6 @@ from math import sin, cos, radians, atan2, tan, asin, atan, pi, acos, sqrt, degr
 
 from pyevspace import EVector
 
-from sattrack.spacetime.juliandate import JulianDate
-from sattrack.structures.coordinates import GeoPosition, CelestialCoordinates
 from sattrack.util.constants import TWOPI, AU
 from sattrack.util.conversions import atan3
 

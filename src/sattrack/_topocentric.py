@@ -3,7 +3,7 @@ from math import radians, pi
 from sattrack.rotation.order import ZYX
 from sattrack.rotation.rotation import getEulerMatrix, EulerAngles, rotateToThenOffset
 from sattrack.spacetime.sidereal import earthOffsetAngle
-from sattrack.structures._coordinates import _compute_position_vector
+from sattrack._coordinates import _compute_position_vector
 
 
 def _to_topocentric(position, geo, time):

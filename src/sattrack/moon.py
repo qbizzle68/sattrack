@@ -1,6 +1,6 @@
 from pyevspace import EVector
 from sattrack.spacetime.juliandate import JulianDate
-from sattrack.structures.coordinates import CelestialCoordinates
+from sattrack.coordinates import CelestialCoordinates
 
 
 def getMoonPosition(jd: JulianDate) -> EVector:
