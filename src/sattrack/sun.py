@@ -16,6 +16,8 @@ from sattrack.spacetime.juliandate import JulianDate
 from sattrack.coordinates import GeoPosition, CelestialCoordinates
 from sattrack.util.constants import AU, TWOPI, DELTAT
 
+__all__ = ('Twilight', 'getTwilight', 'getSunTimes', 'getSunPosition', 'getSunCelestialCoordinates', 'getSunHourAngle')
+
 
 @total_ordering
 class Twilight(Enum):

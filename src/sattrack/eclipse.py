@@ -15,8 +15,7 @@ from sattrack.util.constants import TWOPI, EARTH_EQUITORIAL_RADIUS, SUN_RADIUS
 # [1] Shadow Times Of Earth Satellites - Alessandro de Iaco Veris
 # [2] Visually Observing Earth Satellites - Dr. T. S. Kelso - https://celestrak.org/columns/v03n01/
 
-__all__ = 'Shadow', 'Shadow', 'Eclipse', 'getShadowPositions', \
-          'getShadowAnomalies', 'getShadowTimes', 'isEclipsed'
+__all__ = ('Shadow', 'Eclipse', 'getShadowPositions', 'getShadowAnomalies', 'getShadowTimes', 'isEclipsed')
 
 
 class Shadow(Enum):

@@ -6,6 +6,8 @@ import requests
 
 from sattrack.util.constants import EARTH_MU
 
+__all__ = ('TwoLineElement', 'getTle')
+
 
 class TwoLineElement:
     """An implementation of the NORAD two-line elements sets used by the simplified general perturbation models to
@@ -199,7 +201,7 @@ class TwoLineElement:
         return (EARTH_MU ** (1.0 / 3.0)) / (mMotionRad ** (2.0 / 3.0))
 
 
-CELESTRAK_URL = "https://celestrak.com/NORAD/elements/gp.php?{}={}&FORMAT=TLE"
+_CELESTRAK_URL = "https://celestrak.com/NORAD/elements/gp.php?{}={}&FORMAT=TLE"
 
 
 def getTle(value: str, query: str = 'name') -> TwoLineElement | None:
@@ -219,7 +221,7 @@ def getTle(value: str, query: str = 'name') -> TwoLineElement | None:
         A TwoLineElement object from the search parameters.
     """
 
-    response = requests.get(CELESTRAK_URL.format(query.upper(), value.replace(' ', '%20')))
+    response = requests.get(_CELESTRAK_URL.format(query.upper(), value.replace(' ', '%20')))
     lines = response.text.splitlines()
 
     if response.text == 'No GP data found':

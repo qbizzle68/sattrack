@@ -18,9 +18,9 @@ from sattrack._orbit import _true_to_mean_anomaly, _true_to_eccentric_anomaly, _
 from sattrack.tle import TwoLineElement
 from sattrack.util.constants import TWOPI, EARTH_MU, EARTH_POLAR_RADIUS, EARTH_EQUITORIAL_RADIUS, SUN_MU, SUN_RADIUS
 
-__all__ = ('Elements', 'Body', 'EARTH_BODY', 'SUN_BODY', 'Orbitable', 'Orbit', 'Satellite', 'smaToMeanMotion',
-           'meanMotionToSma', 'meanToTrueAnomaly', 'meanToEccentricAnomaly', 'eccentricToTrueAnomaly',
-           'trueToMeanAnomaly', 'trueToEccentricAnomaly', 'eccentricToMeanAnomaly')
+_all__ = ('Elements', 'Body', 'SUN_BODY', 'EARTH_BODY', 'Orbitable', 'Orbit', 'Satellite', 'meanMotionToSma',
+          'smaToMeanMotion', 'meanToTrueAnomaly', 'meanToEccentricAnomaly', 'eccentricToTrueAnomaly',
+          'trueToMeanAnomaly', 'trueToEccentricAnomaly', 'eccentricToMeanAnomaly')
 
 
 def _elements_from_tle(tle: TwoLineElement, time: JulianDate) -> (float, float, float, float, float, float):

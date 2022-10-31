@@ -1,6 +1,9 @@
 from enum import Enum
 
 
+__all__ = ('Axis', 'EulerOrder', 'XYZ', 'XZY', 'YXZ', 'YZX', 'ZXY', 'ZYX', 'XYX', 'XZX', 'YXY', 'YZY', 'ZXZ', 'ZYZ')
+
+
 # enum for general axis directions, empty_axis has been useful before (2 rotations)
 class Axis(Enum):
     """
@@ -74,6 +77,7 @@ class EulerOrder:
             return axis
         else:
             raise StopIteration
+
 
 # Euler rotation orders
 

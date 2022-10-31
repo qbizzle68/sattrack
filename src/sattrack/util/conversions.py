@@ -2,6 +2,8 @@ from math import atan2
 
 from sattrack.util.constants import TWOPI
 
+__all__ = 'atan3'
+
 
 def atan3(y: float, x: float) -> float:
     # atan2 but range is 0 to 2π

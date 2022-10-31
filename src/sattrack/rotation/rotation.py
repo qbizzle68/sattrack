@@ -5,6 +5,10 @@ from pyevspace import EVector, EMatrix, transpose
 
 from sattrack.rotation.order import Axis, EulerOrder
 
+__all__ = ('EulerAngles', 'getMatrix', 'getEulerMatrix', 'getMatrixFromTo', 'rotateAxisTo', 'rotateAxisFrom',
+           'rotateMatrixTo', 'rotateMatrixFrom', 'rotateOrderTo', 'rotateOrderFrom', 'rotateFromTo', 'ReferenceFrame',
+           'rotateToThenOffset', 'undoRotateToThenOffset')
+
 
 def _xRotation(angle: float) -> EMatrix:
     angleCos = cos(angle)
@@ -109,7 +113,7 @@ class EulerAngles:
             raise StopIteration
 
     def __reduce__(self):
-        return (self.__class__, (self._angles[0], self._angles[1], self._angles[2]))
+        return self.__class__, (self._angles[0], self._angles[1], self._angles[2])
 
 
 # purposefully not documenting these since I intend to implement this in C.
