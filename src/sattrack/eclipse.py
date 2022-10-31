@@ -6,7 +6,7 @@ from pyevspace import EVector, norm, vang
 from sattrack.rotation.order import ZXZ
 from sattrack.rotation.rotation import EulerAngles, rotateOrderTo
 
-from sattrack.sampa import getSunPosition
+from sattrack.sun import getSunPosition
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.structures.orbit import Orbitable
 from sattrack.util.constants import TWOPI, EARTH_EQUITORIAL_RADIUS, SUN_RADIUS

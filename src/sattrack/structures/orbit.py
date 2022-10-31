@@ -9,7 +9,7 @@ from pyevspace import EVector
 from sattrack.rotation.order import ZXZ, Axis
 from sattrack.rotation.rotation import EulerAngles, getEulerMatrix, rotateMatrixFrom, getMatrix, \
     ReferenceFrame
-from sattrack.sampa import getSunPosition
+from sattrack.sun import getSunPosition
 from sattrack.sgp4 import SGP4_Propagator
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import siderealTime

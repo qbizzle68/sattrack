@@ -9,7 +9,7 @@ from sattrack.structures.coordinates import GeoPosition, CelestialCoordinates
 from sattrack.util.constants import TWOPI, AU
 from sattrack.util.conversions import atan3
 
-DELTAT = 72.6
+# DELTAT = 72.6
 
 
 # class Variable:

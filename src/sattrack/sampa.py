@@ -1,6 +1,7 @@
-from sattrack.sampa_funcs import *
+from sattrack._sampa import *
+from sattrack.util.constants import DELTAT
 
-from .sampa_funcs import _mpa_moon_mean_longitude, _mpa_moon_mean_elongation, _mpa_sun_mean_anomaly, \
+from ._sampa import _mpa_moon_mean_longitude, _mpa_moon_mean_elongation, _mpa_sun_mean_anomaly, \
     _mpa_moon_mean_anomaly, _mpa_moon_argument_latitude, _mpa_E_term, _mpa_lr_table, _mpa_l_term, _mpa_r_term, \
     _mpa_b_term, _mpa_a1_term, _mpa_a2_term, _mpa_a3_term, _mpa_delta_l, _mpa_delta_b, _mpa_moon_longitude, \
     _mpa_moon_latitude, _mpa_moon_distance, _mpa_moon_parallax, _x_values, _xy_table, _nutation_longitude, \
@@ -13,8 +14,8 @@ from .sampa_funcs import _mpa_moon_mean_longitude, _mpa_moon_mean_elongation, _m
     _atmospheric_refraction_correction, _topocentric_elevation_angle, _topocentric_zenith_angle, \
     _topocentric_astronomers_azimuth_angle, _topocentric_azimuth_angle, _spa_incidence_angle
 
-# # as of 10/16/2022
-# DELTAT = 72.6
+
+''' saving this so we dont lose it in case we want to use it'''
 
 
 class Variable:
@@ -48,11 +49,11 @@ class Constant:
 
 
 def _generate_times(jd: JulianDate):
-    JD = Constant(jd.value)
-    JDE = Constant(JD.value + DELTAT / 86400)
-    JC = Constant((JD.value - 2451545) / 36525)
-    JCE = Constant((JDE.value - 2451545) / 36525)
-    return JD, JDE, JC, JCE, Constant(JCE.value / 10)
+    JD = jd.value
+    JDE = JD + DELTAT / 86400
+    JC = (JD - 2451545) / 36525
+    JCE = (JDE - 2451545) / 36525
+    return JD, JDE, JC, JCE, JCE / 10
 
 
 def _check_jd(jd):
@@ -69,7 +70,7 @@ class Register:
         JD, JDE, JC, JCE, JME = _generate_times(jd)
         # list all variables involved in the sampa
         self._internalState = {
-            'JD': JD, 'JDE': JDE, 'JC': JC, 'JCE': JCE, 'JME': JME,
+            'JD': Constant(JD), 'JDE': Constant(JDE), 'JC': Constant(JC), 'JCE': Constant(JCE), 'JME': Constant(JME),
             # 'geoLatitude': Constant(radians(geo.latitude)), 'geoLongitude': Constant(radians(geo.longitude)),
             # 'elevation': Constant(geo.elevation),
             # MPA: 3.2
@@ -207,6 +208,7 @@ class RegisterTopocentric(Register):
         self._internalState['sunIncidenceAngle'] = Variable(_spa_incidence_angle,
                                                             ('sunZenithAngle', 'sunAstronomersAzimuth', 'slopeSurface',
                                                              'surfaceAzimuth'), self)
+
 
 '''
      ------------------------------------------------------------------------------------
@@ -349,36 +351,3 @@ class RegisterTopocentric(Register):
     |         equationOfTime        |   E    |    SPA    |       A.1      |   radians    |
      ------------------------------- -------- ----------- ---------------- --------------
 '''
-
-def getSunPosition(jd: JulianDate) -> EVector:
-    pass
-
-
-def getSunTimes(jd: JulianDate) -> tuple[JulianDate]:
-    pass
-
-
-def getSunCelestialCoordinates(jd: JulianDate, topocentric=True) -> CelestialCoordinates:
-    pass
-
-
-def getSunHourAngle(jd: JulianDate, topocentric=True) -> CelestialCoordinates:
-    pass
-
-
-# todo: create an ecliptic coordinate type, then create getSunEclipticCoordinate() method (and moon)
-
-def getMoonPosition(jd: JulianDate) -> EVector:
-    pass
-
-
-def getMoonTimes(jd: JulianDate) -> tuple[JulianDate]:
-    pass
-
-
-def getMoonCelestialCoordinates(jd: JulianDate, topocentric=True) -> CelestialCoordinates:
-    pass
-
-
-def getMoonHourAngle(jd: JulianDate, topocentric=True) -> CelestialCoordinates:
-    pass

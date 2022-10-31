@@ -9,7 +9,7 @@ from sattrack.exceptions import PassConstraintException, NoPassException
 from sattrack.rotation.order import ZYX
 from sattrack.rotation.rotation import getEulerMatrix, EulerAngles, rotateOrderTo, \
     undoRotateToThenOffset
-from sattrack.sampa import getSunTimes
+from sattrack.sun import getSunTimes
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.structures._coordinates import _compute_position_vector, _compute_zenith_vector
@@ -531,13 +531,9 @@ def _max_pass_refine(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -
 
 
 def _next_pass_max(satellite: Orbitable, geo: GeoPosition, time: JulianDate, timeout: float) -> JulianDate:
-    print('time:', time)
-    print('timeout:', timeout)
     nextMax = _next_pass_max_approx(satellite, geo, time)
     altitude = _orbit_altitude(satellite, geo, nextMax)
     while altitude < 0:
-        print('nextMax', nextMax)
-        print('altitude', altitude)
         if nextMax - time < timeout:
             nextMax = _next_pass_max_approx(satellite, geo, nextMax.future(0.001))
             altitude = _orbit_altitude(satellite, geo, nextMax)
@@ -694,7 +690,7 @@ def getNextPass(satellite: Orbitable, geo: GeoPosition, timeOrPass: JulianDate |
     #   wrong day and the unobscured values may be wrong.
     # todo: idea: check sun altitude and always find the next sunset based on the angle, then find the previous rise,
     #   then the above issue shouldn't exist
-    sunRiseTime, sunSetTime, _ = getSunTimes(riseTime, geo)
+    sunRiseTime, sunSetTime = getSunTimes(riseTime, geo)
 
     firstIlluminatedTime, lastIlluminatedTime, riseIlluminated, setIlluminated \
         = _get_special_times(riseTime, setTime, enterTime, exitTime)
