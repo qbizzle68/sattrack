@@ -243,11 +243,11 @@ class SatellitePass:
         return self._lastUnobscured
 
     @property
-    def firstIlluminated(self):
+    def firstIlluminatedInfo(self):
         return self._firstIlluminated
 
     @property
-    def lastIlluminated(self):
+    def lastIlluminatedInfo(self):
         return self._lastIlluminated
 
     @property
