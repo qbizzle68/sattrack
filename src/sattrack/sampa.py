@@ -15,9 +15,10 @@ from ._sampa import _mpa_moon_mean_longitude, _mpa_moon_mean_elongation, _mpa_su
     _topocentric_astronomers_azimuth_angle, _topocentric_azimuth_angle, _spa_incidence_angle
 
 
+# todo: put useful values here like true obliquity etc.
+
+
 ''' saving this so we dont lose it in case we want to use it'''
-
-
 class Variable:
     # self computing variable
     __slots__ = '_args', '_value', '_callback', '_parent'
