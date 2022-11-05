@@ -48,7 +48,7 @@ def _elements_from_tle(tle: TwoLineElement, time: JulianDate) -> (float, float, 
     aopMoon = 0.00169 * (4 - (5 * sin(inc) ** 2)) / n0
     aopSun = 0.00077 * (4 - (5 * sin(inc) ** 2)) / n0
     raan = (tle.getRaan() + (lanJ2Dot + lanMoon + lanSun) * dt) % 360
-    aop = (tle.getAop() + (aopJ2Dot + aopMoon + aopSun) * dt) % 36
+    aop = (tle.getAop() + (aopJ2Dot + aopMoon + aopSun) * dt) % 360
 
     return radians(raan), inc, radians(aop), ecc, sma, meanAnomaly
 
