@@ -2,7 +2,7 @@ from math import atan2
 
 from sattrack.util.constants import TWOPI
 
-__all__ = 'atan3'
+__all__ = ['atan3']
 
 
 def atan3(y: float, x: float) -> float:
