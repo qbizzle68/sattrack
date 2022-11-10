@@ -2,7 +2,7 @@ from abc import abstractmethod, ABC
 from copy import deepcopy
 from enum import Enum
 from inspect import Parameter, signature
-from math import radians, cos, sin, pi, sqrt, atan2, floor
+from math import radians, cos, sin, pi, sqrt, atan2, floor, degrees
 from typing import Callable
 
 from pyevspace import EVector
@@ -155,6 +155,14 @@ class Elements:
 
         raan, inc, aop, ecc, sma, meanAnomaly = _elements_from_state(position, velocity, MU)
         return cls(raan, inc, aop, ecc, sma, meanAnomaly, epoch)
+
+    def __str__(self):
+        header = ' elements |  raan   |   inc   |   aop   |   ecc    |   sma    | mean anom ' \
+                 '|              epoch               '
+        values = '  values  | {:^{w}.{p}} | {:^{w}.{p}} | {:^{w}.{p}} | {:^{w}.{p}f} | {:^{sw}.{sp}} | {:^{mw}.{mp}} ' \
+                 '| {}'.format(degrees(self._raan), degrees(self._inc), degrees(self._aop), self._ecc, self._sma,
+                               degrees(self._meanAnomaly), self._epoch.date(), w=7, p=6, sw=8, sp=7, mw=9, mp=6)
+        return f'{header}\n{values}'
 
     def __reduce__(self):
         return self.__class__, (self._raan, self._inc, self._aop, self._ecc, self._sma, self._meanAnomaly, self._epoch)
