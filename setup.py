@@ -1,7 +1,7 @@
-from setuptools import setup, Extension, find_packages
+from setuptools import setup, Extension
 
-with open("README.md", "r", encoding="utf-8") as fh:
-    long_description = fh.read()
+import sattrack
+description, long_description = sattrack.__doc__.split('\n', 1)
 
 ext_modules = [Extension(
     'sattrack.sgp4',
@@ -17,14 +17,13 @@ setup(
     version = '0.0.1',
     author = "Quinton Barnes",
     author_email = "devqbizzle68@gmail.com",
-    description = "A satellites tracking framework.",
+    description = description,
     long_description = long_description,
-    long_description_content_type = 'text/markdown',
     license= 'MIT',
     url = 'https://github.com/qbizzle68/sattrack',
     install_requires=['pyevspace>=0.0.8', 'requests'],
     classifiers = [
-        'Development Status :: 2 - Pre-Alpha',
+        'Development Status :: 3 - Alpha',
         'Environment :: Console',
         'Intended Audience :: Science/Research',
         'License :: OSI Approved :: MIT License',
@@ -32,7 +31,7 @@ setup(
         'Topic :: Scientific/Engineering',
         'Topic :: Scientific/Engineering :: Astronomy'
     ],
-    packages = ['sattrack', 'sattrack.rotation', 'sattrack.spacetime', 'sattrack.structures', 'sattrack.util'],
+    packages = ['sattrack', 'sattrack.rotation', 'sattrack.spacetime', 'sattrack.util'],
     package_dir = {'': 'src'},
     ext_modules = ext_modules,
 )
