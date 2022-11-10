@@ -1,28 +1,29 @@
 from setuptools import setup, Extension
 
 import sattrack
+
 description, long_description = sattrack.__doc__.split('\n', 1)
 
 ext_modules = [Extension(
     'sattrack.sgp4',
-    include_dirs = ['extensions/sgp4/include'],
-    sources = [
+    include_dirs=['extensions/sgp4/include'],
+    sources=[
         'extensions/sgp4/src/SGP4.cpp',
         'extensions/sgp4/src/sgp4module.cpp'
     ]
 )]
 
 setup(
-    name = 'sattrack',
-    version = '0.0.1',
-    author = "Quinton Barnes",
-    author_email = "devqbizzle68@gmail.com",
-    description = description,
-    long_description = long_description,
-    license= 'MIT',
-    url = 'https://github.com/qbizzle68/sattrack',
+    name='sattrack',
+    version='0.0.1',
+    author="Quinton Barnes",
+    author_email="devqbizzle68@gmail.com",
+    description=description,
+    long_description=long_description,
+    license='MIT',
+    url='https://github.com/qbizzle68/sattrack',
     install_requires=['pyevspace>=0.0.8', 'requests'],
-    classifiers = [
+    classifiers=[
         'Development Status :: 3 - Alpha',
         'Environment :: Console',
         'Intended Audience :: Science/Research',
@@ -31,7 +32,7 @@ setup(
         'Topic :: Scientific/Engineering',
         'Topic :: Scientific/Engineering :: Astronomy'
     ],
-    packages = ['sattrack', 'sattrack.rotation', 'sattrack.spacetime', 'sattrack.util'],
-    package_dir = {'': 'src'},
-    ext_modules = ext_modules,
+    packages=['sattrack', 'sattrack.rotation', 'sattrack.spacetime', 'sattrack.util'],
+    package_dir={'': 'src'},
+    ext_modules=ext_modules,
 )
