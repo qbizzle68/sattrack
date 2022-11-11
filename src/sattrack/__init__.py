@@ -7,11 +7,11 @@ pass above a horizon. Satellites can be created by using raw orbital parameters 
 or by using TLE data published by various online sources, the latter of course being much more accurate for earth based
 satellites.
 
-USAGE
+Usage
 _____
 
-The easiest way to create a satellite is to create a Satellite object using a TLE from the getTle() method which uses
-`Celestrak <http://www.celestrak.com>`.
+The easiest way to create a satellite is to create a `Satellite` object using a TLE from the `getTle()` method which
+uses [Celestrak](http://www.celestrak.com) via the `requests` module.
 
 >>> from sattrack.tle import getTle
 >>> from sattrack.spacetime.juliandate import now
@@ -41,9 +41,9 @@ the default constructor takes values in radians.
 >>> print(state[1])
 [ 4.875803, -5.270390, -2.651550 ]
 
-The Orbit and Satellite objects are derived from a common interface, which allows them to be used interchangabley by
-other methods in the package. The Satellite object is the most accurate when handling satellites in Earth orbit, but
-the Orbit object allows for handling any orbit around any orbitable body. The package also provides a Body object for
+The `Orbit` and `Satellite` objects are derived from a common interface, which allows them to be used interchangabley by
+other methods in the package. The `Satellite` object is the most accurate when handling satellites in Earth orbit, but
+the `Orbit` object allows for handling any orbit around any orbitable body. The package also provides a Body object for
 describing the Body around which an Orbit object orbits.
 
 SatellitePass
@@ -56,27 +56,27 @@ light that can obscure the satellite (i.e. light pollution from highly populated
 
 A pass is considered the time between a satellite rising above the horizon, and setting back below it. There are at
 least three major events in every pass: rise, set and maximum altitude. The information for these events are stored in
-an object called PositionInfo in the topocentric.py module. The PositionInfo object holds the time, altitude, azimuth
+an object called `PositionInfo` in the `topocentric` module. The `PositionInfo` object holds the time, altitude, azimuth
 and other visibility boolean values described next.
 
 If the satellite is in the sunlight it is refered to as illuminated. If the sun is below the horizon while the
 satellite is above the horizon, it is refered to as unobscured. A satellite is therefore refered to as visible if it is
-illuminated and unobscured. During a pass, a satellite can become illuminatd or unobscured, this happens when the
+illuminated and unobscured. During a pass, a satellite can become illuminated or unobscured, this happens when the
 satellite leaves Earth's shadow or sunset occurs during the pass. There are therefore up to four additional events that
 can occur during as pass, first-illuminated, last-illuminated, first-unobscured and last-unobscured. Each of these
-events are stored in a PositionInfo within the SatellitePass object. Each PositionInfo object has an illumnated,
+events are stored in a `PositionInfo` within the `SatellitePass` object. Each `PositionInfo` object has an illumnated,
 unobscured and visible boolean property that relates to those states for each event.
 
-There is also an overall illumnated, unobscured and visible state for the SatellitePass object. Any of these values are
-True if they are true for any event at any point during the pass. Keep in mind that a pass can be illuminated and
+There is also an overall illumnated, unobscured and visible state for the `SatellitePass` object. Any of these values
+are true if they are true for any event at any point during the pass. Keep in mind that a pass can be illuminated and
 unobscured at different times, which therefore means it was never visible, so the pass visibility values will read
 illuminated: True, unobscured: True, visible: False. This can occur if the satellite rises illuminated and obscured,
 then becomes unilluminated by passing into the Earth's shadow, then becomes unobscured due to sunset. At no point in the
 pass was the satellite illuminated and unobscured at the same time, therefore it is never visible. This is a contrived
-example but is intended to show how to interpret a SatellitePass object.
+example but is intended to show how to interpret a `SatellitePass` object.
 
 A further note on passes: if an event is valid at rise or set time, it is not set in the SatellitePass object. For
-example if a satellite rises illuminated, there will not be a first-illuminated PositionInfo set. Likewise, if a
-satellite is unobscured when it rises and sets, there will not be a last-unobscured PositionInfo set. Only alternate
-events that occur DURING the pass will be considered.
+example if a satellite rises illuminated, there will not be a first-illuminated `PositionInfo` set. Likewise, if a
+satellite is unobscured when it rises and sets, there will not be a last-unobscured `PositionInfo` set. Only alternate
+events that occur **during** the pass will be considered.
 """
