@@ -1,5 +1,8 @@
+import sys
+
 from setuptools import setup, Extension
 
+sys.path.append('src')
 import sattrack
 
 description, long_description = sattrack.__doc__.split('\n', 1)
@@ -20,6 +23,7 @@ setup(
     author_email="devqbizzle68@gmail.com",
     description=description,
     long_description=long_description,
+    long_description_content_type='text',
     license='MIT',
     url='https://github.com/qbizzle68/sattrack',
     install_requires=['pyevspace>=0.0.8', 'requests'],
