@@ -149,7 +149,7 @@ def _sun_position_vector(time: JulianDate) -> EVector:
     yComp = xComp * tan(rightAscension)
     yComp = abs(yComp) if rightAscension < pi else -abs(yComp)
 
-    return EVector(xComp, yComp, zComp) * sunDistance * AU
+    return EVector((xComp, yComp, zComp)) * sunDistance * AU
 
 
 def getTwilight(geo: GeoPosition, time: JulianDate) -> Twilight:

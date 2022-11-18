@@ -337,7 +337,7 @@ class Body:
 SUN_BODY = Body('Sun', SUN_MU, SUN_RADIUS, 0, lambda time: 0, getSunPosition)
 
 EARTH_BODY = Body('Earth', EARTH_MU, EARTH_EQUITORIAL_RADIUS, 86164.090531, siderealTime,
-                  lambda time: EVector(0, 0, 0), Rp=EARTH_POLAR_RADIUS, parent=SUN_BODY)
+                  lambda time: EVector((0, 0, 0)), Rp=EARTH_POLAR_RADIUS, parent=SUN_BODY)
 
 
 class _AnomalyDirection(Enum):
@@ -620,7 +620,8 @@ class Orbit(Orbitable):
         rotationMatrix = getEulerMatrix(ZXZ, EulerAngles(self._elements.raan, self._elements.inc,
                                                          self._elements.aop + trueAnomaly))
         position = rotateMatrixFrom(rotationMatrix, EVector.e1) * radius
-        rotationMatrix @= getMatrix(Axis.Z_AXIS, -flightAngle)
+        # rotationMatrix @= getMatrix(Axis.Z_AXIS, -flightAngle)
+        rotationMatrix = rotationMatrix * getMatrix(Axis.Z_AXIS, -flightAngle)
         velocity = rotateMatrixFrom(rotationMatrix, EVector.e2) * velocity
 
         return position, velocity
@@ -747,8 +748,8 @@ class Satellite(Orbitable):
             raise TypeError('time parameter must be JulianDate type')
 
         rawState = self._propagator.getState(self._tle, time)
-        return (EVector(rawState[0][0], rawState[0][1], rawState[0][2]),
-                EVector(rawState[1][0], rawState[1][1], rawState[1][2]))
+        return (EVector((rawState[0][0], rawState[0][1], rawState[0][2])),
+                EVector((rawState[1][0], rawState[1][1], rawState[1][2])))
 
     def getElements(self, time: JulianDate) -> Elements:
         return Elements.fromTle(self._tle, time)

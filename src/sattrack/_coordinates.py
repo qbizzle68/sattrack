@@ -34,11 +34,11 @@ def _radius_at_lat(latitude):
 
 def _compute_normal_vector(latitude, longitude, radius, time):
     longitude += earthOffsetAngle(time)
-    return EVector(
+    return EVector((
         radius * _math.cos(latitude) * _math.cos(longitude),
         radius * _math.cos(latitude) * _math.sin(longitude),
         radius * _math.sin(latitude)
-    )
+    ))
 
 
 def _geodetic_to_geocentric(geodeticLatitude):

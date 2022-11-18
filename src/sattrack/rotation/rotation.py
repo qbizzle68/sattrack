@@ -14,11 +14,9 @@ def _xRotation(angle: float) -> EMatrix:
     angleCos = cos(angle)
     angleSin = sin(angle)
     return EMatrix(
-        [
             [1.0, 0.0, 0.0],
-            [0.0, angleCos, angleSin],
-            [0.0, -angleSin, angleCos]
-        ]
+            [0.0, angleCos, -angleSin],
+            [0.0, angleSin, angleCos]
     )
 
 
@@ -26,11 +24,9 @@ def _yRotation(angle: float) -> EMatrix:
     angleCos = cos(angle)
     angleSin = sin(angle)
     return EMatrix(
-        [
-            [angleCos, 0.0, -angleSin],
+            [angleCos, 0.0, angleSin],
             [0.0, 1.0, 0.0],
-            [angleSin, 0.0, angleCos]
-        ]
+            [-angleSin, 0.0, angleCos]
     )
 
 
@@ -38,11 +34,9 @@ def _zRotation(angle: float) -> EMatrix:
     angleCos = cos(angle)
     angleSin = sin(angle)
     return EMatrix(
-        [
-            [angleCos, angleSin, 0.0],
-            [-angleSin, angleCos, 0.0],
+            [angleCos, -angleSin, 0.0],
+            [angleSin, angleCos, 0.0],
             [0.0, 0.0, 1.0]
-        ]
     )
 
 
@@ -141,7 +135,7 @@ def getEulerMatrix(order: EulerOrder, angles: EulerAngles) -> EMatrix:
     angles: A rotation.EulerAngles object containing the angles corresponding to the axis rotations."""
     rtn = EMatrix.I
     for axis, angle in zip(order, angles):
-        rtn = rtn @ getMatrix(axis, angle)
+        rtn = rtn * getMatrix(axis, angle)
     return rtn
 
 
@@ -155,7 +149,7 @@ def getMatrixFromTo(orderFrom: EulerOrder, angsFrom: EulerAngles, orderTo: Euler
     angsTo:     A rotation.EulerAngles object containing the angles corresponding to the axis rotations for the
                 reference frame rotating to.
     """
-    return transpose(getEulerMatrix(orderTo, angsTo)) @ getEulerMatrix(orderFrom, angsFrom)
+    return transpose(getEulerMatrix(orderTo, angsTo)) * getEulerMatrix(orderFrom, angsFrom)
 
 
 def rotateAxisTo(axis: Axis, angle: float, vector: EVector) -> EVector:
@@ -165,7 +159,7 @@ def rotateAxisTo(axis: Axis, angle: float, vector: EVector) -> EVector:
     axis:   One of the order.Axis enumerated types.
     angle:  The angle of rotation measured in radians.
     vector: The vector to rotate."""
-    return transpose(getMatrix(axis, angle)) @ vector
+    return transpose(getMatrix(axis, angle)) * vector
 
 
 def rotateAxisFrom(axis: Axis, angle: float, vector: EVector) -> EVector:
@@ -175,7 +169,7 @@ def rotateAxisFrom(axis: Axis, angle: float, vector: EVector) -> EVector:
     axis:   One of the order.Axis enumerated types.
     angle:  The angle of rotation measured in radians.
     vector: The vector to rotate."""
-    return getMatrix(axis, angle) @ vector
+    return getMatrix(axis, angle) * vector
 
 
 def rotateMatrixTo(matrix: EMatrix, vector: EVector) -> EVector:
@@ -184,7 +178,7 @@ def rotateMatrixTo(matrix: EMatrix, vector: EVector) -> EVector:
     Parameters:
     matrix: The rotation matrix.
     vector: The vector to rotate."""
-    return transpose(matrix) @ vector
+    return transpose(matrix) * vector
 
 
 def rotateMatrixFrom(matrix: EMatrix, vector: EVector) -> EVector:
@@ -193,7 +187,7 @@ def rotateMatrixFrom(matrix: EMatrix, vector: EVector) -> EVector:
     Parameters:
     matrix: The rotation matrix.
     vector: The vector to rotate."""
-    return matrix @ vector
+    return matrix * vector
 
 
 def rotateOrderTo(order: EulerOrder, angles: EulerAngles, vector: EVector) -> EVector:
@@ -203,7 +197,7 @@ def rotateOrderTo(order: EulerOrder, angles: EulerAngles, vector: EVector) -> EV
     order:  An order.EulerOrder object found in order.Order representing the rotation order.
     angles: A rotation.EulerAngles object containing the angles corresponding to the axis rotations.
     vector: The vector to rotate."""
-    return transpose(getEulerMatrix(order, angles)) @ vector
+    return transpose(getEulerMatrix(order, angles)) * vector
 
 
 def rotateOrderFrom(order: EulerOrder, angles: EulerAngles, vector: EVector) -> EVector:
@@ -213,7 +207,7 @@ def rotateOrderFrom(order: EulerOrder, angles: EulerAngles, vector: EVector) -> 
     order:  An order.EulerOrder object found in order.Order representing the rotation order.
     angles: A rotation.EulerAngles object containing the angles corresponding to the axis rotations.
     vector: The vector to rotate."""
-    return getEulerMatrix(order, angles) @ vector
+    return getEulerMatrix(order, angles) * vector
 
 
 def rotateFromTo(orderFrom: EulerOrder, angsFrom: EulerAngles, orderTo: EulerOrder, angsTo: EulerAngles,
@@ -222,7 +216,7 @@ def rotateFromTo(orderFrom: EulerOrder, angsFrom: EulerAngles, orderTo: EulerOrd
     Parameters:
     orderFrom:  An order.EulerOrder object found in order.Order representing the reference frame rotating from.
     angsFrom:   A rotation.EulerAngles object containing the angles corresponding to the axis rotations """
-    return getMatrixFromTo(orderFrom, angsFrom, orderTo, angsTo) @ vector
+    return getMatrixFromTo(orderFrom, angsFrom, orderTo, angsTo) * vector
 
 
 class ReferenceFrame:
@@ -271,7 +265,7 @@ class ReferenceFrame:
             The vector rotated to the reference frame represented by the instance.
         """
 
-        return transpose(self._matrix) @ vector
+        return transpose(self._matrix) * vector
 
     def RotateFrom(self, vector: EVector) -> EVector:
         """
@@ -286,7 +280,7 @@ class ReferenceFrame:
             The vector rotated from the reference frame represented by the instance.
         """
 
-        return self._matrix @ vector
+        return self._matrix * vector
 
     def RotateToFrame(self, refFrame, vector: EVector) -> EVector:
         """
@@ -302,7 +296,7 @@ class ReferenceFrame:
             The vector rotated to the ReferenceFrame parameter's reference frame.
         """
 
-        return transpose(refFrame.getMatrix()) @ self._matrix @ vector
+        return transpose(refFrame.getMatrix()) * self._matrix * vector
 
     def RotateFromFrame(self, refFrame, vector: EVector) -> EVector:
         """
@@ -318,7 +312,7 @@ class ReferenceFrame:
             The vector rotated from the ReferenceFrame parameter's reference frame.
         """
 
-        return transpose(self._matrix) @ refFrame.getMatrix() @ vector
+        return transpose(self._matrix) * refFrame.getMatrix() * vector
 
 
 def rotateToThenOffset(rotation: EMatrix, offset: EVector, original: EVector) -> EVector:
@@ -334,8 +328,8 @@ def rotateToThenOffset(rotation: EMatrix, offset: EVector, original: EVector) ->
         The original vector in the rotated and offset reference frame.
     """
 
-    rotatedOriginal = transpose(rotation) @ original
-    rotatedOffset = transpose(rotation) @ offset
+    rotatedOriginal = transpose(rotation) * original
+    rotatedOffset = transpose(rotation) * offset
     return rotatedOriginal - rotatedOffset
 
 
@@ -353,6 +347,6 @@ def undoRotateToThenOffset(rotation: EMatrix, offset: EVector, rotated: EVector)
         The original vector.
     """
 
-    rotatedOffset = transpose(rotation) @ offset
+    rotatedOffset = transpose(rotation) * offset
     rotatedOriginal = rotated + rotatedOffset
-    return rotation @ rotatedOriginal
+    return rotation * rotatedOriginal

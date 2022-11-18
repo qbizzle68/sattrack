@@ -423,7 +423,7 @@ def _get_p_vector(geo: GeoPosition, position: EVector, velocity: EVector, time: 
     else:
         y = dot(zeta, gamma) / (zeta[1] - (zeta[0] * lamb[1] / lamb[0]))
         x = -lamb[1] * y / lamb[0]
-    r = EVector(x, y, 0)
+    r = EVector((x, y, 0))
     v = cross(zeta, lamb)
 
     # compute exact solution for parameterized vector which yields the nearest point to intersection
@@ -461,16 +461,19 @@ def _time_to_plane(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> 
 
 
 def _next_pass_max_approx(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> JulianDate:
+    print('here0')
     if _orbit_altitude(satellite, geo, time) < 0:
         tn = _time_to_plane(satellite, geo, time)
     else:
         tn = time
+    print('here1')
 
     mu = satellite.body.mu
     elements = satellite.getElements(time)
     ecc = elements.ecc
     # mean motion in radians / day
     meanMotion = _sma_to_mean_motion(elements.sma, mu) * 86400
+    print('here2')
 
     state = satellite.getState(tn)
     pVector = _get_p_vector(geo, *state, tn)
@@ -479,10 +482,13 @@ def _next_pass_max_approx(satellite: Orbitable, geo: GeoPosition, time: JulianDa
     if meanAnomaly_n1 < meanAnomaly_n:
         dma += TWOPI
     tn = tn.future(dma / meanMotion)
+    print('here3')
 
     state = satellite.getState(tn)
     pVector = _get_p_vector(geo, *state, tn)
     while vang(state[0], pVector) > 4.85e-6:  # one arc-second
+        print('inside while')
+        print(tn)
         trueAnomaly_n, trueAnomaly_n1, meanAnomaly_n, meanAnomaly_n1 = __max_pass_anomalies(*state, mu, pVector, ecc)
         dma = meanAnomaly_n1 - meanAnomaly_n
         if trueAnomaly_n1 <= trueAnomaly_n:
@@ -494,6 +500,8 @@ def _next_pass_max_approx(satellite: Orbitable, geo: GeoPosition, time: JulianDa
         tn = tn.future(dma / meanMotion)
         state = satellite.getState(tn)
         pVector = _get_p_vector(geo, *state, tn)
+        print(pVector)
+    print('here4')
 
     return tn
 
@@ -530,8 +538,11 @@ def _max_pass_refine(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -
 
 
 def _next_pass_max(satellite: Orbitable, geo: GeoPosition, time: JulianDate, timeout: float) -> JulianDate:
+    print('here0')
     nextMax = _next_pass_max_approx(satellite, geo, time)
+    print('here1')
     altitude = _orbit_altitude(satellite, geo, nextMax)
+    print('here2')
     while altitude < 0:
         if nextMax - time < timeout:
             nextMax = _next_pass_max_approx(satellite, geo, nextMax.future(0.001))
@@ -539,6 +550,7 @@ def _next_pass_max(satellite: Orbitable, geo: GeoPosition, time: JulianDate, tim
         else:
             # todo: make a more specific exception type for this
             raise NoPassException('timed out looking for next pass')
+    print('here3')
     return _max_pass_refine(satellite, geo, nextMax)
 
 
@@ -671,6 +683,8 @@ def _derive_basic_info(satellite: Orbitable, geo: GeoPosition, time: JulianDate,
 
 def getNextPass(satellite: Orbitable, geo: GeoPosition, timeOrPass: JulianDate | SatellitePass,
                 timeout: float = 7) -> SatellitePass:
+    print("THIS IS CHANGED")
+    print(timeOrPass)
     if not isinstance(satellite, Orbitable):
         raise TypeError('satellite parameter must be Orbitable subtype')
     if not isinstance(geo, GeoPosition):
@@ -681,8 +695,10 @@ def getNextPass(satellite: Orbitable, geo: GeoPosition, timeOrPass: JulianDate |
         time = timeOrPass.maxInfo.time.future(0.001)
     else:
         raise TypeError('timeOrPass parameter must be JulianDate or SatellitePass type')
+    print('here0')
     nextPassTime = _next_pass_max(satellite, geo, time, timeout)
 
+    print("here1")
     riseTime, setTime = _rise_set_times(satellite, geo, nextPassTime)
     enterTime, exitTime = getShadowTimes(satellite, nextPassTime, Shadow.PENUMBRA)
     # todo: if timezone of riseTime is different than the timezone of geo, then the rise/set times may be for the
@@ -691,6 +707,7 @@ def getNextPass(satellite: Orbitable, geo: GeoPosition, timeOrPass: JulianDate |
     #   then the above issue shouldn't exist
     sunRiseTime, sunSetTime = getSunTimes(riseTime, geo)
 
+    print('here2')
     firstIlluminatedTime, lastIlluminatedTime, riseIlluminated, setIlluminated \
         = _get_special_times(riseTime, setTime, enterTime, exitTime)
     firstUnobscuredTime, lastUnobscuredTime, riseUnobscured, setUnobscured \
@@ -698,10 +715,12 @@ def getNextPass(satellite: Orbitable, geo: GeoPosition, timeOrPass: JulianDate |
     maxIlluminated = not (enterTime <= nextPassTime <= exitTime)
     maxUnobscured = (nextPassTime < sunRiseTime) or (nextPassTime >= sunSetTime)
 
+    print('here3')
     riseInfo = _derive_basic_info(satellite, geo, riseTime, riseIlluminated, riseUnobscured)
     setInfo = _derive_basic_info(satellite, geo, setTime, setIlluminated, setUnobscured)
     maxInfo = _derive_basic_info(satellite, geo, nextPassTime, maxIlluminated, maxUnobscured)
 
+    print('here4')
     firstIlluminatedInfo = lastIlluminatedInfo = firstUnobscuredInfo = lastUnobscuredInfo = None
     if firstIlluminatedTime is not None and firstIlluminatedTime != riseTime:
         firstIlluminatedInfo = _derive_basic_info(satellite, geo, firstIlluminatedTime, True,
@@ -720,6 +739,7 @@ def getNextPass(satellite: Orbitable, geo: GeoPosition, timeOrPass: JulianDate |
                                                 lastUnobscuredTime < enterTime
                                                 or lastUnobscuredTime >= exitTime, True)
 
+    print('here5')
     np = SatellitePass(riseInfo, setInfo, maxInfo,
                        firstUnobscuredInfo=firstUnobscuredInfo,
                        lastUnobscuredInfo=lastUnobscuredInfo,

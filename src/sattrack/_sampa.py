@@ -976,7 +976,7 @@ def _celestial_coordinates_to_position_vector(rightAscension, declination, sunDi
     yComp = xComp * tan(rightAscension)
     yComp = abs(yComp) if rightAscension < pi else -abs(yComp)
 
-    return EVector(xComp, yComp, zComp) * sunDistance * AU
+    return EVector((xComp, yComp, zComp)) * sunDistance * AU
 
 
 def _get_twilight_type(topocentricPositionVector):
