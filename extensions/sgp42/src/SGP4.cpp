@@ -60,7 +60,7 @@
 #define pi 3.14159265358979323846
 
 /* used to reduce unused code bloat in twoline2rv */
-#define _REDUCE_VER
+#define _REDUCED_VERSION
 
 // define global variables here, not in .h
 // use extern in main
@@ -2175,12 +2175,12 @@ namespace SGP4Funcs
 	void twoline2rv
 		(
 		char longstr1[130], char longstr2[130],
-#ifndef _REDUCE_VER
+#ifndef _REDUCED_VERSION
 		char typerun, char typeinput, 
 #endif
 		char opsmode,
 		gravconsttype whichconst,
-#ifndef _REDUCE_VER
+#ifndef _REDUCED_VERSION
 		double& startmfe, double& stopmfe, double& deltamin,
 #endif
 		elsetrec& satrec
@@ -2244,7 +2244,7 @@ namespace SGP4Funcs
 			&satrec.epochdays, &satrec.ndot, &satrec.nddot, &nexp, &satrec.bstar,
 			&ibexp, &satrec.ephtype, &satrec.elnum);
 #endif
-#ifndef _REDUCE_VER
+#ifndef _REDUCED_VERSION
 		if (typerun == 'v')  // run for specified times from the file
 		{
 			if (longstr2[52] == ' ')
@@ -2345,7 +2345,7 @@ namespace SGP4Funcs
 		days2mdhms_SGP4(year, satrec.epochdays, mon, day, hr, minute, sec);
 		jday_SGP4(year, mon, day, hr, minute, sec, satrec.jdsatepoch, satrec.jdsatepochF);
 
-#ifndef _REDUCE_VER
+#ifndef _REDUCED_VERSION
 		// ---- input start stop times manually
 		if ((typerun != 'v') && (typerun != 'c'))
 		{
