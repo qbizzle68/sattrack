@@ -1,9 +1,8 @@
 #define PY_SSIZE_CLEAN_T
 #include <Python.h>
 
-/* used to reduce unused code bloat in twoline2rv */
-#define _REDUCED_VERSION
 #include <SGP4.h>
+#include <stdio.h>  // sscanf
 
 #define SAT_NAME_LENGTH 24
 
@@ -14,11 +13,37 @@ typedef struct {
 } tle_t;
 
 
+static int split_tle_string(const char* tle_string, char name[SAT_NAME_LENGTH], char line1[130], char line2[130]) 
+{
+    try {
+        if (tle_string[0] == '1' && tle_string[1] == ' ') {
+            // no name present
+            sscanf(tle_string, "[^\n] [^\n]", line1, line2);
+        }
+        else {
+            // name present
+            sscanf(tle_string, "[^\n] [^\n] [^\n]", name, line1, line2);
+        }
+    }
+    catch (...) {
+        return -1;
+    }
 
-static void tle_init(tle_t* tle, PyObject* args) {
-    PyObject* tle_string = NULL;
 
-    if (PyArg_ParseTuple(args, ))
+    return 0;
+}
+
+static int tle_init(tle_t* tle, PyObject* args, PyObject* kwargs) {
+    const char* tle_string;
+
+    if (PyArg_ParseTuple(args, "s", tle_string) < 0) {
+        PyErr_SetString(PyExc_TypeError, "argument must be str type");
+        return -1;
+    }
+
+    char name[SAT_NAME_LENGTH];
+    char line1[130], line2[130];
+    int result = split_tle_string(tle_string, name, line1, line2);
 }
 
 static PyTypeObject tle_type = {
