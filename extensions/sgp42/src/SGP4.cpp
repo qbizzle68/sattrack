@@ -59,9 +59,6 @@
 
 #define pi 3.14159265358979323846
 
-/* used to reduce unused code bloat in twoline2rv */
-#define _REDUCED_VERSION
-
 // define global variables here, not in .h
 // use extern in main
 char help = 'n';
