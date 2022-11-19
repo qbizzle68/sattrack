@@ -57,6 +57,9 @@
 
 #define SGP4Version  "SGP4 Version 2020-07-13"
 
+/* used to reduce unused code bloat in twoline2rv */
+#define _REDUCED_VERSION
+
 // -------------------------- structure declarations ----------------------------
 typedef enum
 {
