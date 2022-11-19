@@ -151,9 +151,14 @@ namespace SGP4Funcs
 	void twoline2rv
 		(
 		char      longstr1[130], char longstr2[130],
-		char      typerun, char typeinput, char opsmode,
+#ifndef _REDUCED_VERSION
+		char      typerun, char typeinput, 
+#endif
+		char opsmode,
 		gravconsttype       whichconst,
+#ifndef _REDUCED_VERSION
 		double& startmfe, double& stopmfe, double& deltamin,
+#endif
 		elsetrec& satrec
 		);
 
