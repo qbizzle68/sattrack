@@ -2122,7 +2122,9 @@ namespace SGP4Funcs
 			j3oj2 = j3 / j2;
 			break;
 		default:
+#ifndef _REDUCED_VERSION
 			fprintf(stderr, "unknown gravity option (%d)\n", whichconst);
+#endif
 			break;
 		}
 
