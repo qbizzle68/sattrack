@@ -57,15 +57,13 @@ void print_satrec(const elsetrec& rec) {
 static int tle_init(PyObject* self, PyObject* args, PyObject* kwargs) {
     tle_t* tle = (tle_t*)self;
     const char* tle_string = "";
-    gravconsttype grav = (gravconsttype)(-1);
+    gravconsttype grav = gravconsttype::wgs72;
+    //int grav = -1;
 
-    if (PyArg_ParseTuple(args, "s|i", &tle_string, (int*)&grav) < 0) {
-        if (!tle_string)
-            PyErr_SetString(PyExc_TypeError, "first argument must be str type");
-        else if (grav == (gravconsttype)(-1))
-            PyErr_SetString(PyExc_TypeError, "second argument must be in type");
-        else if (grav != gravconsttype::wgs72old && grav != gravconsttype::wgs72 && grav != gravconsttype::wgs84)
-            PyErr_SetString(PyExc_ValueError, "second argument must be wgs72old, wgs72 or wgs84");
+    if (PyArg_ParseTuple(args, "s|i", &tle_string, (int*)&grav) < 0)
+        return -1;
+    if (grav != gravconsttype::wgs72old && grav != gravconsttype::wgs72 && grav != gravconsttype::wgs84) {
+        PyErr_SetString(PyExc_ValueError, "second argument must be wfs72old, wgs72 or wgs84");
         return -1;
     }
 
@@ -84,7 +82,7 @@ static int tle_init(PyObject* self, PyObject* args, PyObject* kwargs) {
 #endif
 
     /* call to init elsetrec values */
-    SGP4Funcs::twoline2rv(line1, line2, 'i', grav, tle->satrec);
+    SGP4Funcs::twoline2rv(line1, line2, 'i', (gravconsttype)grav, tle->satrec);
 #ifdef _DEBUG
     printf("error code: %i\n", tle->satrec.error);
 #endif
@@ -102,10 +100,32 @@ static PyObject* get_state(PyObject* self, PyObject* args) {
     double r[3], v[3];
     PyObject* position_tuple = NULL, * velocity_tuple = NULL, * position = NULL, * velocity = NULL;
 
-//    double jdepoch, jdepochF;
-  //  if (PyArgs_ParseTuple(args, "O"))
+    /* args should be a JulianDate type */
+    PyObject* jdNumberObj = PyObject_GetAttrString(args, "_dayNumber");
+    if (!jdNumberObj)
+        return NULL;
+    PyObject* jdFractionObj = PyObject_GetAttrString(args, "_dayFraction");
+    if (!jdFractionObj) {
+        Py_DECREF(jdNumberObj);
+        return NULL;
+    }
 
-    SGP4Funcs::sgp4(tle->satrec, 0, r, v);
+    double jdepoch = PyLong_AsDouble(jdNumberObj);
+    if (jdepoch == -1.0 && PyErr_Occurred()) {
+        Py_DECREF(jdNumberObj);
+        Py_DECREF(jdFractionObj);
+        return NULL;
+    }
+    double jdepochF = PyFloat_AS_DOUBLE(jdFractionObj);
+    if (jdepochF == -1.0 && PyErr_Occurred()) {
+        Py_DECREF(jdNumberObj);
+        Py_DECREF(jdFractionObj);
+        return NULL;
+    }
+
+    double dt = (jdepoch + jdepochF - tle->satrec.jdsatepoch 
+                - tle->satrec.jdsatepochF) * 1440.0;
+    SGP4Funcs::sgp4(tle->satrec, dt, r, v);
 
     if (tle->satrec.error) {
         PyObject* exc = PyErr_NewException("tle.sgp4Error", NULL, NULL);
@@ -155,7 +175,7 @@ cleanup:
 }
 
 static PyMethodDef tle_methods[] = {
-    {"getState", get_state, METH_NOARGS, "gets the state at time 0"},
+    {"getState", get_state, METH_O, "gets the state at time 0"},
     {NULL, NULL}
 };
 
