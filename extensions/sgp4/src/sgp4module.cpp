@@ -72,11 +72,10 @@ split_tle_string(const char* tle_string, char name[], char line1[], char line2[]
 static int 
 tle_init(tle_t* self, PyObject* args, PyObject* kwargs) 
 {
-//static int tle_init(PyObject* self, PyObject* args, PyObject* kwargs) {
-//    tle_t* tle = (tle_t*)self;
     const char* tle_string = "";
     gravconsttype grav = gravconsttype::wgs72;
 
+    // get arguments, default grav to wgs72
     if (PyArg_ParseTuple(args, "s|i", &tle_string, (int*)&grav) < 0)
         return -1;
     if (grav != gravconsttype::wgs72old && grav != gravconsttype::wgs72 && grav != gravconsttype::wgs84) {
@@ -84,6 +83,7 @@ tle_init(tle_t* self, PyObject* args, PyObject* kwargs)
         return -1;
     }
 
+    // parse tle string argument into lines
     char name[SAT_NAME_LENGTH];
     char line1[130], line2[130]; // twoline2rv expects arrays of 130 length
     int result = split_tle_string(tle_string, name, line1, line2);
@@ -104,26 +104,6 @@ tle_init(tle_t* self, PyObject* args, PyObject* kwargs)
     }
 
     return 0;
-}
-
-static inline int
-tle_check(PyObject* module, PyObject* obj)
-{
-    sgp4_state* state = (sgp4_state*)PyModule_GetState(module);
-    if (!state)
-        return NULL;
-
-    int result = Py_IS_TYPE(obj, (PyTypeObject*)state->TwoLineElement);
-    return (result) ? 0 : -1;
-
-    /*PyTypeObject* tle_type = (PyTypeObject*)PyObject_GetAttrString(module, "TwoLineElement");
-    if (!tle_type)
-        return -1;
-
-    int result = Py_IS_TYPE(obj, tle_type);
-    Py_DECREF(tle_type);
-    // cant ensure result is 1 when true so have to check all values
-    return (result) ? 0 : -1;*/
 }
 
 static int
@@ -176,10 +156,6 @@ get_state(PyObject* self, PyObject* const* args, Py_ssize_t size)
         PyErr_SetString(PyExc_TypeError, "first parameter must be TwoLineElement type");
         return NULL;
     }
-    /*if (tle_check(self, args[0]) < 0) {
-        PyErr_SetString(PyExc_TypeError, "first parameter must be TwoLineElement type");
-        return NULL;
-    }*/
 
     tle_t* tle = (tle_t*)args[0];
     double jd;
@@ -271,22 +247,49 @@ get_elements_from_state(PyObject* self, PyObject* const* args, Py_ssize_t size)
     if (get_vec_items(args[1], v) < 0)
         return NULL;
 
+    double p, a, ecc, incl, omega, argp, nu, m, arglat, truelon, lonper;
+    SGP4Funcs::rv2coe_SGP4(r, v, mu, p, a, ecc, incl, omega, argp, nu, m, arglat, truelon, lonper);
 
+    // returning mean anomaly right now with this 
+    return Py_BuildValue("ddddddd", omega, incl, argp, ecc, a, m, nu);
+}
 
-    /*// extract arguments
+static PyObject*
+get_elements_from_tle(PyObject* self, PyObject* const* args, Py_ssize_t size)
+{
+    // signiture: _elements_from_tle(tle: TwoLineElement, jd: JulianDate, MU: float = EARTH_MU)
+    //                  -> (raan, inc, aop, ecc, a, m, nu)
+
+    double mu = EARTH_MU;
+    if (size == 3) {
+        mu = PyFloat_AsDouble(args[2]);
+        if (mu == -1.0 && PyErr_Occurred())
+            return NULL;
+    }
+    else if (size != 2) {
+        PyErr_Format(PyExc_TypeError, "_sgp4._getState() takes two or three arguments (%i given)", size);
+        return NULL;
+    }
+
+    // get module state
+    sgp4_state* state = (sgp4_state*)PyModule_GetState(self);
+    if (!state)
+        return NULL;
+
+    // extract arguments
     if (!Py_IS_TYPE(args[0], (PyTypeObject*)state->TwoLineElement)) {
-    //if (tle_check(self, args[0]) < 0) {
         PyErr_SetString(PyExc_TypeError, "first argument must be TwoLineElement type");
         return NULL;
     }
-    double jd;
-    if (jd_AsDouble(args[1], (PyTypeObject*)state->JulianDate, jd, "second") < 0)
-        return NULL;
-    tle_t* tle = (tle_t*)args[0];*/
+    double jd; 
+    jd_AsDouble(args[1], (PyTypeObject*)state->JulianDate, jd, "second");
 
-    // call sgp4 library functions
-    //double dt = jd - TLE_JDNUMBER(tle) - TLE_JDFRACTION(tle), r[3], v[3];
-    //SGP4Funcs::sgp4(tle->satrec, dt, r, v);
+    // get state
+    tle_t* tle = (tle_t*)args[0];
+    double r[3], v[3], dt = jd - TLE_JDNUMBER(tle) - TLE_JDFRACTION(tle);
+    SGP4Funcs::sgp4(tle->satrec, dt, r, v);
+
+    // get elements
     double p, a, ecc, incl, omega, argp, nu, m, arglat, truelon, lonper;
     SGP4Funcs::rv2coe_SGP4(r, v, mu, p, a, ecc, incl, omega, argp, nu, m, arglat, truelon, lonper);
 
@@ -349,7 +352,8 @@ compute_ecc_vector(PyObject* self, PyObject* const* args, Py_ssize_t size)
 
 static PyMethodDef sgp4_methods[] = {
     {"_getState", (PyCFunction)get_state, METH_FASTCALL, "_getState(tle, jd, mu) -> (position, velocity)"},
-    {"_elements_from_state", (PyCFunction)get_elements_from_state, METH_FASTCALL, "_elements_from_state(position, velocity, mu) -> (sma, ecc, inc, raan, aop, m, nu"},
+    {"_elements_from_state", (PyCFunction)get_elements_from_state, METH_FASTCALL, "_elements_from_state(position, velocity, mu) -> (sma, ecc, inc, raan, aop, m, nu)"},
+    {"_elements_from_tle", (PyCFunction)get_elements_from_tle, METH_FASTCALL, "_elements_from_tle(tle, jd, mu) -> (sma, ecc, inc, raan, aop, m, nu)"},
     {"_compute_eccentric_vector", (PyCFunction)compute_ecc_vector, METH_FASTCALL, "_compute_eccentric_vector(position, velocity, mu) -> eccentricVector"},
     {NULL, NULL}
 };
