@@ -8,7 +8,7 @@ import sattrack
 description, long_description = sattrack.__doc__.split('\n', 1)
 
 ext_modules = [Extension(
-    'sattrack.sgp4',
+    'sattrack._sgp4',
     include_dirs=['extensions/sgp4/include'],
     sources=[
         'extensions/sgp4/src/SGP4.cpp',
