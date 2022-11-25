@@ -3,12 +3,13 @@ from math import sqrt, sin, cos, acos, pi
 from pyevspace import EVector, dot, vang, norm, cross
 from sattrack.util.constants import TWOPI
 from sattrack.util.conversions import atan3
+from sattrack._sgp4 import _compute_eccentric_vector, _elements_from_state
 
 
-def _compute_eccentric_vector(position: EVector, velocity: EVector, MU: float) -> EVector:
-    lhs = position * ((velocity.mag2() / MU) - (1 / position.mag()))
-    rhs = velocity * (dot(position, velocity) / MU)
-    return lhs - rhs
+# def _compute_eccentric_vector(position: EVector, velocity: EVector, MU: float) -> EVector:
+#     lhs = position * ((velocity.mag2() / MU) - (1 / position.mag()))
+#     rhs = velocity * (dot(position, velocity) / MU)
+#     return lhs - rhs
 
 
 def _true_anomaly_from_state(position: EVector, velocity: EVector, mu: float) -> float:
@@ -34,26 +35,26 @@ def _eccentric_to_mean_anomaly(eccentricAnomaly: float, eccentricity: float) -> 
     return eccentricAnomaly - eccentricity * sin(eccentricAnomaly)
 
 
-def _elements_from_state(position: EVector, velocity: EVector, MU: float) -> (float, float, float, float, float, float):
-    angularMomentum = cross(position, velocity)
-    lineOfNodes = norm(cross(EVector.e3, angularMomentum))
-    eccentricityVector = _compute_eccentric_vector(position, velocity, MU)
-
-    ecc = eccentricityVector.mag()
-    inc = acos(angularMomentum[2] / angularMomentum.mag())
-    raan = acos(lineOfNodes[0])
-    if lineOfNodes[1] < 0:
-        raan = TWOPI - raan
-    aop = acos(dot(lineOfNodes, eccentricityVector) / eccentricityVector.mag())
-    if eccentricityVector[2] < 0:
-        aop = TWOPI - aop
-    tAnom = acos(dot(eccentricityVector, position) / (eccentricityVector.mag() * position.mag()))
-    if dot(position, velocity) < 0:
-        tAnom = 2 * pi - tAnom
-    mAnom = _true_to_mean_anomaly(tAnom, ecc)
-    sma = (angularMomentum.mag() ** 2) / ((1 - (ecc * ecc)) * MU)
-
-    return raan, inc, aop, ecc, sma, mAnom
+# def _elements_from_state(position: EVector, velocity: EVector, MU: float) -> (float, float, float, float, float, float):
+#     angularMomentum = cross(position, velocity)
+#     lineOfNodes = norm(cross(EVector.e3, angularMomentum))
+#     eccentricityVector = _compute_eccentric_vector(position, velocity, MU)
+#
+#     ecc = eccentricityVector.mag()
+#     inc = acos(angularMomentum[2] / angularMomentum.mag())
+#     raan = acos(lineOfNodes[0])
+#     if lineOfNodes[1] < 0:
+#         raan = TWOPI - raan
+#     aop = acos(dot(lineOfNodes, eccentricityVector) / eccentricityVector.mag())
+#     if eccentricityVector[2] < 0:
+#         aop = TWOPI - aop
+#     tAnom = acos(dot(eccentricityVector, position) / (eccentricityVector.mag() * position.mag()))
+#     if dot(position, velocity) < 0:
+#         tAnom = 2 * pi - tAnom
+#     mAnom = _true_to_mean_anomaly(tAnom, ecc)
+#     sma = (angularMomentum.mag() ** 2) / ((1 - (ecc * ecc)) * MU)
+#
+#     return raan, inc, aop, ecc, sma, mAnom
 
 
 def _sma_to_mean_motion(semiMajorAxis: float, mu: float) -> float:

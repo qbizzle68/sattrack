@@ -6,16 +6,18 @@ from math import radians, cos, sin, pi, sqrt, atan2, floor, degrees
 from typing import Callable
 
 from pyevspace import EVector
+from sattrack._sgp4 import TwoLineElement, _elements_from_tle, _getState
+
 from sattrack.rotation.order import ZXZ, Axis
 from sattrack.rotation.rotation import EulerAngles, getEulerMatrix, rotateMatrixFrom, getMatrix, \
     ReferenceFrame
 from sattrack.sun import getSunPosition
-from sattrack.sgp4 import SGP4_Propagator
+# from sattrack.sgp4 import SGP4_Propagator
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import siderealTime
 from sattrack._orbit import _true_to_mean_anomaly, _true_to_eccentric_anomaly, _eccentric_to_mean_anomaly, \
     _elements_from_state, _sma_to_mean_motion, _nearest_true_anomaly, _nearest_mean_anomaly
-from sattrack.tle import TwoLineElement
+# from sattrack.tle import TwoLineElement
 from sattrack.util.constants import TWOPI, EARTH_MU, EARTH_POLAR_RADIUS, EARTH_EQUITORIAL_RADIUS, SUN_MU, SUN_RADIUS
 
 _all__ = ('Elements', 'Body', 'SUN_BODY', 'EARTH_BODY', 'Orbitable', 'Orbit', 'Satellite', 'meanMotionToSma',
@@ -23,34 +25,38 @@ _all__ = ('Elements', 'Body', 'SUN_BODY', 'EARTH_BODY', 'Orbitable', 'Orbit', 'S
           'trueToMeanAnomaly', 'trueToEccentricAnomaly', 'eccentricToMeanAnomaly')
 
 
-def _elements_from_tle(tle: TwoLineElement, time: JulianDate) -> (float, float, float, float, float, float):
-    dt = time - tle.getEpoch()
-    inc = radians(tle.getInc())
-    n0 = tle.getMeanMotion()
-    dM = (dt * (n0 + dt * (tle.getMeanMotionDot() + dt * tle.getMeanMotionDDot()))) * 360
-    meanAnomaly = radians(tle.getMeanAnomaly() + dM) % TWOPI
-    ecc0 = tle.getEcc()
-    n0dot = tle.getMeanMotionDot() * 2
-    a0 = tle.getSma()
-    aDot = -2 * a0 * n0dot / (3 * n0)
-    sma = a0 + aDot * dt
-    eDot = -2 * (1 - ecc0) * n0dot / (3 * n0)
-    ecc = ecc0 + eDot * dt
-    temp = (a0 ** -3.5) / ((1 - (ecc0 * ecc0)) ** 2)
-
-    # perturbations
-    # non-spherical earth
-    lanJ2Dot = -2.06474e14 * temp * cos(inc)
-    aopJ2Dot = 1.03237e14 * temp * (4 - 5 * (sin(inc) ** 2))
-    # third-body
-    lanMoon = -0.00338 * cos(inc) / n0
-    lanSun = -0.00154 * cos(inc) / n0
-    aopMoon = 0.00169 * (4 - (5 * sin(inc) ** 2)) / n0
-    aopSun = 0.00077 * (4 - (5 * sin(inc) ** 2)) / n0
-    raan = (tle.getRaan() + (lanJ2Dot + lanMoon + lanSun) * dt) % 360
-    aop = (tle.getAop() + (aopJ2Dot + aopMoon + aopSun) * dt) % 360
-
-    return radians(raan), inc, radians(aop), ecc, sma, meanAnomaly
+# def _elements_from_tle(tle: TwoLineElement, time: JulianDate) -> (float, float, float, float, float, float):
+#     state = _getState(tle, time, EARTH_MU);
+#     elements = _elements_from_state(*state, EARTH_MU)
+#     # ignore true anomaly
+#     return elements[:-1]
+#     dt = time - tle.getEpoch()
+#     inc = radians(tle.getInc())
+#     n0 = tle.getMeanMotion()
+#     dM = (dt * (n0 + dt * (tle.getMeanMotionDot() + dt * tle.getMeanMotionDDot()))) * 360
+#     meanAnomaly = radians(tle.getMeanAnomaly() + dM) % TWOPI
+#     ecc0 = tle.getEcc()
+#     n0dot = tle.getMeanMotionDot() * 2
+#     a0 = tle.getSma()
+#     aDot = -2 * a0 * n0dot / (3 * n0)
+#     sma = a0 + aDot * dt
+#     eDot = -2 * (1 - ecc0) * n0dot / (3 * n0)
+#     ecc = ecc0 + eDot * dt
+#     temp = (a0 ** -3.5) / ((1 - (ecc0 * ecc0)) ** 2)
+#
+#     # perturbations
+#     # non-spherical earth
+#     lanJ2Dot = -2.06474e14 * temp * cos(inc)
+#     aopJ2Dot = 1.03237e14 * temp * (4 - 5 * (sin(inc) ** 2))
+#     # third-body
+#     lanMoon = -0.00338 * cos(inc) / n0
+#     lanSun = -0.00154 * cos(inc) / n0
+#     aopMoon = 0.00169 * (4 - (5 * sin(inc) ** 2)) / n0
+#     aopSun = 0.00077 * (4 - (5 * sin(inc) ** 2)) / n0
+#     raan = (tle.getRaan() + (lanJ2Dot + lanMoon + lanSun) * dt) % 360
+#     aop = (tle.getAop() + (aopJ2Dot + aopMoon + aopSun) * dt) % 360
+#
+#     return radians(raan), inc, radians(aop), ecc, sma, meanAnomaly
 
 
 def _check_type(value, paramName):
@@ -90,71 +96,75 @@ class Elements:
 
     @classmethod
     def fromTle(cls, tle: TwoLineElement, epoch: JulianDate):
-        if not isinstance(tle, TwoLineElement):
-            raise TypeError('tle parameter must be a TwoLineElement type')
-        if not isinstance(epoch, JulianDate):
-            raise TypeError('time parameter must be a JulianDate type')
-
-        # dt = epoch - tle.getEpoch()
-        # inc = radians(tle.getInc())
-        # n0 = tle.getMeanMotion()
-        # dM = (dt * (n0 + dt * (tle.getMeanMotionDot() + dt * tle.getMeanMotionDDot()))) * 360
-        # meanAnomaly = radians(tle.getMeanAnomaly() + dM) % TWOPI
-        # ecc0 = tle.getEcc()
-        # n0dot = tle.getMeanMotionDot() * 2
-        # a0 = tle.getSma()
-        # aDot = -2 * a0 * n0dot / (3 * n0)
-        # sma = a0 + aDot * dt
-        # eDot = -2 * (1 - ecc0) * n0dot / (3 * n0)
-        # ecc = ecc0 + eDot * dt
-        # temp = (a0 ** -3.5) / ((1 - (ecc0 * ecc0)) ** 2)
+        state = _getState(tle, epoch)
+        return cls.fromState(*state, epoch, EARTH_MU)
+        # if not isinstance(tle, TwoLineElement):
+        #     raise TypeError('tle parameter must be a TwoLineElement type')
+        # if not isinstance(epoch, JulianDate):
+        #     raise TypeError('time parameter must be a JulianDate type')
         #
-        # # perturbations
-        # # non-spherical earth
-        # lanJ2Dot = -2.06474e14 * temp * cos(inc)
-        # aopJ2Dot = 1.03237e14 * temp * (4 - 5 * (sin(inc) ** 2))
-        # # third-body
-        # lanMoon = -0.00338 * cos(inc) / n0
-        # lanSun = -0.00154 * cos(inc) / n0
-        # aopMoon = 0.00169 * (4 - (5 * sin(inc) ** 2)) / n0
-        # aopSun = 0.00077 * (4 - (5 * sin(inc) ** 2)) / n0
-        # raan = (tle.getRaan() + (lanJ2Dot + lanMoon + lanSun) * dt) % 360
-        # aop = (tle.getAop() + (aopJ2Dot + aopMoon + aopSun) * dt) % 36
-
-        raan, inc, aop, ecc, sma, meanAnomaly = _elements_from_tle(tle, epoch)
-        return cls(raan, inc, aop, ecc, sma, meanAnomaly, epoch)
+        # # dt = epoch - tle.getEpoch()
+        # # inc = radians(tle.getInc())
+        # # n0 = tle.getMeanMotion()
+        # # dM = (dt * (n0 + dt * (tle.getMeanMotionDot() + dt * tle.getMeanMotionDDot()))) * 360
+        # # meanAnomaly = radians(tle.getMeanAnomaly() + dM) % TWOPI
+        # # ecc0 = tle.getEcc()
+        # # n0dot = tle.getMeanMotionDot() * 2
+        # # a0 = tle.getSma()
+        # # aDot = -2 * a0 * n0dot / (3 * n0)
+        # # sma = a0 + aDot * dt
+        # # eDot = -2 * (1 - ecc0) * n0dot / (3 * n0)
+        # # ecc = ecc0 + eDot * dt
+        # # temp = (a0 ** -3.5) / ((1 - (ecc0 * ecc0)) ** 2)
+        # #
+        # # # perturbations
+        # # # non-spherical earth
+        # # lanJ2Dot = -2.06474e14 * temp * cos(inc)
+        # # aopJ2Dot = 1.03237e14 * temp * (4 - 5 * (sin(inc) ** 2))
+        # # # third-body
+        # # lanMoon = -0.00338 * cos(inc) / n0
+        # # lanSun = -0.00154 * cos(inc) / n0
+        # # aopMoon = 0.00169 * (4 - (5 * sin(inc) ** 2)) / n0
+        # # aopSun = 0.00077 * (4 - (5 * sin(inc) ** 2)) / n0
+        # # raan = (tle.getRaan() + (lanJ2Dot + lanMoon + lanSun) * dt) % 360
+        # # aop = (tle.getAop() + (aopJ2Dot + aopMoon + aopSun) * dt) % 36
+        #
+        # raan, inc, aop, ecc, sma, meanAnomaly = _elements_from_tle(tle, epoch)
+        # return cls(raan, inc, aop, ecc, sma, meanAnomaly, epoch)
 
     @classmethod
     def fromState(cls, position: EVector, velocity: EVector, epoch: JulianDate, MU: float = EARTH_MU):
-        if not isinstance(position, EVector):
-            raise TypeError('position parameter must be an EVector type')
-        if not isinstance(velocity, EVector):
-            raise TypeError('velocity parameter must be an EVector type')
-        if not isinstance(epoch, JulianDate):
-            raise TypeError('time parameter must be a JulianDate type')
-        if not isinstance(MU, (int, float)):
-            raise TypeError('MU parameter must be an int float type')
-
-        # angularMomentum = cross(position, velocity)
-        # lineOfNodes = norm(cross(EVector.e3, angularMomentum))
-        # eccentricityVector = _compute_eccentric_vector(position, velocity, MU)
+        elements = _elements_from_state(position, velocity, MU)
+        return cls(*elements[:-1], epoch)
+        # if not isinstance(position, EVector):
+        #     raise TypeError('position parameter must be an EVector type')
+        # if not isinstance(velocity, EVector):
+        #     raise TypeError('velocity parameter must be an EVector type')
+        # if not isinstance(epoch, JulianDate):
+        #     raise TypeError('time parameter must be a JulianDate type')
+        # if not isinstance(MU, (int, float)):
+        #     raise TypeError('MU parameter must be an int float type')
         #
-        # ecc = eccentricityVector.mag()
-        # inc = acos(angularMomentum[2] / angularMomentum.mag())
-        # raan = acos(lineOfNodes[0])
-        # if lineOfNodes[1] < 0:
-        #     raan = TWOPI - raan
-        # aop = acos(dot(lineOfNodes, eccentricityVector) / eccentricityVector.mag())
-        # if eccentricityVector[2] < 0:
-        #     aop = TWOPI - aop
-        # tAnom = acos(dot(eccentricityVector, position) / (eccentricityVector.mag() * position.mag()))
-        # if dot(position, velocity) < 0:
-        #     tAnom = 2 * pi - tAnom
-        # mAnom = trueToMean(tAnom, ecc)
-        # sma = (angularMomentum.mag() ** 2) / ((1 - (ecc * ecc)) * MU)
-
-        raan, inc, aop, ecc, sma, meanAnomaly = _elements_from_state(position, velocity, MU)
-        return cls(raan, inc, aop, ecc, sma, meanAnomaly, epoch)
+        # # angularMomentum = cross(position, velocity)
+        # # lineOfNodes = norm(cross(EVector.e3, angularMomentum))
+        # # eccentricityVector = _compute_eccentric_vector(position, velocity, MU)
+        # #
+        # # ecc = eccentricityVector.mag()
+        # # inc = acos(angularMomentum[2] / angularMomentum.mag())
+        # # raan = acos(lineOfNodes[0])
+        # # if lineOfNodes[1] < 0:
+        # #     raan = TWOPI - raan
+        # # aop = acos(dot(lineOfNodes, eccentricityVector) / eccentricityVector.mag())
+        # # if eccentricityVector[2] < 0:
+        # #     aop = TWOPI - aop
+        # # tAnom = acos(dot(eccentricityVector, position) / (eccentricityVector.mag() * position.mag()))
+        # # if dot(position, velocity) < 0:
+        # #     tAnom = 2 * pi - tAnom
+        # # mAnom = trueToMean(tAnom, ecc)
+        # # sma = (angularMomentum.mag() ** 2) / ((1 - (ecc * ecc)) * MU)
+        #
+        # raan, inc, aop, ecc, sma, meanAnomaly = _elements_from_state(position, velocity, MU)
+        # return cls(raan, inc, aop, ecc, sma, meanAnomaly, epoch)
 
     def __str__(self):
         header = ' elements |  raan   |   inc   |   aop   |   ecc    |   sma    | mean anom ' \
@@ -680,9 +690,9 @@ class Satellite(Orbitable):
     def __init__(self, tle: TwoLineElement):
         if not isinstance(tle, TwoLineElement):
             raise TypeError('tle parameter must be a TwoLineElement type')
-        super().__init__(tle.getName(), EARTH_BODY)
+        super().__init__(tle.name, EARTH_BODY)
         self._tle = tle
-        self._propagator = SGP4_Propagator(tle)
+        # self._propagator = SGP4_Propagator(tle)
 
     def anomalyAt(self, time: JulianDate, anomalyType: _Anomaly = True) -> float:
         if not isinstance(time, JulianDate):
@@ -690,15 +700,19 @@ class Satellite(Orbitable):
         if not isinstance(anomalyType, _Anomaly):
             raise TypeError('anomalyType parameter must be Anomaly type')
 
-        # todo: if eccentricVector works, compute this with SGP4 position vector
-        # elements = Elements.fromTle(self._tle, time)
-        _, _, _, eccentricity, _, meanAnomaly = _elements_from_tle(self._tle, time)
+        elements = _elements_from_tle(self._tle, time)
         if anomalyType is _TRUE:
-            # return _mean_to_true_anomaly(elements.meanAnomaly, elements.ecc)
-            return _mean_to_true_anomaly(meanAnomaly, eccentricity)
+            return elements[-1]
         elif anomalyType is _MEAN:
-            # return elements.meanAnomaly
-            return meanAnomaly
+            return elements[-2]
+        # # elements = Elements.fromTle(self._tle, time)
+        # _, _, _, eccentricity, _, meanAnomaly = _elements_from_tle(self._tle, time)
+        # if anomalyType is _TRUE:
+        #     # return _mean_to_true_anomaly(elements.meanAnomaly, elements.ecc)
+        #     return _mean_to_true_anomaly(meanAnomaly, eccentricity)
+        # elif anomalyType is _MEAN:
+        #     # return elements.meanAnomaly
+        #     return meanAnomaly
         else:
             raise ValueError('anomalyType must be TRUE or MEAN')
 
@@ -715,21 +729,21 @@ class Satellite(Orbitable):
 
         # todo: determine if this is ideal using SGP4 states
         # elements = Elements.fromTle(self._tle, time)
-        _, _, _, eccentricity, sma, meanAnomaly = _elements_from_tle(self._tle, time)
+        _, _, _, eccentricity, sma, meanAnomaly, trueAnomaly = _elements_from_tle(self._tle, time)
         # meanMotion = _sma_to_mean_motion(elements.sma, self._body.mu) * 86400 / TWOPI
         meanMotion = _sma_to_mean_motion(sma, self._body.mu) * 86400 / TWOPI
         if anomalyType is _TRUE:
             # t0 = _mean_to_true_anomaly(elements.meanAnomaly, elements.ecc)
-            t0 = _mean_to_true_anomaly(meanAnomaly, eccentricity)
+            # t0 = _mean_to_true_anomaly(meanAnomaly, eccentricity)
             if direction is _NEXT:
                 # return _next_true_anomaly(meanMotion, elements.ecc, t0, time, anomaly, time)
-                return _next_true_anomaly(meanMotion, eccentricity, t0, time, anomaly, time)
+                return _next_true_anomaly(meanMotion, eccentricity, trueAnomaly, time, anomaly, time)
             elif direction is _PREVIOUS:
                 # return _previous_true_anomaly(meanMotion, elements.ecc, t0, time, anomaly, time)
-                return _previous_true_anomaly(meanMotion, eccentricity, t0, time, anomaly, time)
+                return _previous_true_anomaly(meanMotion, eccentricity, trueAnomaly, time, anomaly, time)
             else:
                 # return _nearest_true_anomaly(meanMotion, elements.ecc, t0, time, anomaly)
-                return _nearest_true_anomaly(meanMotion, eccentricity, t0, time, anomaly)
+                return _nearest_true_anomaly(meanMotion, eccentricity, trueAnomaly, time, anomaly)
         elif anomalyType is _MEAN:
             if direction is _NEXT:
                 # return _next_mean_anomaly(meanMotion, elements.meanAnomaly, time, anomaly, time)
@@ -747,15 +761,17 @@ class Satellite(Orbitable):
         if not isinstance(time, JulianDate):
             raise TypeError('time parameter must be JulianDate type')
 
-        rawState = self._propagator.getState(self._tle, time)
-        return (EVector((rawState[0][0], rawState[0][1], rawState[0][2])),
-                EVector((rawState[1][0], rawState[1][1], rawState[1][2])))
+        return _getState(self._tle, time)
+        # rawState = self._propagator.getState(self._tle, time)
+        # return (EVector((rawState[0][0], rawState[0][1], rawState[0][2])),
+        #         EVector((rawState[1][0], rawState[1][1], rawState[1][2])))
 
     def getElements(self, time: JulianDate) -> Elements:
         return Elements.fromTle(self._tle, time)
 
     def getReferenceFrame(self, time: JulianDate = None) -> ReferenceFrame:
         # elements = Elements.fromTle(self._tle, time)
+        #  todo: compute the vectors from eccentric and angular momentum vectors ?
         raan, inc, aop, *_ = _elements_from_tle(self._tle, time)
         return ReferenceFrame(ZXZ, EulerAngles(raan, inc, aop))
 
@@ -763,15 +779,17 @@ class Satellite(Orbitable):
         if not isinstance(time, JulianDate):
             raise TypeError('time parameter must be JulianDate type')
         # elements = Elements.fromTle(self._tle, time)
-        _, _, _, eccentricity, sma, _ = _elements_from_tle(self._tle, time)
-        return _radius_at_periapsis(sma, eccentricity)
+        # _, _, _, eccentricity, sma, _ = _elements_from_tle(self._tle, time)
+        # return _radius_at_periapsis(sma, eccentricity)
+        return self._tle.periapsis
 
     def getApoapsis(self, time: JulianDate = None) -> float:
         if not isinstance(time, JulianDate):
             raise TypeError('time parameter must be JulianDate type')
         # elements = Elements.fromTle(self._tle, time)
-        _, _, _, eccentricity, sma, _ = _elements_from_tle(self._tle, time)
-        return _radius_at_apoapsis(sma, eccentricity)
+        # _, _, _, eccentricity, sma, _ = _elements_from_tle(self._tle, time)
+        # return _radius_at_apoapsis(sma, eccentricity)
+        return self._tle.apoapsis
 
 
 def _mean_motion_to_sma(meanMotion: float, mu: float) -> float:
