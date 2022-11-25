@@ -34,15 +34,19 @@ typedef struct {
 typedef struct {
     PyObject* EVector;
     PyObject* JulianDate;
+    PyObject* TwoLineElement;
 } sgp4_state;
 
-static void trim_name(char name[]) {
+static void 
+trim_name(char name[]) 
+{
     char* end = name + 23;
     while (end > name && isspace((unsigned char)*end)) end--;
     end[1] = '\0';
 }
 
-static int split_tle_string(const char* tle_string, char name[], char line1[], char line2[])
+static int 
+split_tle_string(const char* tle_string, char name[], char line1[], char line2[])
 {
     int result;
     try {
@@ -65,8 +69,11 @@ static int split_tle_string(const char* tle_string, char name[], char line1[], c
     return 0;
 }
 
-static int tle_init(PyObject* self, PyObject* args, PyObject* kwargs) {
-    tle_t* tle = (tle_t*)self;
+static int 
+tle_init(tle_t* self, PyObject* args, PyObject* kwargs) 
+{
+//static int tle_init(PyObject* self, PyObject* args, PyObject* kwargs) {
+//    tle_t* tle = (tle_t*)self;
     const char* tle_string = "";
     gravconsttype grav = gravconsttype::wgs72;
 
@@ -84,14 +91,14 @@ static int tle_init(PyObject* self, PyObject* args, PyObject* kwargs) {
         PyErr_SetString(PyExc_ValueError, "error parsing argument during tle initialization");
         return -1;
     }
-    strncpy(tle->name, name, SAT_NAME_LENGTH);
+    strncpy(self->name, name, SAT_NAME_LENGTH);
 
-    /* call to init elsetrec values */
-    SGP4Funcs::twoline2rv(line1, line2, 'i', grav, tle->satrec);
-    if (tle->satrec.error) {
+    // call to init elsetrec values
+    SGP4Funcs::twoline2rv(line1, line2, 'i', grav, self->satrec);
+    if (self->satrec.error) {
         // do we save this somewhere else?
-        PyObject* exc = PyErr_NewException("tle.sgp4Error", NULL, NULL);
-        PyErr_Format(exc, "error in sgp4 library (error = %i)", tle->satrec.error);
+        PyObject* exc = PyErr_NewException("_sgp4.sgp4Error", NULL, NULL);
+        PyErr_Format(exc, "error in sgp4 library (error = %i)", self->satrec.error);
         Py_DECREF(exc);
         return -1;
     }
@@ -102,14 +109,21 @@ static int tle_init(PyObject* self, PyObject* args, PyObject* kwargs) {
 static inline int
 tle_check(PyObject* module, PyObject* obj)
 {
-    PyTypeObject* tle_type = (PyTypeObject*)PyObject_GetAttrString(module, "TwoLineElement");
+    sgp4_state* state = (sgp4_state*)PyModule_GetState(module);
+    if (!state)
+        return NULL;
+
+    int result = Py_IS_TYPE(obj, (PyTypeObject*)state->TwoLineElement);
+    return (result) ? 0 : -1;
+
+    /*PyTypeObject* tle_type = (PyTypeObject*)PyObject_GetAttrString(module, "TwoLineElement");
     if (!tle_type)
         return -1;
 
     int result = Py_IS_TYPE(obj, tle_type);
     Py_DECREF(tle_type);
     // cant ensure result is 1 when true so have to check all values
-    return (result) ? 0 : -1;
+    return (result) ? 0 : -1;*/
 }
 
 static int
@@ -158,10 +172,14 @@ get_state(PyObject* self, PyObject* const* args, Py_ssize_t size)
         return NULL;
 
     // extract arguments
-    if (tle_check(self, args[0]) < 0) {
+    if (!Py_IS_TYPE(args[0], (PyTypeObject*)state->TwoLineElement)) {
         PyErr_SetString(PyExc_TypeError, "first parameter must be TwoLineElement type");
         return NULL;
     }
+    /*if (tle_check(self, args[0]) < 0) {
+        PyErr_SetString(PyExc_TypeError, "first parameter must be TwoLineElement type");
+        return NULL;
+    }*/
 
     tle_t* tle = (tle_t*)args[0];
     double jd;
@@ -175,9 +193,12 @@ get_state(PyObject* self, PyObject* const* args, Py_ssize_t size)
     // check if the error flag was set
     if (tle->satrec.error) {
         PyObject* exc = PyErr_NewException("_sgp4.sgp4Error", NULL, NULL);
+        PyErr_SetString(exc, "error in sgp4 library (error = %i)");
         Py_DECREF(exc);
         return NULL;
     }
+
+    // get buffer from new vectors here 
 
     PyObject* position = build_vector(state->EVector, r[0], r[1], r[2]);
     if (!position)
@@ -216,27 +237,15 @@ get_elements(PyObject* self, PyObject* const* args, Py_ssize_t size)
         return NULL;
 
     // extract arguments
-    if (tle_check(self, args[0]) < 0) {
+    if (!Py_IS_TYPE(args[0], (PyTypeObject*)state->TwoLineElement)) {
+    //if (tle_check(self, args[0]) < 0) {
         PyErr_SetString(PyExc_TypeError, "first argument must be TwoLineElement type");
         return NULL;
     }
     double jd;
     if (jd_AsDouble(args[1], (PyTypeObject*)state->JulianDate, jd, "second") < 0)
         return NULL;
-    /*if (!Py_IS_TYPE(args[1], Py_TYPE(state->JulianDate))) {
-        PyErr_SetString(PyExc_TypeError, "second parameter must be JulianDate type");
-        Py_DECREF(state);
-        return NULL;
-    }*/
-
     tle_t* tle = (tle_t*)args[0];
-    /*PyObject* obj = PyObject_GetAttrString(args[1], "value");
-    if (!obj) {
-        Py_DECREF(state);
-        return NULL;
-    }
-    double jd = PyFloat_AS_DOUBLE(obj);
-    Py_DECREF(obj);*/
 
     // call sgp4 library functions
     double dt = jd - TLE_JDNUMBER(tle) - TLE_JDFRACTION(tle), r[3], v[3];
@@ -248,6 +257,7 @@ get_elements(PyObject* self, PyObject* const* args, Py_ssize_t size)
     return Py_BuildValue("ddddddd", omega, incl, argp, ecc, a, m, nu);
 }
 
+/* this should be replacable with access to EVector buffer */
 static int
 get_vec_items(PyObject* const self, double v[])
 {
@@ -264,10 +274,15 @@ get_vec_items(PyObject* const self, double v[])
 static PyObject* 
 compute_ecc_vector(PyObject* self, PyObject* const* args, Py_ssize_t size)
 {
-    // signiture: compute_ecc_vector(EVector, EVector, float) -> EVector
+    // signiture: compute_ecc_vector(position: EVector, velocity: EVector, mu: float = EARTH_MU) -> EVector
     double mu = EARTH_MU;
-    if (size != 3) {
-        PyErr_Format(PyExc_TypeError, "_compute_eccentric_vector() takes exactly three arguments (%i given)", size);
+    if (size == 3) {
+        mu = PyFloat_AsDouble(args[2]);
+        if (mu == -1.0 && PyErr_Occurred())
+            return NULL;
+    }
+    else if (size != 2) {
+        PyErr_Format(PyExc_TypeError, "_sgp4._compute_eccentric_vector() takes two or three arguments (%i given)", size);
         return NULL;
     }
 
@@ -276,7 +291,7 @@ compute_ecc_vector(PyObject* self, PyObject* const* args, Py_ssize_t size)
     if (!state)
         return NULL;
 
-    // extract arguments
+    // check arguments
     if (!Py_IS_TYPE(args[0], (PyTypeObject*)state->EVector)) {
         PyErr_SetString(PyExc_TypeError, "first argument must be EVector type");
         Py_DECREF(state);
@@ -285,13 +300,6 @@ compute_ecc_vector(PyObject* self, PyObject* const* args, Py_ssize_t size)
     if (!Py_IS_TYPE(args[1], (PyTypeObject*)state->EVector)) {
         PyErr_SetString(PyExc_TypeError, "second argument must be EVector type");
         Py_DECREF(state);
-        return NULL;
-    }
-    //double mu = PyFloat_AsDouble(args[2]);
-    mu = PyFloat_AsDouble(args[2]);
-    if (mu == -1.0 && PyErr_Occurred()) {
-        if (PyErr_Occurred() == PyExc_TypeError)
-            PyErr_SetString(PyExc_TypeError, "third argument must be numeric type");
         return NULL;
     }
 
@@ -314,7 +322,6 @@ compute_ecc_vector(PyObject* self, PyObject* const* args, Py_ssize_t size)
         ebar[i] = (c1 * r[i] - rdotv * v[i]) / mu;
 
     // build and return eccentric vector
-    // make an array_to_vector to handle this
     PyObject* eccVec = build_vector(state->EVector, ebar[0], ebar[1], ebar[2]);
     return eccVec;
 }
@@ -373,50 +380,7 @@ static PyGetSetDef tle_getset[] = {
     {NULL}
 };
 
-//static PyTypeObject tle_type = {
-//	PyVarObject_HEAD_INIT(NULL, 0)
-//    "tle.TwoLineElement",   /* tp_name */
-//    sizeof(tle_t),          /* tp_basicsize */
-//    0,                      /* tp_itemsize */
-//    0,                      /* tp_dealloc */
-//    0,                      /* tp_vectorcall_offset */
-//    0,                      /* tp_getattr */
-//    0,                      /* tp_setattr */
-//    0,                      /* tp_as_async */
-//    0,                      /* tp_repr */
-//    0,                      /* tp_as_number */
-//    0,                      /* tp_as_sequence */
-//    0,                      /* tp_as_mapping */
-//    0,                      /* tp_hash */
-//    0,                      /* tp_call */
-//    0,                      /* tp_str */
-//    0,                      /* tp_getattro */
-//    0,                      /* tp_setattro */
-//    0,                      /* tp_as_buffer */
-//    Py_TPFLAGS_DEFAULT,     /* tp_flags */
-//    PyDoc_STR(""),          /* tp_doc */
-//    0,                      /* tp_traverse */
-//    0,                      /* tp_clear */
-//    0,                      /* tp_richcompare */
-//    0,                      /* tp_weaklistoffset */
-//    0,                      /* tp_iter */
-//    0,                      /* tp_iternext */
-//    tle_methods,            /* tp_methods */
-//    0,                      /* tp_members */
-//    tle_getset,             /* tp_getset */
-//    0,                      /* tp_base */
-//    0,                      /* tp_dict */
-//    0,                      /* tp_descr_get */
-//    0,                      /* tp_descr_set */
-//    0,                      /* tp_dictoffset */
-//    (initproc)tle_init,     /* tp_init */
-//    0,                      /* tp_alloc */
-//    PyType_GenericNew,      /* tp_new */
-//    0,                      /* tp_free */
-//};
-
 static PyType_Slot tle_slots[] = {
-    //{Py_tp_methods, tle_methods},
     {Py_tp_getset, tle_getset},
     {Py_tp_init, (initproc)tle_init},
     {Py_tp_new, PyType_GenericNew},
@@ -431,55 +395,49 @@ static PyType_Spec tle_spec = {
     tle_slots
 };
 
-static int sgp4_exec(PyObject* module) 
+static int
+sgp4_exec(PyObject* module)
 {
-    PyObject* tle = PyType_FromModuleAndSpec(module, &tle_spec, NULL);
-    if (!tle)
-        return -1;
-    Py_INCREF(tle);
-    if (PyModule_AddObject(module, "TwoLineElement", tle) < 0) {
-        Py_DECREF(tle);
-        return -1;
-    }
-    /*if (PyType_Ready(&tle_type) < 0)
-        return -1;
-
-    Py_INCREF(&tle_type);
-    if (PyModule_AddObject(module, "TwoLineElement", (PyObject*)&tle_type) < 0) {
-        Py_DECREF(&tle_type);
-        return -1;
-    }*/
-        //goto error;
-
     sgp4_state* state = (sgp4_state*)PyModule_GetState(module);
     if (!state)
         return -1;
 
-    PyObject* module_import = PyImport_ImportModule("pyevspace");
-    if (!module_import)
+    PyObject* type = PyType_FromModuleAndSpec(module, &tle_spec, NULL);
+    if (!type)
         return -1;
-    PyObject* type = PyObject_GetAttrString(module_import, "EVector");
-    Py_DECREF(module_import);
-    if (!type) {
+    if (PyModule_AddObjectRef(module, "TwoLineElement", type) < 0) {
+        Py_DECREF(type);
         return -1;
     }
+    state->TwoLineElement = type;
 
+    PyObject* module_import = PyImport_ImportModule("pyevspace");
+    if (!module_import) {
+        Py_DECREF(state->TwoLineElement);
+        return -1;
+    }
+    type = PyObject_GetAttrString(module_import, "EVector");
+    Py_DECREF(module_import);
+    if (!type) {
+        Py_DECREF(state->TwoLineElement);
+        return -1;
+    }
     state->EVector = type;
-    type = NULL;
 
     module_import = PyImport_ImportModule("sattrack.spacetime.juliandate");
     if (!module_import) {
+        Py_DECREF(state->TwoLineElement);
         Py_DECREF(state->EVector);
         return -1;
     }
     type = PyObject_GetAttrString(module_import, "JulianDate");
     Py_DECREF(module_import);
     if (!type) {
+        Py_DECREF(state->TwoLineElement);
         Py_DECREF(state->EVector);
         return -1;
     }
     state->JulianDate = type;
-    type = NULL;
 
     return 0;
 }
@@ -492,6 +450,7 @@ static void sgp4_free(void* self)
 
     Py_DECREF(state->EVector);
     Py_DECREF(state->JulianDate);
+    Py_DECREF(state->TwoLineElement);
 }
 
 static PyModuleDef_Slot sgp4_slots[]{
@@ -502,7 +461,7 @@ static PyModuleDef_Slot sgp4_slots[]{
 PyDoc_STRVAR(tle_doc, "Module supporting the SGP4 satellite propagation model.");
 static PyModuleDef tle_module = {
 	PyModuleDef_HEAD_INIT,	/* m_base */
-	"_sgp4",		            /* m_name */
+	"_sgp4",		        /* m_name */
 	tle_doc,	            /* m_doc */
 	sizeof(sgp4_state),	    /* m_size */
     sgp4_methods,           /* m_methods */
@@ -515,44 +474,5 @@ static PyModuleDef tle_module = {
 PyMODINIT_FUNC
 PyInit__sgp4(void)
 {
-	/*PyObject* module = NULL;
-    PyObject* obj = NULL;*/
-
-    /*if (PyType_Ready(&tle_type) < 0)
-        return NULL;*/
-
-    /*module = PyModule_Create(&tle_module);
-    if (!module)
-        return NULL;*/
-
-    /*Py_INCREF(&tle_type);
-    if (PyModule_AddObject(module, "TwoLineElement", (PyObject*)&tle_type) < 0)
-        goto error;*/
-
-    /*obj = PyImport_ImportModule("sattrack.spacetime.juliandate");
-    if (!obj)
-        goto error;
-
-    JulianDate = PyObject_GetAttrString(obj, "JulianDate");
-    Py_DECREF(obj);
-    if (!JulianDate)
-        goto error;
-
-    obj = PyImport_ImportModule("pyevspace");
-    if (!obj)
-        goto error;
-
-    EVector = PyObject_GetAttrString(obj, "EVector");
-    Py_DECREF(obj);
-    if (!EVector)
-        goto error;*/
-	
-	//return module;
-    return PyModuleDef_Init(&tle_module);
-
-/*error:
-    Py_DECREF(module);
-    Py_DECREF(&tle_type);
-    Py_XDECREF(JulianDate);
-    return NULL;*/
+	return PyModuleDef_Init(&tle_module);
 }
