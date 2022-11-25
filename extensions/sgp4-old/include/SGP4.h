@@ -57,9 +57,6 @@
 
 #define SGP4Version  "SGP4 Version 2020-07-13"
 
-/* used to reduce unused code bloat in twoline2rv */
-#define _REDUCED_VERSION
-
 // -------------------------- structure declarations ----------------------------
 typedef enum
 {
@@ -154,14 +151,9 @@ namespace SGP4Funcs
 	void twoline2rv
 		(
 		char      longstr1[130], char longstr2[130],
-#ifndef _REDUCED_VERSION
-		char      typerun, char typeinput, 
-#endif
-		char opsmode,
+		char      typerun, char typeinput, char opsmode,
 		gravconsttype       whichconst,
-#ifndef _REDUCED_VERSION
 		double& startmfe, double& stopmfe, double& deltamin,
-#endif
 		elsetrec& satrec
 		);
 

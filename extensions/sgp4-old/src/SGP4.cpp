@@ -2122,9 +2122,7 @@ namespace SGP4Funcs
 			j3oj2 = j3 / j2;
 			break;
 		default:
-#ifndef _REDUCED_VERSION
 			fprintf(stderr, "unknown gravity option (%d)\n", whichconst);
-#endif
 			break;
 		}
 
@@ -2174,14 +2172,9 @@ namespace SGP4Funcs
 	void twoline2rv
 		(
 		char longstr1[130], char longstr2[130],
-#ifndef _REDUCED_VERSION
-		char typerun, char typeinput, 
-#endif
-		char opsmode,
+		char typerun, char typeinput, char opsmode,
 		gravconsttype whichconst,
-#ifndef _REDUCED_VERSION
 		double& startmfe, double& stopmfe, double& deltamin,
-#endif
 		elsetrec& satrec
 		)
 	{
@@ -2243,7 +2236,6 @@ namespace SGP4Funcs
 			&satrec.epochdays, &satrec.ndot, &satrec.nddot, &nexp, &satrec.bstar,
 			&ibexp, &satrec.ephtype, &satrec.elnum);
 #endif
-#ifndef _REDUCED_VERSION
 		if (typerun == 'v')  // run for specified times from the file
 		{
 			if (longstr2[52] == ' ')
@@ -2276,7 +2268,6 @@ namespace SGP4Funcs
 			}
 		}
 		else  // simply run -1 day to +1 day or user input times
-#endif
 		{
 			if (longstr2[52] == ' ')
 			{
@@ -2344,7 +2335,6 @@ namespace SGP4Funcs
 		days2mdhms_SGP4(year, satrec.epochdays, mon, day, hr, minute, sec);
 		jday_SGP4(year, mon, day, hr, minute, sec, satrec.jdsatepoch, satrec.jdsatepochF);
 
-#ifndef _REDUCED_VERSION
 		// ---- input start stop times manually
 		if ((typerun != 'v') && (typerun != 'c'))
 		{
@@ -2440,7 +2430,6 @@ namespace SGP4Funcs
 			stopmfe = 1440.0;
 			deltamin = 10.0;
 		}
-#endif
 
 		// ---------------- initialize the orbit at sgp4epoch -------------------
 		sgp4init(whichconst, opsmode, satrec.satnum, (satrec.jdsatepoch + satrec.jdsatepochF) - 2433281.5, satrec.bstar,
