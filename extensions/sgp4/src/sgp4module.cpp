@@ -217,9 +217,26 @@ get_state(PyObject* self, PyObject* const* args, Py_ssize_t size)
     return rtn;
 }
 
-static PyObject*
-get_elements(PyObject* self, PyObject* const* args, Py_ssize_t size)
+/* this should be replacable with access to EVector buffer */
+static int
+get_vec_items(PyObject* const self, double v[])
 {
+    PyObject* obj = PySequence_Fast(self, NULL);
+    if (!obj)
+        return -1;
+    PyObject** items = PySequence_Fast_ITEMS(obj);
+    v[0] = PyFloat_AS_DOUBLE(items[0]);
+    v[1] = PyFloat_AS_DOUBLE(items[1]);
+    v[2] = PyFloat_AS_DOUBLE(items[2]);
+    return 0;
+}
+
+static PyObject*
+get_elements_from_state(PyObject* self, PyObject* const* args, Py_ssize_t size)
+{
+    // signiture: _elements_from_state(position: EVector, velocity: EVector, MU: float = EARTH_MU) 
+    //                  -> (raan, inc, aop, ecc, a, m, nu)
+
     double mu = EARTH_MU;
     if (size == 3) {
         mu = PyFloat_AsDouble(args[2]);
@@ -237,6 +254,26 @@ get_elements(PyObject* self, PyObject* const* args, Py_ssize_t size)
         return NULL;
 
     // extract arguments
+    if (!Py_IS_TYPE(args[0], (PyTypeObject*)state->EVector)) {
+        PyErr_SetString(PyExc_TypeError, "first argument must be pyevspace.EVector type");
+        return NULL;
+    }
+    if (!Py_IS_TYPE(args[1], (PyTypeObject*)state->EVector)) {
+        PyErr_SetString(PyExc_TypeError, "second argument must be pyevspace.EVector type");
+        return NULL;
+    }
+
+    //  get EVector buffer here
+
+    double r[3], v[3];
+    if (get_vec_items(args[0], r) < 0)
+        return NULL;
+    if (get_vec_items(args[1], v) < 0)
+        return NULL;
+
+
+
+    /*// extract arguments
     if (!Py_IS_TYPE(args[0], (PyTypeObject*)state->TwoLineElement)) {
     //if (tle_check(self, args[0]) < 0) {
         PyErr_SetString(PyExc_TypeError, "first argument must be TwoLineElement type");
@@ -245,30 +282,16 @@ get_elements(PyObject* self, PyObject* const* args, Py_ssize_t size)
     double jd;
     if (jd_AsDouble(args[1], (PyTypeObject*)state->JulianDate, jd, "second") < 0)
         return NULL;
-    tle_t* tle = (tle_t*)args[0];
+    tle_t* tle = (tle_t*)args[0];*/
 
     // call sgp4 library functions
-    double dt = jd - TLE_JDNUMBER(tle) - TLE_JDFRACTION(tle), r[3], v[3];
-    SGP4Funcs::sgp4(tle->satrec, dt, r, v);
+    //double dt = jd - TLE_JDNUMBER(tle) - TLE_JDFRACTION(tle), r[3], v[3];
+    //SGP4Funcs::sgp4(tle->satrec, dt, r, v);
     double p, a, ecc, incl, omega, argp, nu, m, arglat, truelon, lonper;
     SGP4Funcs::rv2coe_SGP4(r, v, mu, p, a, ecc, incl, omega, argp, nu, m, arglat, truelon, lonper);
 
     // returning mean anomaly right now with this 
     return Py_BuildValue("ddddddd", omega, incl, argp, ecc, a, m, nu);
-}
-
-/* this should be replacable with access to EVector buffer */
-static int
-get_vec_items(PyObject* const self, double v[])
-{
-    PyObject* obj = PySequence_Fast(self, NULL);
-    if (!obj)
-        return -1;
-    PyObject** items = PySequence_Fast_ITEMS(obj);
-    v[0] = PyFloat_AS_DOUBLE(items[0]);
-    v[1] = PyFloat_AS_DOUBLE(items[1]);
-    v[2] = PyFloat_AS_DOUBLE(items[2]);
-    return 0;
 }
 
 static PyObject* 
@@ -294,12 +317,10 @@ compute_ecc_vector(PyObject* self, PyObject* const* args, Py_ssize_t size)
     // check arguments
     if (!Py_IS_TYPE(args[0], (PyTypeObject*)state->EVector)) {
         PyErr_SetString(PyExc_TypeError, "first argument must be EVector type");
-        Py_DECREF(state);
         return NULL;
     }
     if (!Py_IS_TYPE(args[1], (PyTypeObject*)state->EVector)) {
         PyErr_SetString(PyExc_TypeError, "second argument must be EVector type");
-        Py_DECREF(state);
         return NULL;
     }
 
@@ -327,8 +348,8 @@ compute_ecc_vector(PyObject* self, PyObject* const* args, Py_ssize_t size)
 }
 
 static PyMethodDef sgp4_methods[] = {
-    {"_getState", (PyCFunction)get_state, METH_FASTCALL, "_getState(jd) -> (position, velocity)"},
-    {"_elements_from_state", (PyCFunction)get_elements, METH_FASTCALL, "_elements_from_state(tle, jd, mu) -> (sma, ecc, inc, raan, aop, m, nu"},
+    {"_getState", (PyCFunction)get_state, METH_FASTCALL, "_getState(tle, jd, mu) -> (position, velocity)"},
+    {"_elements_from_state", (PyCFunction)get_elements_from_state, METH_FASTCALL, "_elements_from_state(position, velocity, mu) -> (sma, ecc, inc, raan, aop, m, nu"},
     {"_compute_eccentric_vector", (PyCFunction)compute_ecc_vector, METH_FASTCALL, "_compute_eccentric_vector(position, velocity, mu) -> eccentricVector"},
     {NULL, NULL}
 };
@@ -342,7 +363,6 @@ tle_epoch(tle_t* self, void* Py_UNUSED)
 
     double jdValue = TLE_JDNUMBER(self) + TLE_JDFRACTION(self);
     PyObject* jd = PyObject_CallMethod(state->JulianDate, "fromNumber", "d", jdValue);
-    Py_DECREF(state);
 
     return jd;
 }
@@ -372,9 +392,9 @@ tle_apoapsis(tle_t* self, void* Py_UNUSED)
 }
 
 static PyGetSetDef tle_getset[] = {
-    {"epoch",   (getter)tle_epoch},
-    {"name",    (getter)tle_name},
-    {"sma",     (getter)tle_sma},
+    {"epoch",       (getter)tle_epoch},
+    {"name",        (getter)tle_name},
+    {"sma",         (getter)tle_sma},
     {"apoapsis",    (getter)tle_apoapsis},
     {"periapsis",   (getter)tle_periapsis},
     {NULL}
@@ -423,6 +443,7 @@ sgp4_exec(PyObject* module)
         return -1;
     }
     state->EVector = type;
+    type = NULL;
 
     module_import = PyImport_ImportModule("sattrack.spacetime.juliandate");
     if (!module_import) {
@@ -438,6 +459,7 @@ sgp4_exec(PyObject* module)
         return -1;
     }
     state->JulianDate = type;
+    type = NULL;
 
     if (PyModule_AddIntConstant(module, "WGS72OLD", (int)gravconsttype::wgs72old) < 0) {
         Py_DECREF(state->TwoLineElement);
