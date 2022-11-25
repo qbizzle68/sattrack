@@ -351,7 +351,7 @@ compute_ecc_vector(PyObject* self, PyObject* const* args, Py_ssize_t size)
 }
 
 static PyMethodDef sgp4_methods[] = {
-    {"_getState", (PyCFunction)get_state, METH_FASTCALL, "_getState(tle, jd, mu) -> (position, velocity)"},
+    {"_getState", (PyCFunction)get_state, METH_FASTCALL, "_getState(tle, jd) -> (position, velocity)"},
     {"_elements_from_state", (PyCFunction)get_elements_from_state, METH_FASTCALL, "_elements_from_state(position, velocity, mu) -> (sma, ecc, inc, raan, aop, m, nu)"},
     {"_elements_from_tle", (PyCFunction)get_elements_from_tle, METH_FASTCALL, "_elements_from_tle(tle, jd, mu) -> (sma, ecc, inc, raan, aop, m, nu)"},
     {"_compute_eccentric_vector", (PyCFunction)compute_ecc_vector, METH_FASTCALL, "_compute_eccentric_vector(position, velocity, mu) -> eccentricVector"},
