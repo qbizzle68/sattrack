@@ -439,6 +439,25 @@ sgp4_exec(PyObject* module)
     }
     state->JulianDate = type;
 
+    if (PyModule_AddIntConstant(module, "WGS72OLD", (int)gravconsttype::wgs72old) < 0) {
+        Py_DECREF(state->TwoLineElement);
+        Py_DECREF(state->EVector);
+        Py_DECREF(state->JulianDate);
+        return -1;
+    }
+    if (PyModule_AddIntConstant(module, "WGS72", (int)gravconsttype::wgs72) < 0) {
+        Py_DECREF(state->TwoLineElement);
+        Py_DECREF(state->EVector);
+        Py_DECREF(state->JulianDate);
+        return -1;
+    }
+    if (PyModule_AddIntConstant(module, "WGS84", (int)gravconsttype::wgs84) < 0) {
+        Py_DECREF(state->TwoLineElement);
+        Py_DECREF(state->EVector);
+        Py_DECREF(state->JulianDate);
+        return -1;
+    }
+
     return 0;
 }
 
