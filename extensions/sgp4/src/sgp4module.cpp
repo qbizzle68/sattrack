@@ -32,7 +32,7 @@ typedef struct {
 
 /* struct for module state */
 typedef struct {
-    PyObject* EVector;
+    PyObject* Vector;
     PyObject* JulianDate;
     PyObject* TwoLineElement;
 } sgp4_state;
@@ -176,11 +176,11 @@ get_state(PyObject* self, PyObject* const* args, Py_ssize_t size)
 
     // get buffer from new vectors here 
 
-    PyObject* position = build_vector(state->EVector, r[0], r[1], r[2]);
+    PyObject* position = build_vector(state->Vector, r[0], r[1], r[2]);
     if (!position)
         return NULL;
 
-    PyObject* velocity = build_vector(state->EVector, v[0], v[1], v[2]);
+    PyObject* velocity = build_vector(state->Vector, v[0], v[1], v[2]);
     if (!velocity) {
         Py_DECREF(position);
         return NULL;
@@ -193,7 +193,7 @@ get_state(PyObject* self, PyObject* const* args, Py_ssize_t size)
     return rtn;
 }
 
-/* this should be replacable with access to EVector buffer */
+/* this should be replacable with access to Vector buffer */
 static int
 get_vec_items(PyObject* const self, double v[])
 {
@@ -210,7 +210,7 @@ get_vec_items(PyObject* const self, double v[])
 static PyObject*
 get_elements_from_state(PyObject* self, PyObject* const* args, Py_ssize_t size)
 {
-    // signiture: _elements_from_state(position: EVector, velocity: EVector, MU: float = EARTH_MU) 
+    // signiture: _elements_from_state(position: Vector, velocity: Vector, MU: float = EARTH_MU)
     //                  -> (raan, inc, aop, ecc, a, m, nu)
 
     double mu = EARTH_MU;
@@ -230,16 +230,16 @@ get_elements_from_state(PyObject* self, PyObject* const* args, Py_ssize_t size)
         return NULL;
 
     // extract arguments
-    if (!Py_IS_TYPE(args[0], (PyTypeObject*)state->EVector)) {
-        PyErr_SetString(PyExc_TypeError, "first argument must be pyevspace.EVector type");
+    if (!Py_IS_TYPE(args[0], (PyTypeObject*)state->Vector)) {
+        PyErr_SetString(PyExc_TypeError, "first argument must be pyevspace.Vector type");
         return NULL;
     }
-    if (!Py_IS_TYPE(args[1], (PyTypeObject*)state->EVector)) {
-        PyErr_SetString(PyExc_TypeError, "second argument must be pyevspace.EVector type");
+    if (!Py_IS_TYPE(args[1], (PyTypeObject*)state->Vector)) {
+        PyErr_SetString(PyExc_TypeError, "second argument must be pyevspace.Vector type");
         return NULL;
     }
 
-    //  get EVector buffer here
+    //  get Vector buffer here
 
     double r[3], v[3];
     if (get_vec_items(args[0], r) < 0)
@@ -300,7 +300,7 @@ get_elements_from_tle(PyObject* self, PyObject* const* args, Py_ssize_t size)
 static PyObject* 
 compute_ecc_vector(PyObject* self, PyObject* const* args, Py_ssize_t size)
 {
-    // signiture: compute_ecc_vector(position: EVector, velocity: EVector, mu: float = EARTH_MU) -> EVector
+    // signiture: compute_ecc_vector(position: Vector, velocity: Vector, mu: float = EARTH_MU) -> Vector
     double mu = EARTH_MU;
     if (size == 3) {
         mu = PyFloat_AsDouble(args[2]);
@@ -318,12 +318,12 @@ compute_ecc_vector(PyObject* self, PyObject* const* args, Py_ssize_t size)
         return NULL;
 
     // check arguments
-    if (!Py_IS_TYPE(args[0], (PyTypeObject*)state->EVector)) {
-        PyErr_SetString(PyExc_TypeError, "first argument must be EVector type");
+    if (!Py_IS_TYPE(args[0], (PyTypeObject*)state->Vector)) {
+        PyErr_SetString(PyExc_TypeError, "first argument must be pyevspace.Vector type");
         return NULL;
     }
-    if (!Py_IS_TYPE(args[1], (PyTypeObject*)state->EVector)) {
-        PyErr_SetString(PyExc_TypeError, "second argument must be EVector type");
+    if (!Py_IS_TYPE(args[1], (PyTypeObject*)state->Vector)) {
+        PyErr_SetString(PyExc_TypeError, "second argument must be pyevspace.Vector type");
         return NULL;
     }
 
@@ -331,7 +331,7 @@ compute_ecc_vector(PyObject* self, PyObject* const* args, Py_ssize_t size)
 
     // replicate computing eccentric vector from rv2coe
     double r[3], v[3];
-    // replace this with the buffer from EVector
+    // replace this with the buffer from Vector
     if (get_vec_items(args[0], r) < 0)
         return NULL;
     if (get_vec_items(args[1], v) < 0)
@@ -346,7 +346,7 @@ compute_ecc_vector(PyObject* self, PyObject* const* args, Py_ssize_t size)
         ebar[i] = (c1 * r[i] - rdotv * v[i]) / mu;
 
     // build and return eccentric vector
-    PyObject* eccVec = build_vector(state->EVector, ebar[0], ebar[1], ebar[2]);
+    PyObject* eccVec = build_vector(state->Vector, ebar[0], ebar[1], ebar[2]);
     return eccVec;
 }
 
@@ -440,26 +440,26 @@ sgp4_exec(PyObject* module)
         Py_DECREF(state->TwoLineElement);
         return -1;
     }
-    type = PyObject_GetAttrString(module_import, "EVector");
+    type = PyObject_GetAttrString(module_import, "Vector");
     Py_DECREF(module_import);
     if (!type) {
         Py_DECREF(state->TwoLineElement);
         return -1;
     }
-    state->EVector = type;
+    state->Vector = type;
     type = NULL;
 
     module_import = PyImport_ImportModule("sattrack.spacetime.juliandate");
     if (!module_import) {
         Py_DECREF(state->TwoLineElement);
-        Py_DECREF(state->EVector);
+        Py_DECREF(state->Vector);
         return -1;
     }
     type = PyObject_GetAttrString(module_import, "JulianDate");
     Py_DECREF(module_import);
     if (!type) {
         Py_DECREF(state->TwoLineElement);
-        Py_DECREF(state->EVector);
+        Py_DECREF(state->Vector);
         return -1;
     }
     state->JulianDate = type;
@@ -467,19 +467,19 @@ sgp4_exec(PyObject* module)
 
     if (PyModule_AddIntConstant(module, "WGS72OLD", (int)gravconsttype::wgs72old) < 0) {
         Py_DECREF(state->TwoLineElement);
-        Py_DECREF(state->EVector);
+        Py_DECREF(state->Vector);
         Py_DECREF(state->JulianDate);
         return -1;
     }
     if (PyModule_AddIntConstant(module, "WGS72", (int)gravconsttype::wgs72) < 0) {
         Py_DECREF(state->TwoLineElement);
-        Py_DECREF(state->EVector);
+        Py_DECREF(state->Vector);
         Py_DECREF(state->JulianDate);
         return -1;
     }
     if (PyModule_AddIntConstant(module, "WGS84", (int)gravconsttype::wgs84) < 0) {
         Py_DECREF(state->TwoLineElement);
-        Py_DECREF(state->EVector);
+        Py_DECREF(state->Vector);
         Py_DECREF(state->JulianDate);
         return -1;
     }
@@ -493,7 +493,7 @@ static void sgp4_free(void* self)
     if (!state)
         return;
 
-    Py_DECREF(state->EVector);
+    Py_DECREF(state->Vector);
     Py_DECREF(state->JulianDate);
     Py_DECREF(state->TwoLineElement);
 }

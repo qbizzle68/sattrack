@@ -5,12 +5,13 @@ from inspect import Parameter, signature
 from math import radians, cos, sin, pi, sqrt, atan2, floor, degrees
 from typing import Callable
 
-from pyevspace import EVector
+from pyevspace import Vector, ZXZ, Z_AXIS, Angles, getMatrixEuler, rotateMatrixFrom, getMatrixAxis, \
+    ReferenceFrame
 from sattrack._sgp4 import TwoLineElement, _elements_from_tle, _getState
 
-from sattrack.rotation.order import ZXZ, Axis
-from sattrack.rotation.rotation import EulerAngles, getEulerMatrix, rotateMatrixFrom, getMatrix, \
-    ReferenceFrame
+# from sattrack.rotation.order import ZXZ, Axis
+# from sattrack.rotation.rotation import EulerAngles, getEulerMatrix, rotateMatrixFrom, getMatrix, \
+#     ReferenceFrame
 from sattrack.sun import getSunPosition
 # from sattrack.sgp4 import SGP4_Propagator
 from sattrack.spacetime.juliandate import JulianDate
@@ -133,7 +134,7 @@ class Elements:
         # return cls(raan, inc, aop, ecc, sma, meanAnomaly, epoch)
 
     @classmethod
-    def fromState(cls, position: EVector, velocity: EVector, epoch: JulianDate, MU: float = EARTH_MU):
+    def fromState(cls, position: Vector, velocity: Vector, epoch: JulianDate, MU: float = EARTH_MU):
         elements = _elements_from_state(position, velocity, MU)
         return cls(*elements[:-1], epoch)
         # if not isinstance(position, EVector):
@@ -340,14 +341,14 @@ class Body:
     def getOffsetAngle(self, time: JulianDate) -> float:
         return self._offsetFunc(time)
 
-    def getPosition(self, time: JulianDate) -> EVector:
+    def getPosition(self, time: JulianDate) -> Vector:
         return self._positionFunc(time)
 
 
 SUN_BODY = Body('Sun', SUN_MU, SUN_RADIUS, 0, lambda time: 0, getSunPosition)
 
 EARTH_BODY = Body('Earth', EARTH_MU, EARTH_EQUITORIAL_RADIUS, 86164.090531, siderealTime,
-                  lambda time: EVector((0, 0, 0)), Rp=EARTH_POLAR_RADIUS, parent=SUN_BODY)
+                  lambda time: Vector((0, 0, 0)), Rp=EARTH_POLAR_RADIUS, parent=SUN_BODY)
 
 
 class _AnomalyDirection(Enum):
@@ -424,7 +425,7 @@ class Orbitable(ABC):
         pass
 
     @abstractmethod
-    def getState(self, time: JulianDate) -> (EVector, EVector):
+    def getState(self, time: JulianDate) -> (Vector, Vector):
         pass
 
     @abstractmethod
@@ -621,18 +622,21 @@ class Orbit(Orbitable):
         else:
             raise ValueError('anomalyType must be TRUE or MEAN')
 
-    def getState(self, time: JulianDate) -> (EVector, EVector):
+    def getState(self, time: JulianDate) -> (Vector, Vector):
         trueAnomaly = self._get_true_anomaly_at(time)
         radius = _radius_at_anomaly(self._elements.sma, self._elements.ecc, trueAnomaly)
         flightAngle = _flight_angle_at_anomaly(self._elements.ecc, trueAnomaly)
         velocity = _velocity_at_anomaly(self._elements.sma, radius, self._body.mu)
 
-        rotationMatrix = getEulerMatrix(ZXZ, EulerAngles(self._elements.raan, self._elements.inc,
-                                                         self._elements.aop + trueAnomaly))
-        position = rotateMatrixFrom(rotationMatrix, EVector.e1) * radius
+        rotationMatrix = getMatrixEuler(ZXZ, Angles(self._elements.raan, self._elements.inc,
+                                                    self._elements.aop + trueAnomaly))
+        # rotationMatrix = getEulerMatrix(ZXZ, EulerAngles(self._elements.raan, self._elements.inc,
+        #                                                  self._elements.aop + trueAnomaly))
+        position = rotateMatrixFrom(rotationMatrix, Vector.e1) * radius
         # rotationMatrix @= getMatrix(Axis.Z_AXIS, -flightAngle)
-        rotationMatrix = rotationMatrix * getMatrix(Axis.Z_AXIS, -flightAngle)
-        velocity = rotateMatrixFrom(rotationMatrix, EVector.e2) * velocity
+        rotationMatrix = rotationMatrix @ getMatrixAxis(Z_AXIS, -flightAngle)
+        # rotationMatrix = rotationMatrix * getMatrix(Axis.Z_AXIS, -flightAngle)
+        velocity = rotateMatrixFrom(rotationMatrix, Vector.e2) * velocity
 
         return position, velocity
 
@@ -650,7 +654,8 @@ class Orbit(Orbitable):
 
     def getReferenceFrame(self, time: JulianDate = None) -> ReferenceFrame:
         # todo: put getting reference frame into helper method?
-        return ReferenceFrame(ZXZ, EulerAngles(self._elements.raan, self._elements.inc, self._elements.aop))
+        return ReferenceFrame(ZXZ, Angles(self._elements.raan, self._elements.inc, self._elements.aop))
+        # return ReferenceFrame(ZXZ, EulerAngles(self._elements.raan, self._elements.inc, self._elements.aop))
 
     def getPeriapsis(self, time: JulianDate = None) -> float:
         return self._periapsis
@@ -665,11 +670,13 @@ class Orbit(Orbitable):
         # x - radial out, y - prograde, z - normal
         trueAnomaly = self._get_true_anomaly_at(time)
         flightAngle = _flight_angle_at_anomaly(self._elements.ecc, trueAnomaly)
-        referenceFrame = ReferenceFrame(ZXZ, EulerAngles(self._elements.raan, self._elements.inc,
-                                                         self._elements.aop + trueAnomaly - flightAngle))
-        progradeVector = referenceFrame.RotateFrom(EVector.e2)
-        radialVector = referenceFrame.RotateFrom(EVector.e1)
-        normalVector = referenceFrame.RotateFrom(EVector.e3)
+        referenceFrame = ReferenceFrame(ZXZ, Angles(self._elements.raan, self._elements.inc,
+                                                    self._elements.aop + trueAnomaly - flightAngle))
+        # referenceFrame = ReferenceFrame(ZXZ, EulerAngles(self._elements.raan, self._elements.inc,
+        #                                                  self._elements.aop + trueAnomaly - flightAngle))
+        progradeVector = referenceFrame.RotateFrom(Vector.e2)
+        radialVector = referenceFrame.RotateFrom(Vector.e1)
+        normalVector = referenceFrame.RotateFrom(Vector.e3)
 
         newVelocity = velocity + progradeVector * prograde + radialVector * radial + normalVector * normal
         self._elements = Elements.fromState(position, newVelocity, self._elements.epoch)
@@ -757,7 +764,7 @@ class Satellite(Orbitable):
         else:
             raise ValueError('anomalyType must be TRUE or MEAN')
 
-    def getState(self, time: JulianDate) -> (EVector, EVector):
+    def getState(self, time: JulianDate) -> (Vector, Vector):
         if not isinstance(time, JulianDate):
             raise TypeError('time parameter must be JulianDate type')
 
@@ -773,7 +780,8 @@ class Satellite(Orbitable):
         # elements = Elements.fromTle(self._tle, time)
         #  todo: compute the vectors from eccentric and angular momentum vectors ?
         raan, inc, aop, *_ = _elements_from_tle(self._tle, time)
-        return ReferenceFrame(ZXZ, EulerAngles(raan, inc, aop))
+        return ReferenceFrame(ZXZ, Angles(raan, inc, aop))
+        # return ReferenceFrame(ZXZ, EulerAngles(raan, inc, aop))
 
     def getPeriapsis(self, time: JulianDate = None) -> float:
         if not isinstance(time, JulianDate):

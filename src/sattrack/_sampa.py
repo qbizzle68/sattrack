@@ -2,7 +2,7 @@ from enum import Enum
 from functools import total_ordering
 from math import sin, cos, radians, atan2, tan, asin, atan, pi, acos, sqrt, degrees
 
-from pyevspace import EVector
+from pyevspace import Vector
 
 from sattrack.util.constants import TWOPI, AU
 from sattrack.util.conversions import atan3
@@ -976,7 +976,7 @@ def _celestial_coordinates_to_position_vector(rightAscension, declination, sunDi
     yComp = xComp * tan(rightAscension)
     yComp = abs(yComp) if rightAscension < pi else -abs(yComp)
 
-    return EVector((xComp, yComp, zComp)) * sunDistance * AU
+    return Vector((xComp, yComp, zComp)) * sunDistance * AU
 
 
 def _get_twilight_type(topocentricPositionVector):

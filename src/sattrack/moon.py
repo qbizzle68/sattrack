@@ -1,9 +1,9 @@
-from pyevspace import EVector
+from pyevspace import Vector
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.coordinates import CelestialCoordinates
 
 
-def getMoonPosition(jd: JulianDate) -> EVector:
+def getMoonPosition(jd: JulianDate) -> Vector:
     pass
 
 

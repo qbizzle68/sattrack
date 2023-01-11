@@ -1,5 +1,5 @@
-from sattrack.rotation.order import *
-from sattrack.rotation.rotation import *
+# from sattrack.rotation.order import *
+# from sattrack.rotation.rotation import *
 
 from sattrack.spacetime.juliandate import *
 from sattrack.spacetime.sidereal import *

@@ -1,17 +1,17 @@
 import math as _math
 
-from pyevspace import EVector
+from pyevspace import Vector
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.util.constants import EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS, EARTH_FLATTENING
 
 
-def _compute_zenith_vector(latitude: float, longitude: float, elevation: float, time) -> EVector:
+def _compute_zenith_vector(latitude: float, longitude: float, elevation: float, time) -> Vector:
     # geodetic latitude
     radius = _radius_at_lat(latitude)
     return _compute_normal_vector(latitude, longitude, radius + elevation, time)
 
 
-def _compute_position_vector(latitude: float, longitude: float, elevation: float, time) -> EVector:
+def _compute_position_vector(latitude: float, longitude: float, elevation: float, time) -> Vector:
     # geodetic latitude
     radius = _radius_at_lat(latitude)
     geocentricLatitude = _geodetic_to_geocentric(latitude)
@@ -34,7 +34,7 @@ def _radius_at_lat(latitude):
 
 def _compute_normal_vector(latitude, longitude, radius, time):
     longitude += earthOffsetAngle(time)
-    return EVector((
+    return Vector((
         radius * _math.cos(latitude) * _math.cos(longitude),
         radius * _math.cos(latitude) * _math.sin(longitude),
         radius * _math.sin(latitude)

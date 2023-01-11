@@ -2,9 +2,9 @@ from enum import Enum
 from math import atan2, cos, sin, pi, sqrt, acos, asin
 from operator import index
 
-from pyevspace import EVector, norm, vang
-from sattrack.rotation.order import ZXZ
-from sattrack.rotation.rotation import EulerAngles, rotateOrderTo
+from pyevspace import Vector, norm, vang, ZXZ, Angles, rotateEulerTo
+# from sattrack.rotation.order import ZXZ
+# from sattrack.rotation.rotation import EulerAngles, rotateOrderTo
 
 from sattrack.sun import getSunPosition
 from sattrack.spacetime.juliandate import JulianDate
@@ -46,16 +46,17 @@ _EXIT = Eclipse.EXIT
 # EXIT = EnterExit(1)
 
 
-def __compute_s_vector(sunPosition: EVector, raan: float, inclination: float, aop: float) -> EVector:
+def __compute_s_vector(sunPosition: Vector, raan: float, inclination: float, aop: float) -> Vector:
     S = -norm(sunPosition)
-    return rotateOrderTo(ZXZ, EulerAngles(raan, inclination, aop), S)
+    # return rotateOrderTo(ZXZ, EulerAngles(raan, inclination, aop), S)
+    return rotateEulerTo(ZXZ, Angles(raan, inclination, aop), S)
 
 
-def __compute_gamma(sVector: EVector) -> float:
+def __compute_gamma(sVector: Vector) -> float:
     return atan2(sVector[1], -sVector[0])
 
 
-def __escobal_method(R: float, sVector: EVector, phi: float, zeta: float, sma: float, ecc: float,
+def __escobal_method(R: float, sVector: Vector, phi: float, zeta: float, sma: float, ecc: float,
                      shadow: Shadow) -> float:
     # Escobal's re-defined shadow function from Ref[1]
     cosPhi = cos(phi)
@@ -76,7 +77,7 @@ def __escobal_method(R: float, sVector: EVector, phi: float, zeta: float, sma: f
     return term1 + term2 - term3 + term4
 
 
-def __escobal_method_derivative(R: float, sVector: EVector, phi: float, zeta: float, sma: float, ecc: float,
+def __escobal_method_derivative(R: float, sVector: Vector, phi: float, zeta: float, sma: float, ecc: float,
                                 shadow: Shadow) -> float:
     # derivative of Escobal's re-defined shadow function from Ref[1]
     cosPhi = cos(phi)
@@ -100,7 +101,7 @@ def __escobal_method_derivative(R: float, sVector: EVector, phi: float, zeta: fl
 # todo: a satellite can have 0, 2, or 4 solutions, need to find solution to this issue
 #   idea: test if guessing 8 always hits the unique solutions
 #   later if there is only 2 solutions and they don't checkout they're invalid
-def __find_zero_newton(R: float, sVector: EVector, guess: float, zeta: float, sma: float, ecc: float, shadow: Shadow,
+def __find_zero_newton(R: float, sVector: Vector, guess: float, zeta: float, sma: float, ecc: float, shadow: Shadow,
                        epsilon: float = 1e-5) -> float:
     phi = guess
     gi = __escobal_method(R, sVector, phi, zeta, sma, ecc, shadow)
@@ -110,7 +111,7 @@ def __find_zero_newton(R: float, sVector: EVector, guess: float, zeta: float, sm
     return phi % TWOPI
 
 
-def __find_fast_zero(R: float, sVector: EVector, gamma: float, zeta: float, sma: float, ecc: float, shadow: Shadow,
+def __find_fast_zero(R: float, sVector: Vector, gamma: float, zeta: float, sma: float, ecc: float, shadow: Shadow,
                      enterOrExit: Eclipse, epsilon: float = 1e-5):
     if enterOrExit is _ENTER:
         return __find_zero_newton(R, sVector, 3*pi/4 - gamma, zeta, sma, ecc, shadow, epsilon)
@@ -120,7 +121,7 @@ def __find_fast_zero(R: float, sVector: EVector, gamma: float, zeta: float, sma:
         raise ValueError('enterOrExit parameter value must be ENTER or EXIT')
 
 
-def __find_certain_zeros(R: float, sVector: EVector, zeta: float, sma: float, ecc: float, shadow: Shadow,
+def __find_certain_zeros(R: float, sVector: Vector, zeta: float, sma: float, ecc: float, shadow: Shadow,
                          epsilon: float = 1e-5) -> float:
     zeros = []
     frac = 0.5
@@ -139,7 +140,7 @@ def __find_certain_zeros(R: float, sVector: EVector, zeta: float, sma: float, ec
     return zeros
 
 
-def __check_zero(phi: float, sVector: EVector):
+def __check_zero(phi: float, sVector: Vector):
     return (sVector[0] * cos(phi) + sVector[1] * sin(phi)) > 0
 
 
@@ -172,7 +173,7 @@ def _get_zero(R: float, sVector: float, zeta: float, sma: float, ecc: float, sha
     raise Exception('unable to find a valid zero')
 
 
-def __get_radius_z_comp(sVector: EVector, sma: float, ecc: float, inc: float, aop: float, phi: float) -> float:
+def __get_radius_z_comp(sVector: Vector, sma: float, ecc: float, inc: float, aop: float, phi: float) -> float:
     cosPhi = cos(phi)
     sinPhi = sin(phi)
     sinInc = sin(inc)
@@ -305,7 +306,7 @@ def __compute_anomaly_loop(startTime: JulianDate, referenceTime: JulianDate, sat
     return phi, time
 
 
-def _get_perspective_radius(sVector: EVector, sma: float, ecc: float, inc: float, aop: float, phi: float) -> float:
+def _get_perspective_radius(sVector: Vector, sma: float, ecc: float, inc: float, aop: float, phi: float) -> float:
     Rz = __get_radius_z_comp(sVector, sma, ecc, inc, aop, phi)
     latitudeTerm = __get_latitude_term(Rz)
     return __get_radius_from_latitude(latitudeTerm)

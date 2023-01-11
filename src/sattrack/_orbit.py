@@ -1,6 +1,6 @@
 from math import sqrt, sin, cos, acos, pi
 
-from pyevspace import EVector, dot, vang, norm, cross
+from pyevspace import Vector, dot, vang, norm, cross
 from sattrack.util.constants import TWOPI
 from sattrack.util.conversions import atan3
 from sattrack._sgp4 import _compute_eccentric_vector, _elements_from_state
@@ -12,7 +12,7 @@ from sattrack._sgp4 import _compute_eccentric_vector, _elements_from_state
 #     return lhs - rhs
 
 
-def _true_anomaly_from_state(position: EVector, velocity: EVector, mu: float) -> float:
+def _true_anomaly_from_state(position: Vector, velocity: Vector, mu: float) -> float:
     # todo: we can make a mean anomaly from state if we can guarantee eccentricVector.mag() is accurate
     eccentricVector = _compute_eccentric_vector(position, velocity, mu)
     trueAnomaly = vang(position, eccentricVector)

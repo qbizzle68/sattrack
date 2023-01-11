@@ -2,7 +2,7 @@ from enum import Enum
 from functools import total_ordering
 from math import sin, cos, pi, radians, tan, asin, sqrt, degrees, acos
 
-from pyevspace import EVector
+from pyevspace import Vector
 from sattrack._sampa import _spa_earth_heliocentric_radius, _mean_sidereal_time, _apparent_sidereal_time, \
     _spa_earth_heliocentric_longitude, _spa_geocentric_longitude, _spa_earth_heliocentric_latitude, \
     _spa_geocentric_latitude, _x_values, _xy_table, _nutation_longitude, _nutation_obliquity, _mean_obliquity, \
@@ -135,7 +135,7 @@ def _sun_celestial_coordinates(jd, geo=None):
     return rightAscension, declination
 
 
-def _sun_position_vector(time: JulianDate) -> EVector:
+def _sun_position_vector(time: JulianDate) -> Vector:
     # _, _, _, _, JME = _generate_times(time)
     JME = _compute_jme(time)
 
@@ -149,7 +149,7 @@ def _sun_position_vector(time: JulianDate) -> EVector:
     yComp = xComp * tan(rightAscension)
     yComp = abs(yComp) if rightAscension < pi else -abs(yComp)
 
-    return EVector((xComp, yComp, zComp)) * sunDistance * AU
+    return Vector((xComp, yComp, zComp)) * sunDistance * AU
 
 
 def getTwilight(geo: GeoPosition, time: JulianDate) -> Twilight:
@@ -275,7 +275,7 @@ def _sun_angles(jd, geo, target):
     return time.future(R), time.future(S), time.future(T)
 
 
-def getSunPosition(time: JulianDate) -> EVector:
+def getSunPosition(time: JulianDate) -> Vector:
     # _check_jd(jd)
     # _, _, _, _, JME = _generate_times(jd)
     # rightAscension, declination = _sun_celestial_coordinates(jd)

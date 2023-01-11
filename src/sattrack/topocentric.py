@@ -2,13 +2,13 @@ import json
 from math import radians, pi, asin, cos, acos, sqrt, sin, degrees
 from operator import index
 
-from pyevspace import EVector, vang, norm, cross, dot
+from pyevspace import Vector, vang, norm, cross, dot, ZYX, getMatrixEuler, Angles, rotateEulerTo, rotateOffsetFrom
 from sattrack._topocentric import _to_topocentric
 from sattrack.eclipse import getShadowTimes, Shadow
 from sattrack.exceptions import PassConstraintException, NoPassException
-from sattrack.rotation.order import ZYX
-from sattrack.rotation.rotation import getEulerMatrix, EulerAngles, rotateOrderTo, \
-    undoRotateToThenOffset
+# from sattrack.rotation.order import ZYX
+# from sattrack.rotation.rotation import getEulerMatrix, EulerAngles, rotateOrderTo, \
+#     undoRotateToThenOffset
 from sattrack.sun import getSunTimes
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
@@ -404,7 +404,7 @@ def __max_pass_anomalies(position, velocity, mu, pVector, ecc):
     return trueAnomaly_n, trueAnomaly_n1, meanAnomaly_n, meanAnomaly_n1
 
 
-def _get_p_vector(geo: GeoPosition, position: EVector, velocity: EVector, time: JulianDate) -> EVector:
+def _get_p_vector(geo: GeoPosition, position: Vector, velocity: Vector, time: JulianDate) -> Vector:
     latitude = radians(geo.latitude)
     longitude = radians(geo.longitude)
     elevation = geo.elevation
@@ -423,7 +423,7 @@ def _get_p_vector(geo: GeoPosition, position: EVector, velocity: EVector, time: 
     else:
         y = dot(zeta, gamma) / (zeta[1] - (zeta[0] * lamb[1] / lamb[0]))
         x = -lamb[1] * y / lamb[0]
-    r = EVector((x, y, 0))
+    r = Vector(x, y, 0)
     v = cross(zeta, lamb)
 
     # compute exact solution for parameterized vector which yields the nearest point to intersection
@@ -604,15 +604,24 @@ def _horizon_time_refine(satellite: Orbitable, geo: GeoPosition, time: JulianDat
         if iterCount % 10 == 0:
             p /= 2
 
-        topocentricVelocity = rotateOrderTo(
+        topocentricVelocity = rotateEulerTo(
             ZYX,
-            EulerAngles(
+            Angles(
                 radians(geo.longitude) + earthOffsetAngle(time),
                 radians(90 - geo.latitude),
                 0.0
             ),
             state[1]
         )
+        # topocentricVelocity = rotateOrderTo(
+        #     ZYX,
+        #     EulerAngles(
+        #         radians(geo.longitude) + earthOffsetAngle(time),
+        #         radians(90 - geo.latitude),
+        #         0.0
+        #     ),
+        #     state[1]
+        # )
 
         dz = topocentricPosition.mag() * altitude
         dt = (-dz / topocentricVelocity[2]) / 86400
@@ -748,8 +757,8 @@ def getPassList(satellite: Orbitable, geo: GeoPosition, start: JulianDate, durat
     return tuple(passList)
 
 
-def toTopocentric(vector: EVector, geo: GeoPosition, time: JulianDate) -> EVector:
-    if not isinstance(vector, EVector):
+def toTopocentric(vector: Vector, geo: GeoPosition, time: JulianDate) -> Vector:
+    if not isinstance(vector, Vector):
         raise TypeError('vector parameter must be EVector type')
     if not isinstance(geo, GeoPosition):
         raise TypeError('geo parameter must be GeoPosition type')
@@ -759,8 +768,8 @@ def toTopocentric(vector: EVector, geo: GeoPosition, time: JulianDate) -> EVecto
     return _to_topocentric(vector, geo, time)
 
 
-def fromTopocentric(vector: EVector, time: JulianDate, geo: GeoPosition) -> EVector:
-    if not isinstance(vector, EVector):
+def fromTopocentric(vector: Vector, time: JulianDate, geo: GeoPosition) -> Vector:
+    if not isinstance(vector, Vector):
         raise TypeError('vector parameter must be EVector type')
     if not isinstance(geo, GeoPosition):
         raise TypeError('geo parameter must be GeoPosition type')
@@ -768,16 +777,25 @@ def fromTopocentric(vector: EVector, time: JulianDate, geo: GeoPosition) -> EVec
         raise TypeError('time parameter must be JulianDate type')
 
     geoVector = geo.getPositionVector(time)
-    matrix = getEulerMatrix(
+    matrix = getMatrixEuler(
         ZYX,
-        EulerAngles(
+        Angles(
             radians(geo.longitude) + earthOffsetAngle(time),
             radians(90 - geo.latitude),
             0.0
         )
     )
+    # matrix = getEulerMatrix(
+    #     ZYX,
+    #     EulerAngles(
+    #         radians(geo.longitude) + earthOffsetAngle(time),
+    #         radians(90 - geo.latitude),
+    #         0.0
+    #     )
+    # )
 
-    return undoRotateToThenOffset(matrix, geoVector, vector)
+    # return undoRotateToThenOffset(matrix, geoVector, vector)
+    return rotateOffsetFrom(matrix, geoVector, vector)
 
 
 def getAltitude(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> float:

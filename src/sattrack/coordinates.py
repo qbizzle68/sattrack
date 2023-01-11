@@ -5,7 +5,7 @@ import math as _math
 from sattrack._coordinates import _compute_zenith_vector, _compute_position_vector, _radius_at_lat, \
     _geodetic_to_geocentric
 from sattrack.util.constants import EARTH_FLATTENING
-from pyevspace import EVector
+from pyevspace import Vector
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.util.conversions import atan3
@@ -126,7 +126,7 @@ class GeoPosition(Coordinates):
     def getGeocentricLatitude(self) -> float:
         return _geodetic_to_geocentric(self._lat)
 
-    def getPositionVector(self, jd: JulianDate = None) -> EVector:
+    def getPositionVector(self, jd: JulianDate = None) -> Vector:
         if jd is not None and not isinstance(jd, JulianDate):
             raise TypeError('jd parameter must be a JulianDate type')
         return _compute_position_vector(self._lat, self._lng, self._elevation, jd)
@@ -138,7 +138,7 @@ class GeoPosition(Coordinates):
         #     jd
         # )
 
-    def getZenithVector(self, jd: JulianDate = None) -> EVector:
+    def getZenithVector(self, jd: JulianDate = None) -> Vector:
         if jd is not None and not isinstance(jd, JulianDate):
             raise TypeError('jd parameter must be a JulianDate type')
         return _compute_zenith_vector(self._lat, self._lng, self._elevation, jd)
@@ -249,7 +249,7 @@ class CelestialCoordinates(Coordinates):
         return self._lng * _RAD_TO_HOURS
 
 
-def getSubPoint(position: EVector, jd: JulianDate) -> GeoPosition:
+def getSubPoint(position: Vector, jd: JulianDate) -> GeoPosition:
     declination = _math.degrees(_math.asin(position[2] / position.mag()))
     # longitude is equal to right-ascension minus earth's offset angle at the time
     longitude = (_math.degrees(atan3(position[1], position[0]) - earthOffsetAngle(jd))) % 360.0
