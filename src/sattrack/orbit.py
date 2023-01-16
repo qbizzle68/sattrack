@@ -703,6 +703,10 @@ class Satellite(Orbitable):
         self._tle = tle
         # self._propagator = SGP4_Propagator(tle)
 
+    @property
+    def tle(self):
+        return self._tle
+
     def anomalyAt(self, time: JulianDate, anomalyType: _Anomaly = True) -> float:
         if not isinstance(time, JulianDate):
             raise TypeError('time parameter must be JulianDate type')
