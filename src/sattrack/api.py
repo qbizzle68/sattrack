@@ -16,3 +16,4 @@ from sattrack.sampa import *
 from sattrack.sun import *
 from sattrack.tle import *
 from sattrack.topocentric import *
+from sattrack.sgp4 import *

@@ -7,7 +7,8 @@ from typing import Callable
 
 from pyevspace import Vector, ZXZ, Z_AXIS, Angles, getMatrixEuler, rotateMatrixFrom, getMatrixAxis, \
     ReferenceFrame
-from sattrack._sgp4 import TwoLineElement, _elements_from_tle, _getState
+# from sattrack._sgp4 import TwoLineElement, _elements_from_tle, _getState
+from sattrack.sgp4 import TwoLineElement, elementsFromTle, getState, elementsFromState
 
 # from sattrack.rotation.order import ZXZ, Axis
 # from sattrack.rotation.rotation import EulerAngles, getEulerMatrix, rotateMatrixFrom, getMatrix, \
@@ -17,7 +18,7 @@ from sattrack.sun import getSunPosition
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import siderealTime
 from sattrack._orbit import _true_to_mean_anomaly, _true_to_eccentric_anomaly, _eccentric_to_mean_anomaly, \
-    _elements_from_state, _sma_to_mean_motion, _nearest_true_anomaly, _nearest_mean_anomaly
+    _sma_to_mean_motion, _nearest_true_anomaly, _nearest_mean_anomaly
 # from sattrack.tle import TwoLineElement
 from sattrack.util.constants import TWOPI, EARTH_MU, EARTH_POLAR_RADIUS, EARTH_EQUITORIAL_RADIUS, SUN_MU, SUN_RADIUS
 
@@ -97,7 +98,7 @@ class Elements:
 
     @classmethod
     def fromTle(cls, tle: TwoLineElement, epoch: JulianDate):
-        state = _getState(tle, epoch)
+        state = getState(tle, epoch)
         return cls.fromState(*state, epoch, EARTH_MU)
         # if not isinstance(tle, TwoLineElement):
         #     raise TypeError('tle parameter must be a TwoLineElement type')
@@ -135,7 +136,8 @@ class Elements:
 
     @classmethod
     def fromState(cls, position: Vector, velocity: Vector, epoch: JulianDate, MU: float = EARTH_MU):
-        elements = _elements_from_state(position, velocity, MU)
+        # elements = _elements_from_state(position, velocity, MU)
+        elements = elementsFromState(position, velocity, MU)
         return cls(*elements[:-1], epoch)
         # if not isinstance(position, EVector):
         #     raise TypeError('position parameter must be an EVector type')
@@ -707,7 +709,8 @@ class Satellite(Orbitable):
         if not isinstance(anomalyType, _Anomaly):
             raise TypeError('anomalyType parameter must be Anomaly type')
 
-        elements = _elements_from_tle(self._tle, time)
+        # elements = _elements_from_tle(self._tle, time)
+        elements = elementsFromTle(self._tle, time)
         if anomalyType is _TRUE:
             return elements[-1]
         elif anomalyType is _MEAN:
@@ -736,7 +739,8 @@ class Satellite(Orbitable):
 
         # todo: determine if this is ideal using SGP4 states
         # elements = Elements.fromTle(self._tle, time)
-        _, _, _, eccentricity, sma, meanAnomaly, trueAnomaly = _elements_from_tle(self._tle, time)
+        # _, _, _, eccentricity, sma, meanAnomaly, trueAnomaly = _elements_from_tle(self._tle, time)
+        _, _, _, eccentricity, sma, meanAnomaly, trueAnomaly = elementsFromTle(self._tle, time)
         # meanMotion = _sma_to_mean_motion(elements.sma, self._body.mu) * 86400 / TWOPI
         meanMotion = _sma_to_mean_motion(sma, self._body.mu) * 86400 / TWOPI
         if anomalyType is _TRUE:
@@ -768,7 +772,8 @@ class Satellite(Orbitable):
         if not isinstance(time, JulianDate):
             raise TypeError('time parameter must be JulianDate type')
 
-        return _getState(self._tle, time)
+        # return _getState(self._tle, time)
+        return getState(self._tle, time)
         # rawState = self._propagator.getState(self._tle, time)
         # return (EVector((rawState[0][0], rawState[0][1], rawState[0][2])),
         #         EVector((rawState[1][0], rawState[1][1], rawState[1][2])))
@@ -779,7 +784,8 @@ class Satellite(Orbitable):
     def getReferenceFrame(self, time: JulianDate = None) -> ReferenceFrame:
         # elements = Elements.fromTle(self._tle, time)
         #  todo: compute the vectors from eccentric and angular momentum vectors ?
-        raan, inc, aop, *_ = _elements_from_tle(self._tle, time)
+        # raan, inc, aop, *_ = _elements_from_tle(self._tle, time)
+        raan, inc, aop, *_ = elementsFromTle(self._tle, time)
         return ReferenceFrame(ZXZ, Angles(raan, inc, aop))
         # return ReferenceFrame(ZXZ, EulerAngles(raan, inc, aop))
 

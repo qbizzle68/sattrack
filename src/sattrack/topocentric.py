@@ -13,12 +13,13 @@ from sattrack.sun import getSunTimes
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack._coordinates import _compute_position_vector, _compute_zenith_vector
-from sattrack._orbit import _compute_eccentric_vector, _true_anomaly_from_state, _true_to_mean_anomaly, \
+from sattrack._orbit import _true_anomaly_from_state, _true_to_mean_anomaly, \
     _sma_to_mean_motion, _nearest_true_anomaly
 from sattrack.coordinates import GeoPosition
 from sattrack.orbit import Orbitable
 from sattrack.util.constants import TWOPI
 from sattrack.util.conversions import atan3
+from sattrack.sgp4 import computeEccentricVector
 
 __all__ = ('PositionInfo', 'SatellitePass', 'SatellitePassConstraints', 'getNextPass', 'getPassList', 'toTopocentric',
            'fromTopocentric', 'getAltitude', 'getAzimuth', 'azimuthAngleString')
@@ -393,7 +394,8 @@ class SatellitePassConstraints:
 
 
 def __max_pass_anomalies(position, velocity, mu, pVector, ecc):
-    eccentricVector = _compute_eccentric_vector(position, velocity, mu)
+    # eccentricVector = _compute_eccentric_vector(position, velocity, mu)
+    eccentricVector = computeEccentricVector(position, velocity, mu)
     trueAnomaly_n = _true_anomaly_from_state(position, velocity, mu)
     # todo: use eccentricVector.mag() if we know it's accurate
     meanAnomaly_n = _true_to_mean_anomaly(trueAnomaly_n, ecc)
@@ -438,7 +440,8 @@ def _orbit_altitude(satellite: Orbitable, geo: GeoPosition, time: JulianDate) ->
     gamma = _compute_position_vector(radians(geo.latitude), radians(geo.longitude), geo.elevation, time)
     pVector = _get_p_vector(geo, *state, time)
 
-    eccentricVector = _compute_eccentric_vector(*state, satellite.body.mu)
+    # eccentricVector = _compute_eccentric_vector(*state, satellite.body.mu)
+    eccentricVector = computeEccentricVector(*state, satellite.body.mu)
     trueAnomaly = vang(eccentricVector, pVector)
     pSat = norm(pVector) * ((elements.sma * (1 - elements.ecc * elements.ecc)) / (1 + elements.ecc * cos(trueAnomaly)))
 
@@ -552,7 +555,8 @@ def _rise_set_times_approx(satellite: Orbitable, geo: GeoPosition, time: JulianD
 
     state = satellite.getState(time)
     hNorm = norm(cross(*state))
-    u = norm(_compute_eccentric_vector(*state, mu)) * a
+    # u = norm(_compute_eccentric_vector(*state, mu)) * a
+    u = norm(computeEccentricVector(*state, mu)) * a
     v = norm(cross(hNorm, u)) * b
     ce = -norm(u) * c
 

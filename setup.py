@@ -8,7 +8,7 @@ import sattrack
 description, long_description = sattrack.__doc__.split('\n', 1)
 
 ext_modules = [Extension(
-    'sattrack._sgp4',
+    'sattrack.sgp4',
     include_dirs=['extensions/sgp4/include'],
     sources=[
         'extensions/sgp4/src/SGP4.cpp',
@@ -36,7 +36,7 @@ setup(
         'Topic :: Scientific/Engineering',
         'Topic :: Scientific/Engineering :: Astronomy'
     ],
-    packages=['sattrack', 'sattrack.rotation', 'sattrack.spacetime', 'sattrack.util'],
+    packages=['sattrack', 'sattrack.spacetime', 'sattrack.util'],
     package_dir={'': 'src'},
     ext_modules=ext_modules,
 )

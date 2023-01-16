@@ -1,14 +1,8 @@
-from math import pi
+from sattrack.sgp4 import TwoLineElement
 
-from sattrack._sgp4 import TwoLineElement
-
-from sattrack.exceptions import TokenNumberException, TokenLengthException, LineNumberException, ChecksumException
-from sattrack.spacetime.juliandate import JulianDate
 import requests
 
-from sattrack.util.constants import EARTH_MU
-
-__all__ = ('TwoLineElement', 'getTle')
+__all__ = ("getTle",)
 
 
 # class TwoLineElement:
@@ -229,7 +223,7 @@ def getTle(value: str, query: str = 'name') -> TwoLineElement | None:
     if response.text == 'No GP data found':
         raise Exception("No GP data found")
     elif len(lines) == 3:
-        return TwoLineElement(response.text)
+        return TwoLineElement(response.text.strip())
     else:
         lineGroups = [(lines[i], lines[i + 1], lines[i + 2]) for i in range(0, len(lines), 3)]
         print("Multiple TLEs found.")
