@@ -676,9 +676,9 @@ class Orbit(Orbitable):
                                                     self._elements.aop + trueAnomaly - flightAngle))
         # referenceFrame = ReferenceFrame(ZXZ, EulerAngles(self._elements.raan, self._elements.inc,
         #                                                  self._elements.aop + trueAnomaly - flightAngle))
-        progradeVector = referenceFrame.RotateFrom(Vector.e2)
-        radialVector = referenceFrame.RotateFrom(Vector.e1)
-        normalVector = referenceFrame.RotateFrom(Vector.e3)
+        progradeVector = referenceFrame.rotateFrom(Vector.e2)
+        radialVector = referenceFrame.rotateFrom(Vector.e1)
+        normalVector = referenceFrame.rotateFrom(Vector.e3)
 
         newVelocity = velocity + progradeVector * prograde + radialVector * radial + normalVector * normal
         self._elements = Elements.fromState(position, newVelocity, self._elements.epoch)
@@ -795,7 +795,7 @@ class Satellite(Orbitable):
         # elements = Elements.fromTle(self._tle, time)
         # _, _, _, eccentricity, sma, _ = _elements_from_tle(self._tle, time)
         # return _radius_at_periapsis(sma, eccentricity)
-        return self._tle.periapsis
+        return self._tle.perigee
 
     def getApoapsis(self, time: JulianDate = None) -> float:
         if not isinstance(time, JulianDate):
@@ -803,7 +803,7 @@ class Satellite(Orbitable):
         # elements = Elements.fromTle(self._tle, time)
         # _, _, _, eccentricity, sma, _ = _elements_from_tle(self._tle, time)
         # return _radius_at_apoapsis(sma, eccentricity)
-        return self._tle.apoapsis
+        return self._tle.apogee
 
 
 def _mean_motion_to_sma(meanMotion: float, mu: float) -> float:
