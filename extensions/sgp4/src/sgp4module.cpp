@@ -133,7 +133,7 @@ tle_init(tle_t* self, PyObject* args, PyObject* kwargs)
         // do we save this somewhere else?
         // todo: make an exception for each type of error or add an attribute
         // with the error value
-        PyObject* exc = PyErr_NewException("_sgp4.sgp4Error", NULL, NULL);
+        PyObject* exc = PyErr_NewException("sgp4.sgp4Error", NULL, NULL);
         PyErr_Format(exc, "error in sgp4 library (error = %i)",
                      self->satrec.error);
         Py_DECREF(exc);
@@ -232,7 +232,7 @@ get_state(PyObject* self, PyObject* const* args, Py_ssize_t size)
 
     // check if the error flag was set
     if (tle->satrec.error) {
-        PyObject* exc = PyErr_NewException("_sgp4.sgp4Error",
+        PyObject* exc = PyErr_NewException("sgp4.sgp4Error",
                                            NULL, NULL);
         PyErr_Format(exc, "error in sgp4 library (error = %i)",
                      tle->satrec.error);
