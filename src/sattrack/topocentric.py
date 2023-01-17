@@ -16,10 +16,10 @@ from sattrack._coordinates import _compute_position_vector, _compute_zenith_vect
 from sattrack._orbit import _true_anomaly_from_state, _true_to_mean_anomaly, \
     _sma_to_mean_motion, _nearest_true_anomaly
 from sattrack.coordinates import GeoPosition
-from sattrack.orbit import Orbitable
-from sattrack.util.constants import TWOPI
+from sattrack.orbit import Orbitable, Elements
+from sattrack.util.constants import TWOPI, EARTH_MU
 from sattrack.util.conversions import atan3
-from sattrack.sgp4 import computeEccentricVector
+from sattrack.sgp4 import computeEccentricVector, elementsFromState
 
 __all__ = ('PositionInfo', 'SatellitePass', 'SatellitePassConstraints', 'getNextPass', 'getPassList', 'toTopocentric',
            'fromTopocentric', 'getAltitude', 'getAzimuth', 'azimuthAngleString')
@@ -495,6 +495,110 @@ def _next_pass_max_approx(satellite: Orbitable, geo: GeoPosition, time: JulianDa
             if (trueAnomaly_n1 - trueAnomaly_n) > pi:
                 dma -= TWOPI
         tn = tn.future(dma / meanMotion)
+        print("dma: ", dma, "tn: ", tn)
+        state = satellite.getState(tn)
+        pVector = _get_p_vector(geo, *state, tn)
+
+    return tn
+
+def _vector_almost_equal(vec1, vec2, epsilon=1e-5):
+    return dot(vec1, vec2) > (1 - epsilon)
+
+    # for v1, v2 in zip(vec1, vec2):
+    #     if abs(v1 - v2) > epsilon:
+    #         return False
+    #
+    # return True
+
+
+def _next_pass_max_approx_fix(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> JulianDate:
+    '''this line is to count towards the doc'''
+    '''
+    move the time forward until geo is under the plane
+    
+    need to find time (angle) until sat occupies the pVector position moving forward in time
+        - find eccentric vector
+            - gotten from state vectors
+        - *this only works if a change in true anomaly is constant change in mean anomaly*
+          find angle between position vector to pVector moving forward in time
+            - compute angular momentum vector (normalize it)
+            - find angle between pVector and current position vector
+                - use vang() to get angle.
+                - if norm of cross product of pVector to position is the same direction
+                  as angular momentum angle to travel is TWOPI - angle from pVector to position
+                - else (norm of cross of pVector to position is opposite of angular momentum)
+                  angle to travel is angle from position to pVector
+            - MAKE SURE!!!! this works for prograde AND retrograde orbits
+        - find the current anomaly and anomaly at pVector position
+        - find the angle between these two angle (a0, a1)
+            - a1 - a0, if answer is < 0 just add TWOPI to it
+        - find the time to travel this angle
+            - compute mean motion in radians / days
+            - divide the angle by mean motion for time to occupy pVector in solar days
+        - extra: account for the earth's rotation while satellite moves to pVector position
+            - would need to understand how pVector changes relative to surface
+    '''
+
+    if _orbit_altitude(satellite, geo, time) < 0:
+        tn = _time_to_plane(satellite, geo, time)
+    else:
+        tn = time
+
+    mu = satellite.body.mu
+    state = satellite.getState(tn)
+    # elements = elementsFromState(*state)
+    elements = Elements.fromState(*state, tn)
+    # mean motion in radians / day
+    # meanMotion = _sma_to_mean_motion(elements[4], mu) * 86400
+    meanMotion = _sma_to_mean_motion(elements.sma, mu) * 86400
+
+    pVector = _get_p_vector(geo, *state, tn)
+    eccVector = computeEccentricVector(*state, mu)
+    angularMomentumNorm = norm(cross(*state))
+
+    #todo: replace the methods when the vector equality works
+    taPVector = vang(eccVector, pVector)
+    if not _vector_almost_equal(norm(cross(eccVector, pVector)), angularMomentumNorm):
+        taPVector = TWOPI - taPVector
+
+    # todo: replace this with values from elements variable
+    # maPVector = _true_to_mean_anomaly(taPVector, elements[3])
+    maPVector = _true_to_mean_anomaly(taPVector, elements.ecc)
+    # maPosition = elements[-2]
+    maPosition = elements.meanAnomaly
+
+    dma = maPVector - maPosition
+    if dma < 0:
+        dma += TWOPI
+
+    tn = tn.future(dma / meanMotion)
+    state = satellite.getState(tn)
+    pVector = _get_p_vector(geo, *state, tn)
+
+    while vang(state[0], pVector) > 4.58e-6:    # 1 arc second
+        # elements = elementsFromState(*state)
+        elements = Elements.fromState(*state, tn)
+        # mean motion in radians / day
+        # meanMotion = _sma_to_mean_motion(elements[4], mu) * 86400
+        meanMotion = _sma_to_mean_motion(elements.sma, mu) * 86400
+
+        eccVector = computeEccentricVector(*state, mu)
+        angularMomentumNorm = norm(cross(*state))
+
+        taPVector = vang(eccVector, pVector)
+        if not _vector_almost_equal(norm(cross(eccVector, pVector)), angularMomentumNorm):
+            taPVector = TWOPI - taPVector
+
+        # maPVector = _true_to_mean_anomaly(taPVector, elements[3])
+        maPVector = _true_to_mean_anomaly(taPVector, elements.ecc)
+        # maPosition = elements[-2]
+        maPosition = elements.meanAnomaly
+
+        dma = maPVector - maPosition
+        if dma < 0:
+            dma += TWOPI
+
+        tn = tn.future(dma / meanMotion)
         state = satellite.getState(tn)
         pVector = _get_p_vector(geo, *state, tn)
 
@@ -533,11 +637,11 @@ def _max_pass_refine(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -
 
 
 def _next_pass_max(satellite: Orbitable, geo: GeoPosition, time: JulianDate, timeout: float) -> JulianDate:
-    nextMax = _next_pass_max_approx(satellite, geo, time)
+    nextMax = _next_pass_max_approx_fix(satellite, geo, time)
     altitude = _orbit_altitude(satellite, geo, nextMax)
     while altitude < 0:
         if nextMax - time < timeout:
-            nextMax = _next_pass_max_approx(satellite, geo, nextMax.future(0.001))
+            nextMax = _next_pass_max_approx_fix(satellite, geo, nextMax.future(0.001))
             altitude = _orbit_altitude(satellite, geo, nextMax)
         else:
             # todo: make a more specific exception type for this
@@ -594,6 +698,13 @@ def _rise_set_times_approx(satellite: Orbitable, geo: GeoPosition, time: JulianD
     return jd2, jd1
 
 
+'''this method gives us some issues. it is not uncommon for an infinite loop to occur
+while approaching the horizon. the altitude oscillates around 0, never converging. A
+brute force fix could be to take a proportion of the approximated time, but would 
+converge much more slowly. Current idea is to interpolate the 'right' dt term after
+actually computing the future value before looping to the next iteration.'''
+# todo: can we account for earth's rotation here? will that be more accurate/fix our issues?
+
 def _horizon_time_refine(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> JulianDate:
     # needed to add a proportional governor because of cases oscillating around the zero altitude
     # todo: look into a pid loop for this
@@ -617,15 +728,6 @@ def _horizon_time_refine(satellite: Orbitable, geo: GeoPosition, time: JulianDat
             ),
             state[1]
         )
-        # topocentricVelocity = rotateOrderTo(
-        #     ZYX,
-        #     EulerAngles(
-        #         radians(geo.longitude) + earthOffsetAngle(time),
-        #         radians(90 - geo.latitude),
-        #         0.0
-        #     ),
-        #     state[1]
-        # )
 
         dz = topocentricPosition.mag() * altitude
         dt = (-dz / topocentricVelocity[2]) / 86400
