@@ -17,8 +17,8 @@ from sattrack.sun import getSunPosition
 # from sattrack.sgp4 import SGP4_Propagator
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import siderealTime
-from sattrack._orbit import _true_to_mean_anomaly, _true_to_eccentric_anomaly, _eccentric_to_mean_anomaly, \
-    _sma_to_mean_motion, _nearest_true_anomaly, _nearest_mean_anomaly
+from sattrack._orbit import _trueToMeanAnomaly, _trueToEccentricAnomaly, _eccentricToMeanAnomaly, \
+    _smaToMeanMotion, _nearestTrueAnomaly, _nearestMeanAnomaly
 # from sattrack.tle import TwoLineElement
 from sattrack.util.constants import TWOPI, EARTH_MU, EARTH_POLAR_RADIUS, EARTH_EQUITORIAL_RADIUS, SUN_MU, SUN_RADIUS
 
@@ -200,7 +200,7 @@ class Elements:
 
     def setMeanAnomaly(self, anomaly: float, epoch: JulianDate):
         self.meanAnomaly = anomaly
-        self._trueAnomaly = _true_to_mean_anomaly(self._meanAnomaly, self._ecc)
+        self._trueAnomaly = _trueToMeanAnomaly(self._meanAnomaly, self._ecc)
         self.epoch = epoch
 
     def setTrueAnomaly(self, anomaly: float, epoch: JulianDate):
@@ -492,16 +492,16 @@ def _previous_mean_anomaly(meanMotion: float, m0: float, epoch0: JulianDate, m1:
 def _next_true_anomaly(meanMotion: float, eccentricity: float, t0: float, epoch0: JulianDate,
                        t1: float, time: JulianDate) -> JulianDate:
     # meanMotion - rev / day; m0, m1 - radians
-    m0 = _true_to_mean_anomaly(t0, eccentricity)
-    m1 = _true_to_mean_anomaly(t1, eccentricity)
+    m0 = _trueToMeanAnomaly(t0, eccentricity)
+    m1 = _trueToMeanAnomaly(t1, eccentricity)
     return _next_mean_anomaly(meanMotion, m0, epoch0, m1, time)
 
 
 def _previous_true_anomaly(meanMotion: float, eccentricity: float, t0: float, epoch0: JulianDate,
                            t1: float, time: JulianDate) -> JulianDate:
     # meanMotion - rev / day; m0, m1 - radians
-    m0 = _true_to_mean_anomaly(t0, eccentricity)
-    m1 = _true_to_mean_anomaly(t1, eccentricity)
+    m0 = _trueToMeanAnomaly(t0, eccentricity)
+    m1 = _trueToMeanAnomaly(t1, eccentricity)
     return _previous_mean_anomaly(meanMotion, m0, epoch0, m1, time)
 
 
@@ -513,7 +513,7 @@ def _mean_anomaly_at(meanMotion: float, m0: float, epoch0: JulianDate, time: Jul
 
 def _true_anomaly_at(meanMotion: float, eccentricity: float, t0: float, epoch0: JulianDate, time: JulianDate) -> float:
     # meanMotion - rev / day; t0 - radians
-    m0 = _true_to_mean_anomaly(t0, eccentricity)
+    m0 = _trueToMeanAnomaly(t0, eccentricity)
     m1 = _mean_anomaly_at(meanMotion, m0, epoch0, time)
     return _mean_to_true_anomaly(m1, eccentricity)
 
@@ -539,7 +539,7 @@ class Orbit(Orbitable):
         if not isinstance(anomalyType, _Anomaly):
             raise TypeError('anomalyType parameter must be an Anomaly type')
 
-        meanMotion = _sma_to_mean_motion(self._elements.sma, self._body.mu)
+        meanMotion = _smaToMeanMotion(self._elements.sma, self._body.mu)
         if anomalyType is _MEAN:
             anomaly = _mean_anomaly_at(meanMotion, self._elements.meanAnomaly, self._elements.epoch, time)
         elif anomalyType is _TRUE:
@@ -562,7 +562,7 @@ class Orbit(Orbitable):
         elif direction is not _NEAREST:
             raise ValueError('direction parameter must be NEXT, PREVIOUS, or NEAREST')
 
-        meanMotion = _sma_to_mean_motion(self._elements.sma, self._body.mu) * 86400 / TWOPI
+        meanMotion = _smaToMeanMotion(self._elements.sma, self._body.mu) * 86400 / TWOPI
         if anomalyType is _TRUE:
             t0 = _mean_to_true_anomaly(self._elements.meanAnomaly, self._elements.ecc)
             if direction is _NEXT:
@@ -570,7 +570,7 @@ class Orbit(Orbitable):
             elif direction is _PREVIOUS:
                 return _previous_true_anomaly(meanMotion, self._elements.ecc, t0, self._elements.epoch, anomaly, time)
             else:
-                return _nearest_true_anomaly(meanMotion, self._elements.ecc, t0, self._elements.epoch, anomaly)
+                return _nearestTrueAnomaly(meanMotion, self._elements.ecc, t0, self._elements.epoch, anomaly)
         elif anomalyType is _MEAN:
             if direction is _NEXT:
                 return _next_mean_anomaly(meanMotion, self._elements.meanAnomaly, self._elements.epoch, anomaly, time)
@@ -578,7 +578,7 @@ class Orbit(Orbitable):
                 return _previous_mean_anomaly(meanMotion, self._elements.meanAnomaly, self._elements.epoch, anomaly,
                                               time)
             else:
-                return _nearest_mean_anomaly(meanMotion, self._elements.meanAnomaly, self._elements.epoch, anomaly)
+                return _nearestMeanAnomaly(meanMotion, self._elements.meanAnomaly, self._elements.epoch, anomaly)
         else:
             raise ValueError('anomalyType must be TRUE or MEAN')
 
@@ -602,7 +602,7 @@ class Orbit(Orbitable):
 
     def getElements(self, time: JulianDate) -> Elements:
         elements = deepcopy(self._elements)
-        meanMotion = _sma_to_mean_motion(self._elements.sma, self._body.mu)
+        meanMotion = _smaToMeanMotion(self._elements.sma, self._body.mu)
         elements.meanAnomaly = _mean_anomaly_at(meanMotion, self._elements.meanAnomaly, self._elements.epoch, time)
         elements.epoch = time
         return elements
@@ -646,7 +646,7 @@ class Orbit(Orbitable):
     def _get_true_anomaly_at(self, time: JulianDate):
         if not isinstance(time, JulianDate):
             raise TypeError('time parameter must be a JulianDate type')
-        meanMotion = _sma_to_mean_motion(self._elements.sma, self._body.mu)
+        meanMotion = _smaToMeanMotion(self._elements.sma, self._body.mu)
         trueAnomaly_0 = _mean_to_true_anomaly(self._elements.meanAnomaly, self._elements.ecc)
         return _true_anomaly_at(meanMotion, self._elements.ecc, trueAnomaly_0, self._elements.epoch, time)
 
@@ -704,7 +704,7 @@ class Satellite(Orbitable):
         # _, _, _, eccentricity, sma, meanAnomaly, trueAnomaly = _elements_from_tle(self._tle, time)
         _, _, _, eccentricity, sma, meanAnomaly, trueAnomaly = elementsFromTle(self._tle, time)
         # meanMotion = _sma_to_mean_motion(elements.sma, self._body.mu) * 86400 / TWOPI
-        meanMotion = _sma_to_mean_motion(sma, self._body.mu) * 86400 / TWOPI
+        meanMotion = _smaToMeanMotion(sma, self._body.mu) * 86400 / TWOPI
         if anomalyType is _TRUE:
             # t0 = _mean_to_true_anomaly(elements.meanAnomaly, elements.ecc)
             # t0 = _mean_to_true_anomaly(meanAnomaly, eccentricity)
@@ -716,7 +716,7 @@ class Satellite(Orbitable):
                 return _previous_true_anomaly(meanMotion, eccentricity, trueAnomaly, time, anomaly, time)
             else:
                 # return _nearest_true_anomaly(meanMotion, elements.ecc, t0, time, anomaly)
-                return _nearest_true_anomaly(meanMotion, eccentricity, trueAnomaly, time, anomaly)
+                return _nearestTrueAnomaly(meanMotion, eccentricity, trueAnomaly, time, anomaly)
         elif anomalyType is _MEAN:
             if direction is _NEXT:
                 # return _next_mean_anomaly(meanMotion, elements.meanAnomaly, time, anomaly, time)
@@ -726,7 +726,7 @@ class Satellite(Orbitable):
                 return _previous_mean_anomaly(meanMotion, meanAnomaly, time, anomaly, time)
             else:
                 # return _nearest_mean_anomaly(meanMotion, elements.meanAnomaly, time, anomaly)
-                return _nearest_mean_anomaly(meanMotion, meanAnomaly, time, anomaly)
+                return _nearestMeanAnomaly(meanMotion, meanAnomaly, time, anomaly)
         else:
             raise ValueError('anomalyType must be TRUE or MEAN')
 
@@ -788,7 +788,7 @@ def meanMotionToSma(meanMotion: float, mu: float) -> float:
 def smaToMeanMotion(semiMajorAxis: float, mu: float) -> float:
     _check_real_number(semiMajorAxis, 'semiMajorAxis')
     _check_real_number(mu, 'mu')
-    return _sma_to_mean_motion(semiMajorAxis, mu)
+    return _smaToMeanMotion(semiMajorAxis, mu)
 
 
 def meanToTrueAnomaly(meanAnomaly: float, eccentricity: float) -> float:
@@ -812,19 +812,19 @@ def eccentricToTrueAnomaly(eccentricAnomaly: float, eccentricity: float) -> floa
 def trueToMeanAnomaly(trueAnomaly: float, eccentricity: float) -> float:
     _check_real_number(trueAnomaly, 'trueAnomaly')
     _check_real_number(eccentricity, 'eccentricity')
-    return _true_to_mean_anomaly(trueAnomaly, eccentricity)
+    return _trueToMeanAnomaly(trueAnomaly, eccentricity)
 
 
 def trueToEccentricAnomaly(trueAnomaly: float, eccentricity: float) -> float:
     _check_real_number(trueAnomaly, 'trueAnomaly')
     _check_real_number(eccentricity, 'eccentricity')
-    return _true_to_eccentric_anomaly(trueAnomaly, eccentricity)
+    return _trueToEccentricAnomaly(trueAnomaly, eccentricity)
 
 
 def eccentricToMeanAnomaly(eccentricAnomaly: float, eccentricity: float) -> float:
     _check_real_number(eccentricAnomaly, 'eccentricAnomaly')
     _check_real_number(eccentricity, 'eccentricity')
-    return _eccentric_to_mean_anomaly(eccentricAnomaly, eccentricity)
+    return _eccentricToMeanAnomaly(eccentricAnomaly, eccentricity)
 
 
 # meanAnomalyAt

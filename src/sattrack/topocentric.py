@@ -13,8 +13,8 @@ from sattrack.sun import getSunTimes
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack._coordinates import _compute_position_vector, _compute_zenith_vector
-from sattrack._orbit import _true_anomaly_from_state, _true_to_mean_anomaly, \
-    _sma_to_mean_motion, _nearest_true_anomaly
+from sattrack._orbit import _trueAnomalyFromState, _trueToMeanAnomaly, \
+    _smaToMeanMotion, _nearestTrueAnomaly
 from sattrack.coordinates import GeoPosition
 from sattrack.orbit import Orbitable, Elements
 from sattrack.util.constants import TWOPI, EARTH_MU
@@ -396,13 +396,13 @@ class SatellitePassConstraints:
 def __max_pass_anomalies(position, velocity, mu, pVector, ecc):
     # eccentricVector = _compute_eccentric_vector(position, velocity, mu)
     eccentricVector = computeEccentricVector(position, velocity, mu)
-    trueAnomaly_n = _true_anomaly_from_state(position, velocity, mu)
+    trueAnomaly_n = _trueAnomalyFromState(position, velocity, mu)
     # todo: use eccentricVector.mag() if we know it's accurate
-    meanAnomaly_n = _true_to_mean_anomaly(trueAnomaly_n, ecc)
+    meanAnomaly_n = _trueToMeanAnomaly(trueAnomaly_n, ecc)
     trueAnomaly_n1 = vang(eccentricVector, pVector)
     if norm(cross(eccentricVector, pVector)) != norm(cross(position, velocity)):
         trueAnomaly_n1 = TWOPI - trueAnomaly_n1
-    meanAnomaly_n1 = _true_to_mean_anomaly(trueAnomaly_n1, ecc)
+    meanAnomaly_n1 = _trueToMeanAnomaly(trueAnomaly_n1, ecc)
     return trueAnomaly_n, trueAnomaly_n1, meanAnomaly_n, meanAnomaly_n1
 
 
@@ -473,7 +473,7 @@ def _next_pass_max_approx(satellite: Orbitable, geo: GeoPosition, time: JulianDa
     elements = satellite.getElements(time)
     ecc = elements.ecc
     # mean motion in radians / day
-    meanMotion = _sma_to_mean_motion(elements.sma, mu) * 86400
+    meanMotion = _smaToMeanMotion(elements.sma, mu) * 86400
 
     state = satellite.getState(tn)
     pVector = _get_p_vector(geo, *state, tn)
@@ -550,7 +550,7 @@ def _next_pass_max_approx_fix(satellite: Orbitable, geo: GeoPosition, time: Juli
     elements = Elements.fromState(*state, tn)
     # mean motion in radians / day
     # meanMotion = _sma_to_mean_motion(elements[4], mu) * 86400
-    meanMotion = _sma_to_mean_motion(elements.sma, mu) * 86400
+    meanMotion = _smaToMeanMotion(elements.sma, mu) * 86400
 
     pVector = _get_p_vector(geo, *state, tn)
     eccVector = computeEccentricVector(*state, mu)
@@ -563,7 +563,7 @@ def _next_pass_max_approx_fix(satellite: Orbitable, geo: GeoPosition, time: Juli
 
     # todo: replace this with values from elements variable
     # maPVector = _true_to_mean_anomaly(taPVector, elements[3])
-    maPVector = _true_to_mean_anomaly(taPVector, elements.ecc)
+    maPVector = _trueToMeanAnomaly(taPVector, elements.ecc)
     # maPosition = elements[-2]
     maPosition = elements.meanAnomaly
 
@@ -580,7 +580,7 @@ def _next_pass_max_approx_fix(satellite: Orbitable, geo: GeoPosition, time: Juli
         elements = Elements.fromState(*state, tn)
         # mean motion in radians / day
         # meanMotion = _sma_to_mean_motion(elements[4], mu) * 86400
-        meanMotion = _sma_to_mean_motion(elements.sma, mu) * 86400
+        meanMotion = _smaToMeanMotion(elements.sma, mu) * 86400
 
         eccVector = computeEccentricVector(*state, mu)
         angularMomentumNorm = norm(cross(*state))
@@ -590,7 +590,7 @@ def _next_pass_max_approx_fix(satellite: Orbitable, geo: GeoPosition, time: Juli
             taPVector = TWOPI - taPVector
 
         # maPVector = _true_to_mean_anomaly(taPVector, elements[3])
-        maPVector = _true_to_mean_anomaly(taPVector, elements.ecc)
+        maPVector = _trueToMeanAnomaly(taPVector, elements.ecc)
         # maPosition = elements[-2]
         maPosition = elements.meanAnomaly
 
@@ -687,12 +687,12 @@ def _rise_set_times_approx(satellite: Orbitable, geo: GeoPosition, time: JulianD
     rho2 = (u * cos(w2) + v * sin(w2)).mag()
     trueAnomaly_2 = atan3(rho2 * sin(w2), rho2 * cos(w2) - a * ecc)
     # todo: find out why we did this?
-    trueAnomaly_10 = _true_anomaly_from_state(*state, mu)
-    trueAnomaly_20 = _true_anomaly_from_state(*state, mu)
+    trueAnomaly_10 = _trueAnomalyFromState(*state, mu)
+    trueAnomaly_20 = _trueAnomalyFromState(*state, mu)
     # meanMotion in rev / day
-    meanMotion = _sma_to_mean_motion(a, mu) * 86400 / TWOPI
-    jd1 = _nearest_true_anomaly(meanMotion, ecc, trueAnomaly_10, time, trueAnomaly_1)
-    jd2 = _nearest_true_anomaly(meanMotion, ecc, trueAnomaly_20, time, trueAnomaly_2)
+    meanMotion = _smaToMeanMotion(a, mu) * 86400 / TWOPI
+    jd1 = _nearestTrueAnomaly(meanMotion, ecc, trueAnomaly_10, time, trueAnomaly_1)
+    jd2 = _nearestTrueAnomaly(meanMotion, ecc, trueAnomaly_20, time, trueAnomaly_2)
     if jd1 < jd2:
         return jd1, jd2
     return jd2, jd1
