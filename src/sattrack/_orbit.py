@@ -23,7 +23,7 @@ def _trueAnomalyFromState(position: Vector, velocity: Vector, mu: float) -> floa
     '''Computes the true anomaly of a position based on its state vectors.'''
     eccentricVector = computeEccentricVector(position, velocity, mu)
     trueAnomaly = vang(position, eccentricVector)
-    if _vectorAlmostEqual(norm(cross(position, eccentricVector)) == norm(cross(position, velocity))):
+    if _vectorAlmostEqual(norm(cross(position, eccentricVector)), norm(cross(position, velocity))):
     # if norm(cross(position, eccentricVector)) == norm(cross(position, velocity)):
         trueAnomaly = TWOPI - trueAnomaly
     return trueAnomaly

@@ -27,39 +27,59 @@ _all__ = ('Elements', 'Body', 'SUN_BODY', 'EARTH_BODY', 'Orbitable', 'Orbit', 'S
           'trueToMeanAnomaly', 'trueToEccentricAnomaly', 'eccentricToMeanAnomaly')
 
 
-# def _elements_from_tle(tle: TwoLineElement, time: JulianDate) -> (float, float, float, float, float, float):
-#     state = _getState(tle, time, EARTH_MU);
-#     elements = _elements_from_state(*state, EARTH_MU)
-#     # ignore true anomaly
-#     return elements[:-1]
-#     dt = time - tle.getEpoch()
-#     inc = radians(tle.getInc())
-#     n0 = tle.getMeanMotion()
-#     dM = (dt * (n0 + dt * (tle.getMeanMotionDot() + dt * tle.getMeanMotionDDot()))) * 360
-#     meanAnomaly = radians(tle.getMeanAnomaly() + dM) % TWOPI
-#     ecc0 = tle.getEcc()
-#     n0dot = tle.getMeanMotionDot() * 2
-#     a0 = tle.getSma()
-#     aDot = -2 * a0 * n0dot / (3 * n0)
-#     sma = a0 + aDot * dt
-#     eDot = -2 * (1 - ecc0) * n0dot / (3 * n0)
-#     ecc = ecc0 + eDot * dt
-#     temp = (a0 ** -3.5) / ((1 - (ecc0 * ecc0)) ** 2)
-#
-#     # perturbations
-#     # non-spherical earth
-#     lanJ2Dot = -2.06474e14 * temp * cos(inc)
-#     aopJ2Dot = 1.03237e14 * temp * (4 - 5 * (sin(inc) ** 2))
-#     # third-body
-#     lanMoon = -0.00338 * cos(inc) / n0
-#     lanSun = -0.00154 * cos(inc) / n0
-#     aopMoon = 0.00169 * (4 - (5 * sin(inc) ** 2)) / n0
-#     aopSun = 0.00077 * (4 - (5 * sin(inc) ** 2)) / n0
-#     raan = (tle.getRaan() + (lanJ2Dot + lanMoon + lanSun) * dt) % 360
-#     aop = (tle.getAop() + (aopJ2Dot + aopMoon + aopSun) * dt) % 360
-#
-#     return radians(raan), inc, radians(aop), ecc, sma, meanAnomaly
+def _elements_from_tle(tle: TwoLineElement, time: JulianDate) -> (float, float, float, float, float, float):
+    # state = _getState(tle, time, EARTH_MU);
+    # elements = _elements_from_state(*state, EARTH_MU)
+    # # ignore true anomaly
+    # return elements[:-1]
+    dt = time - tle.epoch
+    inc = tle.inc
+    # tle.meanMotion is radians / minute
+    n0 = tle.meanMotion / TWOPI * 1440
+    # tle.ndot is radians / minute^2
+    ndot = tle.ndot / TWOPI * 1440 * 1440
+    nddot = tle.nddot / TWOPI * (1440 ** 3)
+    dM = (dt * (n0 + dt * (ndot + dt * nddot))) * TWOPI
+    meanAnomaly = (tle.meanAnomaly + dM) % TWOPI
+    ecc0 = tle.ecc
+    n0dot = ndot * 2
+    a0 = tle.sma
+    aDot = -2 * a0 * n0dot / (3 * n0)
+    sma = a0 + aDot * dt
+    eDot = -2 * (1 - ecc0) * n0dot / (3 * n0)
+    ecc = ecc0 + eDot * dt
+    temp = (a0 ** -3.5) / ((1 - (ecc0 * ecc0)) ** 2)
 
+    # dt = time - tle.getEpoch()
+    # inc = radians(tle.getInc())
+    # n0 = tle.getMeanMotion()
+    # dM = (dt * (n0 + dt * (tle.getMeanMotionDot() + dt * tle.getMeanMotionDDot()))) * 360
+    # meanAnomaly = radians(tle.getMeanAnomaly() + dM) % TWOPI
+    # ecc0 = tle.getEcc()
+    # n0dot = tle.getMeanMotionDot() * 2
+    # a0 = tle.getSma()
+    # aDot = -2 * a0 * n0dot / (3 * n0)
+    # sma = a0 + aDot * dt
+    # eDot = -2 * (1 - ecc0) * n0dot / (3 * n0)
+    # ecc = ecc0 + eDot * dt
+    # temp = (a0 ** -3.5) / ((1 - (ecc0 * ecc0)) ** 2)
+
+    # perturbations
+    # non-spherical earth
+    lanJ2Dot = -2.06474e14 * temp * cos(inc)
+    aopJ2Dot = 1.03237e14 * temp * (4 - 5 * (sin(inc) ** 2))
+    # third-body
+    lanMoon = -0.00338 * cos(inc) / n0
+    lanSun = -0.00154 * cos(inc) / n0
+    aopMoon = 0.00169 * (4 - (5 * sin(inc) ** 2)) / n0
+    aopSun = 0.00077 * (4 - (5 * sin(inc) ** 2)) / n0
+    raan = (tle.raan + radians(lanJ2Dot + lanMoon + lanSun) * dt) % TWOPI
+    aop = (tle.aop + radians(aopJ2Dot + aopMoon + aopSun) * dt) % TWOPI
+    # raan = (tle.getRaan() + (lanJ2Dot + lanMoon + lanSun) * dt) % 360
+    # aop = (tle.getAop() + (aopJ2Dot + aopMoon + aopSun) * dt) % 360
+
+    # return radians(raan), inc, radians(aop), ecc, sma, meanAnomaly
+    return raan, inc, aop, ecc, sma, meanAnomaly
 
 def _check_numeric_type(value, paramName):
     if not isinstance(value, (int, float)):
@@ -103,8 +123,11 @@ class Elements:
 
     @classmethod
     def fromTle(cls, tle: TwoLineElement, epoch: JulianDate):
-        state = getState(tle, epoch)
-        return cls.fromState(*state, epoch, EARTH_MU)
+        # state = getState(tle, epoch)
+        # return cls.fromState(*state, epoch, EARTH_MU)
+        elements = _elements_from_tle(tle, epoch)
+        trueAnomaly = _mean_to_true_anomaly(elements[-1], elements[3])
+        return cls(*elements, epoch, trueAnomaly)
 
     @classmethod
     def fromState(cls, position: Vector, velocity: Vector, epoch: JulianDate, MU: float = EARTH_MU):
@@ -113,11 +136,11 @@ class Elements:
 
     def __str__(self):
         header = ' elements |  raan   |   inc   |   aop   |   ecc    |   sma    | mean anom ' \
-                 '|              epoch               '
+                 '| true anom |        epoch         '
         values = '  values  | {:^{w}.{p}} | {:^{w}.{p}} | {:^{w}.{p}} | {:^{w}.{p}f} | {:^{sw}.{sp}} | {:^{mw}.{mp}} ' \
                  '| {:^{mw}.{mp}} | {}'.format(degrees(self._raan), degrees(self._inc), degrees(self._aop), self._ecc,
-                                               self._sma, degrees(self._meanAnomaly), self._epoch.date(), w=7, p=6,
-                                               sw=8, sp=7, mw=9, mp=6)
+                                               self._sma, degrees(self._meanAnomaly),degrees(self._trueAnomaly),
+                                               self._epoch.date(), w=7, p=6, sw=8, sp=7, mw=9, mp=6)
         return f'{header}\n{values}'
 
     def __reduce__(self):
@@ -672,19 +695,19 @@ class Satellite(Orbitable):
             raise TypeError('anomalyType parameter must be Anomaly type')
 
         # elements = _elements_from_tle(self._tle, time)
-        elements = elementsFromTle(self._tle, time)
-        if anomalyType is _TRUE:
-            return elements[-1]
-        elif anomalyType is _MEAN:
-            return elements[-2]
-        # # elements = Elements.fromTle(self._tle, time)
-        # _, _, _, eccentricity, _, meanAnomaly = _elements_from_tle(self._tle, time)
+        # elements = elementsFromTle(self._tle, time)
         # if anomalyType is _TRUE:
-        #     # return _mean_to_true_anomaly(elements.meanAnomaly, elements.ecc)
-        #     return _mean_to_true_anomaly(meanAnomaly, eccentricity)
+        #     return elements[-1]
         # elif anomalyType is _MEAN:
-        #     # return elements.meanAnomaly
-        #     return meanAnomaly
+        #     return elements[-2]
+        # elements = Elements.fromTle(self._tle, time)
+        _, _, _, eccentricity, _, meanAnomaly = _elements_from_tle(self._tle, time)
+        if anomalyType is _TRUE:
+            # return _mean_to_true_anomaly(elements.meanAnomaly, elements.ecc)
+            return _mean_to_true_anomaly(meanAnomaly, eccentricity)
+        elif anomalyType is _MEAN:
+            # return elements.meanAnomaly
+            return meanAnomaly
         else:
             raise ValueError('anomalyType must be TRUE or MEAN')
 
@@ -701,13 +724,13 @@ class Satellite(Orbitable):
 
         # todo: determine if this is ideal using SGP4 states
         # elements = Elements.fromTle(self._tle, time)
-        # _, _, _, eccentricity, sma, meanAnomaly, trueAnomaly = _elements_from_tle(self._tle, time)
-        _, _, _, eccentricity, sma, meanAnomaly, trueAnomaly = elementsFromTle(self._tle, time)
+        _, _, _, eccentricity, sma, meanAnomaly = _elements_from_tle(self._tle, time)
+        # _, _, _, eccentricity, sma, meanAnomaly, trueAnomaly = elementsFromTle(self._tle, time)
         # meanMotion = _sma_to_mean_motion(elements.sma, self._body.mu) * 86400 / TWOPI
         meanMotion = _smaToMeanMotion(sma, self._body.mu) * 86400 / TWOPI
         if anomalyType is _TRUE:
             # t0 = _mean_to_true_anomaly(elements.meanAnomaly, elements.ecc)
-            # t0 = _mean_to_true_anomaly(meanAnomaly, eccentricity)
+            trueAnomaly = _mean_to_true_anomaly(meanAnomaly, eccentricity)
             if direction is _NEXT:
                 # return _next_true_anomaly(meanMotion, elements.ecc, t0, time, anomaly, time)
                 return _next_true_anomaly(meanMotion, eccentricity, trueAnomaly, time, anomaly, time)
@@ -746,8 +769,8 @@ class Satellite(Orbitable):
     def getReferenceFrame(self, time: JulianDate = None) -> ReferenceFrame:
         # elements = Elements.fromTle(self._tle, time)
         #  todo: compute the vectors from eccentric and angular momentum vectors ?
-        # raan, inc, aop, *_ = _elements_from_tle(self._tle, time)
-        raan, inc, aop, *_ = elementsFromTle(self._tle, time)
+        raan, inc, aop, *_ = _elements_from_tle(self._tle, time)
+        # raan, inc, aop, *_ = elementsFromTle(self._tle, time)
         return ReferenceFrame(ZXZ, Angles(raan, inc, aop))
         # return ReferenceFrame(ZXZ, EulerAngles(raan, inc, aop))
 
