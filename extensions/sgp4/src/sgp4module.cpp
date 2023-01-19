@@ -492,7 +492,7 @@ static PyMethodDef sgp4_methods[] = {
      "tuple of state vectors at the given time.")},
 
     {"elementsFromState", (PyCFunction)elements_from_state, METH_VARARGS,
-     PyDoc_STR("elementsFromState(position, velocity, mu) -> (sma, ecc, "
+     PyDoc_STR("elementsFromState(position, velocity, mu=EARTH_MU) -> (sma, ecc, "
      "inc, raan, aop, m, nu)\n\nReturns a tuple of orbital elements from a "
      "known state. Tuple returned contains the values (raan, inc, aop, ecc, "
      "sma, meanAnomaly, trueAnomaly).")},
@@ -505,7 +505,7 @@ static PyMethodDef sgp4_methods[] = {
      "(raan, inc, aop, ecc, sma, meanAnomaly, trueAnomaly).")},
 
     {"computeEccentricVector", (PyCFunction)compute_ecc_vector,
-     METH_VARARGS, PyDoc_STR("computeEccentricVector(position, velocity, mu) "
+     METH_VARARGS, PyDoc_STR("computeEccentricVector(position, velocity, mu=EARTH_MU) "
      "-> eccentricVector\n\nReturns the eccentric vector of a satellite from "
      "a known state.")},
 
