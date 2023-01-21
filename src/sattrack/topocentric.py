@@ -698,8 +698,81 @@ def _computeAltitude(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -
     return asin(topocentricPosition[2] / topocentricPosition.mag())
 
 
+def _getAltitudeDerivative(topoPosition: Vector, topoVelocity: Vector) -> float:
+    """Computes the derivative of altitude with respect to time from topocentric position and velocity vectors."""
+
+    rDotV = dot(topoPosition, topoVelocity)
+    rMag2 = topoPosition.mag2()
+
+    rightNumeratorTerm = topoPosition[2] * rDotV / rMag2
+    rightDenominatorTerm = topoPosition[2] * topoPosition[2] / rMag2
+    numerator = topoVelocity[2] - rightNumeratorTerm
+    denominator = sqrt(1 - rightDenominatorTerm)
+
+    return numerator / denominator
+
+
+def _getAltitude(topoPosition: Vector) -> float:
+    """Computes the altitude of a topocentric position vector."""
+    return asin(topoPosition[2] / topoPosition.mag())
+
+
 def _maxPassRefine(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> JulianDate:
     """Refines the original time approximation of the maximum altitude of a satellite pass."""
+
+    # this works but the times are inaccurate, either the equation implemented in _getAltitudeDerivative is wrong,
+    # or maybe the earth rotation needs to be accounted for.
+    '''state = satellite.getState(time)
+    topoPosition = _toTopocentricOffset(state[0], geo, time)
+    topoVelocity = _toTopocentric(state[1], geo, time)
+    dadt = _getAltitudeDerivative(topoPosition, topoVelocity)
+
+    # move forward or back 1 second and see how what the derivative is
+    # todo: can we analytical explain why 1 second should be used here?
+    if dadt < 0:
+        direction = -1
+    elif dadt > 0:
+        direction = 1
+    else:
+        # if dadt is zero where at maximum altitude
+        return time
+
+    dadt2 = direction
+    time2 = time
+    topoPosition2 = 0   # to please the IDE
+    topoVelocity2 = 0   # to please the IDE
+    # keep moving forward or back until time and time2 are not both increasing or both decreasing
+    while dadt * dadt2 > 0:
+        time2 = time2.future(direction / 86400)
+        state2 = satellite.getState(time2)
+        topoPosition2 = _toTopocentricOffset(state2[0], geo, time2)
+        topoVelocity2 = _toTopocentric(state2[1], geo, time2)
+        dadt2 = _getAltitudeDerivative(topoPosition2, topoVelocity2)
+
+    # use bisecting logic to find the maximum altitude
+    if time < time2:
+        beforeTime = time
+        afterTime = time2
+    else:
+        beforeTime = time2
+        afterTime = time
+        beforeDadt = _getAltitudeDerivative(topoPosition2, topoVelocity2)
+        afterDadt = _getAltitudeDerivative(topoPosition, topoVelocity)
+    while (afterTime - beforeTime) > (0.001 / 86400):     # 1/1000th of a second
+        halftime = (afterTime - beforeTime) / 2
+        middleTime = beforeTime.future(halftime)
+        state = satellite.getState(middleTime)
+        topoPos = _toTopocentricOffset(state[0], geo, middleTime)
+        topoVel = _toTopocentric(state[1], geo, middleTime)
+        dadt = _getAltitudeDerivative(topoPos, topoVel)
+        if dadt < 0:
+            afterTime = middleTime
+        elif dadt > 0:
+            beforeTime = middleTime
+        else:
+            return middleTime
+
+    return beforeTime'''
 
     # todo: utilize the dadt values to future time increase and make this a more analytical guess
     oneSecond = 1 / 86400
