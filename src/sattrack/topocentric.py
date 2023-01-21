@@ -626,6 +626,8 @@ def _nextPassMaxApproxFix(satellite: Orbitable, geo: GeoPosition, time: JulianDa
             - would need to understand how pVector changes relative to surface
     '''
 
+    # todo: how do we incorporate earth's rotation/what happens when we do?
+
     # if the orbital plane is not above, find the time it appears overhead to start looking for passes
     if _orbitAltitude(satellite, geo, time) < 0:
         tn = _timeToPlane(satellite, geo, time)
