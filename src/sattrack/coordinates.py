@@ -1,3 +1,4 @@
+import json
 import json as _json
 import abc as _abc
 import math as _math
@@ -27,8 +28,8 @@ class Coordinates(_abc.ABC):
         self._lat = self._checkLatitude(latitude)
         self._lng = self._checkLongitude(longitude)
 
-    def __repr__(self) -> str:
-        return _json.dumps(self, default=lambda o: dict(o))
+    # def __repr__(self) -> str:
+    #     return _json.dumps(self, default=lambda o: dict(o))
 
     @property
     def latitude(self):
@@ -92,18 +93,25 @@ class GeoPosition(Coordinates):
             raise TypeError('elevation parameter must be an int or float type', type(elevation))
         self._elevation = elevation
 
-    def __iter__(self):
-        yield from {
-            'latitude': self._lat,
-            'longitude': self._lng,
-            'elevation': self._elevation
-        }.items()
-
     def __str__(self):
+        """Returns a string representation of the geo-position."""
         return f'latitude: {self._fmtLatitude()}, longitude: {self._fmtLongitude()}, elevation: {self._elevation}'
 
+    def __repr__(self):
+        """Returns a string representation of the geo-position."""
+        return f'GeoPosition({self._fmtLatitude()}, {self._fmtLongitude()}, {self._elevation})'
+
     def __reduce__(self):
+        """Allows the GeoPosition to be pickled."""
         return self.__class__, (self._fmtLatitude(), self._fmtLongitude(), self._elevation)
+
+    def toJson(self):
+        """Returns a string of the GeoPosition in json format."""
+        return json.dumps(self, default=lambda o: o.toDict())
+
+    def toDict(self):
+        """Returns a dictionary of the GeoPosition to create json formats of other types containing a GeoPosition."""
+        return {"latitude": self._lat, "longitude": self._lng, "elevation": self._elevation}
 
     @property
     def elevation(self):
@@ -206,18 +214,25 @@ class CelestialCoordinates(Coordinates):
         order of the parameters follows the idiom 'right-ascension and declination', not 'latitude and longitude'."""
         super().__init__(declination, rightAscension)
 
-    def __iter__(self):
-        yield from {
-            'right-ascension': self._lng,
-            'declination': self._lat
-        }.items()
-
     def __str__(self):
+        """Returns a string representation of the coordinates."""
         return f'right-ascension: {self._fmtLongitude()}, declination: {self._fmtLatitude()}'
 
+    def __repr__(self):
+        """Returns a string representation of the coordinates."""
+        return f'CelestialCoordinates({self._fmtLongitude()}, {self._fmtLatitude()})'
+
     def __reduce__(self):
-        # return self.__class__, (_math.degrees(self._lat), _math.degrees(self._lng))
+        """Allows the coordinate object to be pickled."""
         return self.__class__, (self._fmtLatitude(), self._fmtLongitude())
+
+    def toJson(self):
+        """Returns a string of the coordinate in json format."""
+        return json.dumps(self, default=lambda o: o.toDict())
+
+    def toDict(self):
+        """Returns a dictionary of the coordinate to create json formats of other types containing a GeoPosition."""
+        return {"right-ascension": self._fmtLongitude(), "declination": self._fmtLatitude()}
 
     def _fmod(self, value: float) -> float:
         """Modulates the right-ascension between 0 and 24 hours."""

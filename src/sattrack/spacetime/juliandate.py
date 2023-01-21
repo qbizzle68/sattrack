@@ -1,3 +1,4 @@
+import json
 import json as _json
 import time as _time
 import datetime as _datetime
@@ -127,18 +128,22 @@ class JulianDate:
         seconds = date.second + date.microsecond / 1e6
         return JulianDate(date.month, date.day, date.year, date.hour, date.minute, seconds, tz)
 
-    def __iter__(self):
-        yield from {
-            'dayNumber': self._dayNumber,
-            'dayFraction': self._dayFraction
-        }.items()
-
     def __str__(self) -> str:
+        """Creates a string representation of the JulianDate."""
         return str(round(self.value, 6)) + ' --- ' + self.date(self._timezone)
 
     def __repr__(self) -> str:
-        # represent as a JSON
-        return _json.dumps(dict(self))
+        """Creates a string representation of the JulianDate."""
+        m, d, y, h, mi, s = _jdToGregorian(self.value, self._timezone)
+        return f'JulianDate({m}, {d}, {y}, {h}, {mi}, {s}, {self._timezone})'
+
+    def toJson(self):
+        """Returns a string of the coordinate in json format."""
+        return json.dumps(self, default=lambda o: o.toDict())
+
+    def toDict(self):
+        """Returns a dictionary of the JulianDate to create json formats of other types containing a GeoPosition."""
+        return {"dayNumber": self._dayNumber, "dayFraction": self._dayFraction}
 
     # operators
     def __add__(self, other: _datetime.timedelta):

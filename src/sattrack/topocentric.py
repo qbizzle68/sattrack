@@ -15,9 +15,6 @@ from sattrack.exceptions import PassConstraintException, NoPassException
 from sattrack.orbit import Orbitable, Elements
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
-# from sattrack.rotation.order import ZYX
-# from sattrack.rotation.rotation import getEulerMatrix, EulerAngles, rotateOrderTo, \
-#     undoRotateToThenOffset
 from sattrack.sun import getSunTimes
 from sattrack.util.constants import TWOPI
 from sattrack.util.conversions import atan3
@@ -96,24 +93,26 @@ class PositionInfo:
         self._unobscured = index(unobscured)
         self._visible = self._illuminated and self._unobscured
 
-    def __iter__(self):
-        yield from {
-            "altitude": self._altitude,
-            "azimuth": self._azimuth,
-            "direction": self._direction,
-            "time": dict(self._time),
-            "illuminated": self._illuminated,
-            "unobscured": self._unobscured,
-            "visible": self._visible
-        }.items()
-
     def __str__(self):
+        """Creates a string representation of the PositionInfo."""
         return ' {{:^17}} | {:^12} | {:^{altW}.{p}f} | {:^{azw}.{p}f} {:^5} | {!s:^11} | {!s:^10} | {!s:^7} ' \
             .format(self._time.time(), self._altitude, self._azimuth, '({})'.format(self._direction),
                     bool(self._illuminated), bool(self._unobscured), bool(self._visible), altW=8, azw=6, p=2)
 
     def __repr__(self):
-        return json.dumps(self, default=lambda o: dict(o))
+        """Creates a string representation of the PositionInfo."""
+        return f'PositionInfo({self._altitude}, {self._azimuth}, {repr(self._time)}, {self._illuminated},' \
+               f'{self._unobscured})'
+
+    def toJson(self):
+        """Returns a string of the PositionInfo in json format."""
+        return json.dumps(self, default=lambda o: o.toDict())
+
+    def toDict(self):
+        """Returns a dictionary of the PositionInfo to create json formats of other types containing a GeoPosition."""
+        return {"altitude": self._altitude, "azimuth": self._azimuth, "direction": self._direction,
+                "time": self._time.toDict(), "illuminated": self._illuminated, "unobscured": self._unobscured,
+                "visible": self._visible}
 
     @property
     def altitude(self):
@@ -204,20 +203,6 @@ class SatellitePass:
             self._visible = False
         self._name = name
 
-    def __iter__(self):
-        yield from {
-            'riseInfo': dict(self._riseInfo),
-            'setInfo': dict(self._setInfo),
-            'maxInfo': dict(self._maxInfo),
-            'firstUnobscuredInfo': dict(self._firstUnobscured) if self._firstUnobscured is not None else None,
-            'lastUnobscuredInfo': dict(self._lastUnobscured) if self._lastUnobscured is not None else None,
-            'firstIlluminatedInfo': dict(self._firstIlluminated) if self._firstIlluminated is not None else None,
-            'lastIlluminatedInfo': dict(self._lastIlluminated) if self._lastIlluminated is not None else None,
-            'illuminated': self._illuminated,
-            'unobscured': self._unobscured,
-            'visible': self._visible
-        }.items()
-
     def _getInfos(self):
         """Returns the PositionInfos as a list of tuples with their names and values."""
         return [
@@ -251,7 +236,19 @@ class SatellitePass:
         return string
 
     def __repr__(self):
-        return json.dumps(self, default=lambda o: dict(o))
+        """Creates a string representation of the pass."""
+        return self.__str__()
+
+    def toJson(self):
+        """Returns a string of the pass in json format."""
+        return json.dumps(self, default=lambda o: o.toDict())
+
+    def toDict(self):
+        """Returns a dictionary of the pass to create json formats of other types containing a GeoPosition."""
+        return {"name": self._name, "riseInfo": self._riseInfo, "setInfo": self._setInfo, "maxInfo": self._maxInfo,
+                "firstUnobscured": self._firstUnobscured, "lastUnobscured": self._lastUnobscured,
+                "firstIlluminated": self._firstIlluminated, "lastIlluminated": self._lastIlluminated,
+                "illuminated": self._illuminated, "unobscured": self._unobscured, "visible": self._visible}
 
     @property
     def riseInfo(self):
