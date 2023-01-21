@@ -5,16 +5,7 @@ __all__ = ('siderealTime', 'localSiderealTime', 'earthOffsetAngle')
 
 
 def siderealTime(jd: JulianDate) -> float:
-    """
-    Converts a solar time into sidereal time, most useful for computing the right-ascension of earth's zero longitude,
-    equal to the geographic reference frame offset from the geocentric equitorial celestial reference frame.
-
-    Args:
-        jd: Solar time to convert to sidereal time.
-
-    Returns:
-        The Earth's sidereal time at the given solar time.
-    """
+    """Converts a solar time (via JulianDate) into sidereal time in hours."""
 
     dt = jd - J2000
     tmp = (18.697_374_558 + 24.065_709_824_419_08 * dt) % 24.0
@@ -22,17 +13,7 @@ def siderealTime(jd: JulianDate) -> float:
 
 
 def localSiderealTime(jd: JulianDate, lng: float) -> float:
-    """
-    Computes the sidereal time for a line of longitude on Earth, which is equivalent to the offset angle between a line
-    of longitude and the first point of Ares, or the celestial x-axis.
-
-    Args:
-        jd: Solar time to convert to sidereal time.
-        lng: Longitude of the GeoPosition whose local sidereal time is being found.
-
-    Returns:
-        The local sidereal time of a longitude at the given solar time.
-    """
+    """Converts a solar time (via JulianDate) to a local sidereal time in hours, defined by a longitude in degrees."""
 
     if lng < 0:
         lng += 360.0
@@ -43,4 +24,5 @@ def localSiderealTime(jd: JulianDate, lng: float) -> float:
 
 def earthOffsetAngle(jd: JulianDate) -> float:
     """Computes the earth offset angle from the celestial reference frame in radians."""
+
     return siderealTime(jd) / 24.0 * TWOPI

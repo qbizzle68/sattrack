@@ -6,7 +6,8 @@ __all__ = ['atan3']
 
 
 def atan3(y: float, x: float) -> float:
-    # atan2 but range is 0 to 2π
+    """A makeshift version of the atan2 method, where the return value is between 0 and 2π."""
+
     angle = atan2(y, x)
 
     if y < 0:

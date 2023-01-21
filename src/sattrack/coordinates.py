@@ -2,8 +2,8 @@ import json as _json
 import abc as _abc
 import math as _math
 
-from sattrack._coordinates import _compute_zenith_vector, _compute_position_vector, _radius_at_lat, \
-    _geodetic_to_geocentric
+from sattrack._coordinates import _computeZenithVector, _computePositionVector, _radiusAtLat, \
+    _geodeticToGeocentric
 from sattrack.util.constants import EARTH_FLATTENING
 from pyevspace import Vector
 from sattrack.spacetime.juliandate import JulianDate
@@ -23,49 +23,51 @@ class Coordinates(_abc.ABC):
     __slots__ = '_lat', '_lng'
 
     def __init__(self, latitude: float, longitude: float):
-        # constructor
-        self._lat = self._check_latitude(latitude)
-        self._lng = self._check_longitude(longitude)
+        """Initialize coordinates to latitude and longitudes in degrees."""
+        self._lat = self._checkLatitude(latitude)
+        self._lng = self._checkLongitude(longitude)
 
     def __repr__(self) -> str:
         return _json.dumps(self, default=lambda o: dict(o))
 
     @property
     def latitude(self):
-        return self._fmt_latitude()
+        return self._fmtLatitude()
 
     @latitude.setter
     def latitude(self, value):
-        self._lat = self._check_latitude(value)
+        self._lat = self._checkLatitude(value)
 
     @property
     def longitude(self):
-        return self._fmt_longitude()
+        return self._fmtLongitude()
 
     @longitude.setter
     def longitude(self, value):
-        self._lng = self._check_longitude(value)
+        self._lng = self._checkLongitude(value)
 
-    # abstract methods to be overridden
     @_abc.abstractmethod
     def _fmod(self, val: float) -> float:
+        """Modulates a longitude between valid values."""
         pass
 
     @_abc.abstractmethod
-    def _check_latitude(self, lat):
-        pass
-
-    # should call self._fmod() before returning a value
-    @_abc.abstractmethod
-    def _check_longitude(self, lng):
+    def _checkLatitude(self, lat):
         pass
 
     @_abc.abstractmethod
-    def _fmt_latitude(self):
+    def _checkLongitude(self, lng):
+        """Should call self._fmod() before returning a value."""
         pass
 
     @_abc.abstractmethod
-    def _fmt_longitude(self):
+    def _fmtLatitude(self):
+        """Formats the latitude before returning it for display purposes."""
+        pass
+
+    @_abc.abstractmethod
+    def _fmtLongitude(self):
+        """Formats the longitude before returning it for display purposes."""
         pass
 
 
@@ -73,7 +75,7 @@ class GeoPosition(Coordinates):
     """
     A container class for an Earth geo-position. The class contains a latitude, longitude and an optional elevation. The
     elevation is used for positions relative to a geo-position, as well as rotating to a topocentric reference frame.
-    Since the Earth's shape is approximated as an oblate sphere, there are two types of latitudes, geocentric and
+    Since the Earth's shape is approximated as an oblate spheroid, there are two types of latitudes, geocentric and
     geodetic. Geocentric latitude is the angle between the equator and a point on Earth's surface through the Earth's
     center. Geodetic latitude is the angle between the equator and a line normal to Earth's surface at a given point.
     The geodetic latitude is also known as geographic latitude, and is the one used in a geo-position coordinate.
@@ -84,17 +86,10 @@ class GeoPosition(Coordinates):
     __slots__ = '_elevation',
 
     def __init__(self, latitude: float, longitude: float, elevation: float = 0):
-        """
-        Initializes the object with the given values.
-
-        Args:
-            latitude: The latitude in degrees.
-            longitude: The longitude in degrees.
-            elevation: The elevation of the GeoPosition in km (Default = 0).
-        """
+        """Initializes the GeoPosition with the position angles in degrees and optional elevation in kilometers."""
         super().__init__(latitude, longitude)
         if not isinstance(elevation, (int, float)):
-            raise TypeError('elevation parameter must be an int or float type')
+            raise TypeError('elevation parameter must be an int or float type', type(elevation))
         self._elevation = elevation
 
     def __iter__(self):
@@ -105,10 +100,10 @@ class GeoPosition(Coordinates):
         }.items()
 
     def __str__(self):
-        return f'latitude: {self._fmt_latitude()}, longitude: {self._fmt_longitude()}, elevation: {self._elevation}'
+        return f'latitude: {self._fmtLatitude()}, longitude: {self._fmtLongitude()}, elevation: {self._elevation}'
 
     def __reduce__(self):
-        return self.__class__, (self._fmt_latitude(), self._fmt_longitude(), self._elevation)
+        return self.__class__, (self._fmtLatitude(), self._fmtLongitude(), self._elevation)
 
     @property
     def elevation(self):
@@ -121,36 +116,29 @@ class GeoPosition(Coordinates):
         self._elevation = value
 
     def getRadius(self) -> float:
-        return _radius_at_lat(self._lat) + self._elevation
+        """Returns the radius of the position including elevation in kilometers."""
+        return _radiusAtLat(self._lat) + self._elevation
 
     def getGeocentricLatitude(self) -> float:
-        return _geodetic_to_geocentric(self._lat)
+        """Computes the geocentric latitude of the position."""
+        return _geodeticToGeocentric(self._lat)
 
     def getPositionVector(self, jd: JulianDate = None) -> Vector:
+        """Gets the spatial position vector of the GeoPosition. If jd is not None the offset angle of the Earth is taken
+        into account."""
         if jd is not None and not isinstance(jd, JulianDate):
-            raise TypeError('jd parameter must be a JulianDate type')
-        return _compute_position_vector(self._lat, self._lng, self._elevation, jd)
-        # position vector needs geocentric latitude
-        # return _compute_normal_vector(
-        #     _geodetic_to_geocentric(self._lat),
-        #     self._lng,
-        #     _radius_at_lat(self._lat) + self._elevation,
-        #     jd
-        # )
+            raise TypeError('jd parameter must be a JulianDate type', type(jd))
+        return _computePositionVector(self._lat, self._lng, self._elevation, jd)
 
     def getZenithVector(self, jd: JulianDate = None) -> Vector:
+        """Gets the normal vector to the Earth's surface at this GeoPosition. The zenith vector is guaranteed to have
+        a magnitude of 1."""
         if jd is not None and not isinstance(jd, JulianDate):
-            raise TypeError('jd parameter must be a JulianDate type')
-        return _compute_zenith_vector(self._lat, self._lng, self._elevation, jd)
-        # zenithVector = _compute_normal_vector(
-        #     self._lat,
-        #     self._lng,
-        #     _radius_at_lat(self._lat) + self._elevation,
-        #     jd)
-        # return norm(zenithVector)
+            raise TypeError('jd parameter must be a JulianDate type', type(jd))
+        return _computeZenithVector(self._lat, self._lng, self._elevation, jd)
 
     def _fmod(self, value: float) -> float:
-        # find the equivalent angle from -180 to 180
+        """Modulates the latitude value from -180 to 180."""
         if value > 180.0:
             tmp = value - int(value / 360.0) * 360.0
             return tmp - 360.0 if tmp > 180.0 else tmp
@@ -160,45 +148,49 @@ class GeoPosition(Coordinates):
         else:
             return value
 
-    def _check_latitude(self, latitude):
+    def _checkLatitude(self, latitude):
         if not isinstance(latitude, (int, float)):
-            raise TypeError('lat parameter must be an int or float type')
+            raise TypeError('lat parameter must be an int or float type', type(latitude))
+        # a latitude outside the bounds [-90, 90] doesn't make any sense, so raise error if it occurs
         if not -90 <= latitude <= 90:
-            raise ValueError('lat argument must be between -90 and 90 degrees')
+            raise ValueError('lat argument must be between -90 and 90 degrees', latitude)
         return _math.radians(latitude)
 
-    def _check_longitude(self, longitude):
+    def _checkLongitude(self, longitude):
         if not isinstance(longitude, (int, float)):
-            raise TypeError('lng parameter must be an int or float type')
+            raise TypeError('lng parameter must be an int or float type', type(longitude))
         return _math.radians(self._fmod(longitude))
 
-    def _fmt_latitude(self):
+    def _fmtLatitude(self):
+        """Re-convert latitude back to degrees for printing."""
         return _math.degrees(self._lat)
 
-    def _fmt_longitude(self):
+    def _fmtLongitude(self):
+        """Re-convert longitude back to degrees for printing."""
         return _math.degrees(self._lng)
 
 
-def _geocentric_to_geodetic(geocentricLatitude):
-    # parameter and return value are in radians
+def _geocentricToGeodetic(geocentricLatitude):
+    """Converts a geocentric latitude in radians to a geodetic latitude in radians."""
     if not -_math.pi / 2 <= geocentricLatitude <= _math.pi / 2:
-        raise ValueError('lat argument must be between -90 and 90 degrees')
+        raise ValueError('lat argument must be between -90 and 90 degrees', geocentricLatitude)
     return _math.atan(_math.tan(geocentricLatitude) / ((1 - EARTH_FLATTENING) ** 2))
 
 
 def geocentricToGeodetic(geocentricLatitude: float) -> float:
-    # parameter and return value are in degrees
-    return _math.degrees(_geocentric_to_geodetic(_math.radians(geocentricLatitude)))
+    """Converts a geocentric latitude in degrees to a geodetic latitude in degrees."""
+    return _math.degrees(_geocentricToGeodetic(_math.radians(geocentricLatitude)))
 
 
 def geodeticToGeocentric(geodeticLatitude: float) -> float:
+    """Converts a geodetic latitude in degrees to a geocentric latitude in degrees."""
     # parameter and return value are in degrees
-    return _math.degrees(_geodetic_to_geocentric(_math.radians(geodeticLatitude)))
+    return _math.degrees(_geodeticToGeocentric(_math.radians(geodeticLatitude)))
 
 
 def radiusAtLatitude(latitude: float) -> float:
-    # latitude in degrees, return value in kilometers
-    return _radius_at_lat(_math.radians(latitude))
+    """Computes the radius of the Earth in kilometers from a given geodetic latitude in degrees."""
+    return _radiusAtLat(_math.radians(latitude))
 
 
 class CelestialCoordinates(Coordinates):
@@ -210,7 +202,8 @@ class CelestialCoordinates(Coordinates):
     """
 
     def __init__(self, rightAscension: float, declination: float):
-        # order of parameters goes with the idiom 'ra, dec'
+        """Initializes the coordinate object with the right-ascension in hours and declination in degrees. Note the
+        order of the parameters follows the idiom 'right-ascension and declination', not 'latitude and longitude'."""
         super().__init__(declination, rightAscension)
 
     def __iter__(self):
@@ -220,36 +213,40 @@ class CelestialCoordinates(Coordinates):
         }.items()
 
     def __str__(self):
-        return f'right-ascension: {self._fmt_longitude()}, declination: {self._fmt_latitude()}'
+        return f'right-ascension: {self._fmtLongitude()}, declination: {self._fmtLatitude()}'
 
     def __reduce__(self):
         # return self.__class__, (_math.degrees(self._lat), _math.degrees(self._lng))
-        return self.__class__, (self._fmt_latitude(), self._fmt_longitude())
+        return self.__class__, (self._fmtLatitude(), self._fmtLongitude())
 
     def _fmod(self, value: float) -> float:
-        # keeps longitude between 0 and 24 hours
+        """Modulates the right-ascension between 0 and 24 hours."""
         return value % 24.0
 
-    def _check_latitude(self, declination):
+    def _checkLatitude(self, declination):
         if not isinstance(declination, (int, float)):
-            raise TypeError('declination parameter must be an int or float type')
+            raise TypeError('declination parameter must be an int or float type', type(declination))
         if not -90 <= declination <= 90:
-            raise ValueError('declination argument must be between -90 and 90 degrees')
+            raise ValueError('declination argument must be between -90 and 90 degrees', declination)
         return _math.radians(declination)
 
-    def _check_longitude(self, rightAscension):
+    def _checkLongitude(self, rightAscension):
         if not isinstance(rightAscension, (int, float)):
-            raise TypeError('rightAscension parameter must be an int or float type')
+            raise TypeError('rightAscension parameter must be an int or float type', type(rightAscension))
         return self._fmod(rightAscension) / _RAD_TO_HOURS
 
-    def _fmt_latitude(self):
+    def _fmtLatitude(self):
+        """Formats the declination to degrees for printing."""
         return _math.degrees(self._lat)
 
-    def _fmt_longitude(self):
+    def _fmtLongitude(self):
+        """Formats the right-ascension to degrees for printing."""
         return self._lng * _RAD_TO_HOURS
 
 
 def getSubPoint(position: Vector, jd: JulianDate) -> GeoPosition:
+    """Computes the geo-position directly below a satellite at a given time.
+    """
     declination = _math.degrees(_math.asin(position[2] / position.mag()))
     # longitude is equal to right-ascension minus earth's offset angle at the time
     longitude = (_math.degrees(atan3(position[1], position[0]) - earthOffsetAngle(jd))) % 360.0

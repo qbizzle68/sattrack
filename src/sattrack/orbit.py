@@ -1,25 +1,18 @@
 from abc import abstractmethod, ABC
 from copy import deepcopy
-from enum import Enum
 from inspect import Parameter, signature
 from math import radians, cos, sin, pi, sqrt, atan2, floor, degrees
 from typing import Callable
 
 from pyevspace import Vector, ZXZ, Z_AXIS, Angles, getMatrixEuler, rotateMatrixFrom, getMatrixAxis, \
     ReferenceFrame
-# from sattrack._sgp4 import TwoLineElement, _elements_from_tle, _getState
-from sattrack.sgp4 import TwoLineElement, elementsFromTle, getState, elementsFromState
+from sattrack.sgp4 import TwoLineElement, getState, elementsFromState
 
-# from sattrack.rotation.order import ZXZ, Axis
-# from sattrack.rotation.rotation import EulerAngles, getEulerMatrix, rotateMatrixFrom, getMatrix, \
-#     ReferenceFrame
 from sattrack.sun import getSunPosition
-# from sattrack.sgp4 import SGP4_Propagator
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import siderealTime
 from sattrack._orbit import _trueToMeanAnomaly, _trueToEccentricAnomaly, _eccentricToMeanAnomaly, \
     _smaToMeanMotion, _nearestTrueAnomaly, _nearestMeanAnomaly
-# from sattrack.tle import TwoLineElement
 from sattrack.util.constants import TWOPI, EARTH_MU, EARTH_POLAR_RADIUS, EARTH_EQUITORIAL_RADIUS, SUN_MU, SUN_RADIUS
 
 _all__ = ('Elements', 'Body', 'SUN_BODY', 'EARTH_BODY', 'Orbitable', 'Orbit', 'Satellite', 'meanMotionToSma',
@@ -27,11 +20,11 @@ _all__ = ('Elements', 'Body', 'SUN_BODY', 'EARTH_BODY', 'Orbitable', 'Orbit', 'S
           'trueToMeanAnomaly', 'trueToEccentricAnomaly', 'eccentricToMeanAnomaly')
 
 
-def _elements_from_tle(tle: TwoLineElement, time: JulianDate) -> (float, float, float, float, float, float):
-    # state = _getState(tle, time, EARTH_MU);
-    # elements = _elements_from_state(*state, EARTH_MU)
-    # # ignore true anomaly
-    # return elements[:-1]
+def _elementsFromTle(tle: TwoLineElement, time: JulianDate) -> (float, float, float, float, float, float):
+    """Computes the classic orbital elements directly from values of a two-line element set. These values are less
+    accurate instantaneously, however they are much more stable than the oscillating values computed from the SGP4
+    module."""
+
     dt = time - tle.epoch
     inc = tle.inc
     # tle.meanMotion is radians / minute
@@ -50,20 +43,6 @@ def _elements_from_tle(tle: TwoLineElement, time: JulianDate) -> (float, float, 
     ecc = ecc0 + eDot * dt
     temp = (a0 ** -3.5) / ((1 - (ecc0 * ecc0)) ** 2)
 
-    # dt = time - tle.getEpoch()
-    # inc = radians(tle.getInc())
-    # n0 = tle.getMeanMotion()
-    # dM = (dt * (n0 + dt * (tle.getMeanMotionDot() + dt * tle.getMeanMotionDDot()))) * 360
-    # meanAnomaly = radians(tle.getMeanAnomaly() + dM) % TWOPI
-    # ecc0 = tle.getEcc()
-    # n0dot = tle.getMeanMotionDot() * 2
-    # a0 = tle.getSma()
-    # aDot = -2 * a0 * n0dot / (3 * n0)
-    # sma = a0 + aDot * dt
-    # eDot = -2 * (1 - ecc0) * n0dot / (3 * n0)
-    # ecc = ecc0 + eDot * dt
-    # temp = (a0 ** -3.5) / ((1 - (ecc0 * ecc0)) ** 2)
-
     # perturbations
     # non-spherical earth
     lanJ2Dot = -2.06474e14 * temp * cos(inc)
@@ -75,37 +54,45 @@ def _elements_from_tle(tle: TwoLineElement, time: JulianDate) -> (float, float, 
     aopSun = 0.00077 * (4 - (5 * sin(inc) ** 2)) / n0
     raan = (tle.raan + radians(lanJ2Dot + lanMoon + lanSun) * dt) % TWOPI
     aop = (tle.aop + radians(aopJ2Dot + aopMoon + aopSun) * dt) % TWOPI
-    # raan = (tle.getRaan() + (lanJ2Dot + lanMoon + lanSun) * dt) % 360
-    # aop = (tle.getAop() + (aopJ2Dot + aopMoon + aopSun) * dt) % 360
 
-    # return radians(raan), inc, radians(aop), ecc, sma, meanAnomaly
     return raan, inc, aop, ecc, sma, meanAnomaly
 
-def _check_numeric_type(value, paramName):
+
+def _checkNumericType(value, paramName):
+    """Checks the value is a numeric type, with paramName being used in the error message."""
     if not isinstance(value, (int, float)):
-        raise TypeError(f'{paramName} parameter must be a real number')
+        raise TypeError(f'{paramName} parameter must be a numeric type', type(value))
+
+
+def _checkJdType(value, paramName):
+    """Checks the value is a JulianDate type, with paramName being used in the error message."""
+    if not isinstance(value, JulianDate):
+        raise TypeError(f'{paramName} parameter must be a JulianDate type', type(value))
 
 
 class Elements:
+    """An object containing the classical orbital elements of a satellite at a given time. All values of the constructor
+    are in radians, for degrees use the fromDegrees() class method. A true anomaly can be set if known or will be
+    computed otherwise. The epoch parameter is used to compute future or past anomalies."""
+
     __slots__ = '_raan', '_inc', '_aop', '_ecc', '_sma', '_meanAnomaly', '_trueAnomaly', '_epoch'
 
     def __init__(self, raan: float, inclination: float, argumentOfPeriapsis: float, eccentricity: float,
                  semiMajorAxis: float, meanAnomaly: float, epoch: JulianDate, trueAnomaly: float = None):
-        _check_numeric_type(raan, 'raan')
-        _check_numeric_type(inclination, 'inclination')
+        _checkNumericType(raan, 'raan')
+        _checkNumericType(inclination, 'inclination')
         if not 0 <= inclination <= pi:
-            raise ValueError('inclination parameter must be between 0 and 180')
-        _check_numeric_type(argumentOfPeriapsis, 'argumentOfPeriapsis')
-        _check_numeric_type(eccentricity, 'eccentricity')
-        _check_numeric_type(semiMajorAxis, 'semi-major axis')
-        _check_numeric_type(meanAnomaly, 'mean anomaly')
-        if not isinstance(epoch, JulianDate):
-            raise TypeError('epoch parameter must be JulianDate type')
+            raise ValueError('inclination parameter must be between 0 and pi', inclination)
+        _checkNumericType(argumentOfPeriapsis, 'argumentOfPeriapsis')
+        _checkNumericType(eccentricity, 'eccentricity')
+        _checkNumericType(semiMajorAxis, 'semi-major axis')
+        _checkNumericType(meanAnomaly, 'mean anomaly')
+        _checkJdType(epoch, 'epoch')
         if trueAnomaly is not None:
-            _check_numeric_type(trueAnomaly, 'true anomaly')
+            _checkNumericType(trueAnomaly, 'true anomaly')
             self._trueAnomaly = trueAnomaly % TWOPI
         else:
-            self._trueAnomaly = _mean_to_true_anomaly(meanAnomaly, eccentricity)
+            self._trueAnomaly = _meanToTrueAnomaly(meanAnomaly, eccentricity)
 
         self._raan = raan % TWOPI
         self._inc = inclination
@@ -118,137 +105,169 @@ class Elements:
     @classmethod
     def fromDegrees(cls, raan: float, inclination: float, argumentOfPeriapsis: float, eccentricity: float,
                     semiMajorAxis: float, meanAnomaly: float, epoch: JulianDate, trueAnomaly: float = None):
+        """Create an Elements object with parameter units of degrees."""
+
         return cls(radians(raan), radians(inclination), radians(argumentOfPeriapsis), eccentricity, semiMajorAxis,
                    radians(meanAnomaly), epoch, radians(trueAnomaly))
 
     @classmethod
     def fromTle(cls, tle: TwoLineElement, epoch: JulianDate):
-        # state = getState(tle, epoch)
-        # return cls.fromState(*state, epoch, EARTH_MU)
-        elements = _elements_from_tle(tle, epoch)
-        trueAnomaly = _mean_to_true_anomaly(elements[-1], elements[3])
+        """Create an Elements object from the components of a TLE. The epoch parameter is used to adjust the mean
+        elements from the TLE for more accurate values. These elements are less accurate instantaneously, but they are
+        much more stable than the oscillating elements computed from the SGP4 algorithm."""
+
+        if not isinstance(tle, TwoLineElement):
+            raise TypeError('tle parameter must be TwoLineElement type', type(tle))
+        _checkJdType(epoch, 'epoch')
+
+        elements = _elementsFromTle(tle, epoch)
+        trueAnomaly = _meanToTrueAnomaly(elements[-1], elements[3])
         return cls(*elements, epoch, trueAnomaly)
 
     @classmethod
     def fromState(cls, position: Vector, velocity: Vector, epoch: JulianDate, MU: float = EARTH_MU):
+        """Computes an Elements object from a set of state vectors. If using state vectors from the SGP4 module, these
+        will be the oscillating elements. These are much more accurate for a given instance, but also vary more between
+        two different times, which can make computations dependent on them more difficult."""
+
         elements = elementsFromState(position, velocity, MU)
         return cls(*elements[:-1], epoch, elements[-1])
 
     def __str__(self):
+        """Creates a string representation of the elements."""
         header = ' elements |  raan   |   inc   |   aop   |   ecc    |   sma    | mean anom ' \
                  '| true anom |        epoch         '
         values = '  values  | {:^{w}.{p}} | {:^{w}.{p}} | {:^{w}.{p}} | {:^{w}.{p}f} | {:^{sw}.{sp}} | {:^{mw}.{mp}} ' \
                  '| {:^{mw}.{mp}} | {}'.format(degrees(self._raan), degrees(self._inc), degrees(self._aop), self._ecc,
-                                               self._sma, degrees(self._meanAnomaly),degrees(self._trueAnomaly),
+                                               self._sma, degrees(self._meanAnomaly), degrees(self._trueAnomaly),
                                                self._epoch.date(), w=7, p=6, sw=8, sp=7, mw=9, mp=6)
         return f'{header}\n{values}'
 
+    def __repr__(self):
+        """Creates a string representation of the elements."""
+        return f'Elements({self._raan}, {self._inc}, {self._aop}, {self._ecc}, {self._sma}, {self._meanAnomaly},' \
+               f'{repr(self._epoch)}, {self._trueAnomaly})'
+
     def __reduce__(self):
+        """Allows for copying and pickling Elements types."""
         return self.__class__, (self._raan, self._inc, self._aop, self._ecc, self._sma, self._meanAnomaly, self._epoch)
 
     @property
     def raan(self):
+        """Returns right-ascension in radians."""
         return self._raan
 
     @raan.setter
     def raan(self, value):
-        _check_numeric_type(value, 'raan')
-        self._raan = radians(value) % TWOPI
+        """Sets right-ascension in radians."""
+        _checkNumericType(value, 'raan')
+        self._raan = value % TWOPI
 
     @property
     def inc(self):
+        """Returns inclination in radians."""
         return self._inc
 
     @inc.setter
     def inc(self, value):
-        _check_numeric_type(value, 'inclination')
-        if not 0 <= value <= 180:
-            raise ValueError('inclination parameter must be between 0 and 180')
-        self._inc = radians(value)
+        """Sets inclination in radians."""
+        _checkNumericType(value, 'inclination')
+        if not 0 <= value <= pi:
+            raise ValueError('inclination parameter must be between 0 and pi', value)
+        self._inc = value
 
     @property
     def aop(self):
+        """Returns argument of periapsis in radians."""
         return self._aop
 
     @aop.setter
     def aop(self, value):
-        _check_numeric_type(value, 'argumentOfPeriapsis')
-        self._aop = radians(value) % TWOPI
+        """Sets argument of periapsis in radians."""
+        _checkNumericType(value, 'argumentOfPeriapsis')
+        self._aop = value % TWOPI
 
     @property
     def ecc(self):
+        """Returns eccentricity of the orbit."""
         return self._ecc
 
     @ecc.setter
     def ecc(self, value):
-        _check_numeric_type(value, 'eccentricity')
+        """Sets the eccentricity of the orbit."""
+        _checkNumericType(value, 'eccentricity')
         self._ecc = value
 
     @property
     def sma(self):
+        """Returns the semi-major axis in kilometers."""
         return self._sma
 
     @sma.setter
     def sma(self, value):
-        _check_numeric_type(value, 'semi-major axis')
+        """Sets the semi-major axis in kilometers."""
+        _checkNumericType(value, 'semi-major axis')
         self._sma = value
 
     @property
     def meanAnomaly(self):
+        """Returns the mean anomaly in radians."""
         return self._meanAnomaly
 
     @meanAnomaly.setter
     def meanAnomaly(self, value):
-        _check_numeric_type(value, 'mean anomaly')
-        self._meanAnomaly = radians(value)
+        """Sets the mean anomaly in radians without changing the associated epoch."""
+        _checkNumericType(value, 'mean anomaly')
+        self._meanAnomaly = value
 
     @property
     def epoch(self):
+        """Returns the epoch as a JulianDate."""
         return self._epoch
 
     @epoch.setter
     def epoch(self, value: JulianDate):
-        if not isinstance(value, JulianDate):
-            raise TypeError('value parameter must be JulianDate type')
+        """Sets the epoch of the elements without altering the anomalies."""
+        _checkJdType(value, 'value')
         self._epoch = value
 
     @property
     def trueAnomaly(self):
+        """Returns the true anomaly in radians."""
         return self._trueAnomaly
 
     @trueAnomaly.setter
     def trueAnomaly(self, value):
-        _check_numeric_type(value, 'true anomaly')
-        self._trueAnomaly = radians(value)
+        """Sets the true anomaly in radians without changing the associated epoch."""
+        _checkNumericType(value, 'true anomaly')
+        self._trueAnomaly = value
 
     def setMeanAnomaly(self, anomaly: float, epoch: JulianDate):
+        """Sets the mean anomaly in radians and changes the associated epoch at the same time. The true anomaly is
+        also updated, which means if the eccentricity must be updated, it should be done before calling this method so
+        the correct true anomaly can be calculated."""
+
+        _checkNumericType(anomaly, 'anomaly')
+        _checkJdType(epoch, 'epoch')
         self.meanAnomaly = anomaly
         self._trueAnomaly = _trueToMeanAnomaly(self._meanAnomaly, self._ecc)
         self.epoch = epoch
 
     def setTrueAnomaly(self, anomaly: float, epoch: JulianDate):
+        """Sets the true anomaly in radians and changes the associated epoch at the same time. The mean anomaly is
+        also updated, which means if the eccentricity must be updated, it should be done before calling this method so
+        the correct mean anomaly can be calculated."""
+
+        _checkNumericType(anomaly, 'anomaly')
+        _checkJdType(epoch, 'epoch')
         self.trueAnomaly = anomaly
-        self._meanAnomaly = _mean_to_true_anomaly(self._trueAnomaly, self._ecc)
+        self._meanAnomaly = _meanToTrueAnomaly(self._trueAnomaly, self._ecc)
         self.epoch = epoch
 
 
-# def _check_elements(raan, inc, aop, ecc, sma, ma):
-#     _check_type(raan, 'raan')
-#     _check_type(inc, 'inclination')
-#     if not 0 <= inc <= 180:
-#         raise ValueError('inclination parameter must be between 0 and 180')
-#     _check_type(aop, 'argumentOfPeriapsis')
-#     _check_type(ecc, 'eccentricity')
-#     _check_type(sma, 'semi-major axis')
-#     _check_type(ma, 'mean anomaly')
-#     raanRad = radians(raan) % TWOPI
-#     incRad = radians(inc)
-#     aopRad = radians(aop) % TWOPI
-#     maRad = radians(ma) % TWOPI
-#     return raanRad, incRad, aopRad, maRad
+def _checkCallable(func, errorName):
+    """Makes sure an object is a callable with 1 parameter."""
 
-
-def _check_callable(func, errorName):
     if isinstance(func, Callable):
         params = signature(func).parameters
         if len(params) != 1:
@@ -257,7 +276,25 @@ def _check_callable(func, errorName):
             if len(ls) != 1:
                 raise TypeError(f'{errorName} must be a Callable with 1 non-default positional parameter')
     else:
-        raise TypeError(f'{errorName} must be a Callable type')
+        raise TypeError(f'{errorName} must be a Callable type', type(func))
+
+
+def _checkStrType(value, paramName):
+    """Checks the value is a string type, with paramName being used in the error message."""
+    if not isinstance(value, str):
+        raise TypeError(f'{paramName} parameter must be a str type', type(value))
+
+
+def _checkPositiveValue(value, paramName):
+    """Checks the value is positive, with paramName being used in the error message."""
+    if value < 0:
+        raise ValueError(f'{paramName} must be a positive number', value)
+
+
+def _checkNumericPositive(value, paramName):
+    """Checks the value is a numeric type and positive, with paramName being used in the error message."""
+    _checkNumericType(value, paramName)
+    _checkPositiveValue(value, paramName)
 
 
 class Body:
@@ -266,112 +303,103 @@ class Body:
 
     def __init__(self, name: str, MU: float, Re: float, revPeriod: float, offsetFunc: Callable, positionFunc: Callable,
                  *, Rp: float = 0, orbit: 'Orbit' = None, parent: 'Body' = None):
+        """Creates an object representing a celestial body like a plant or moon. Any unknown or non-applicable
+        parameters should be set to None."""
+
+        _checkStrType(name, 'name')
+        _checkNumericPositive(MU, 'MU')
+        _checkNumericPositive(Re, 'Re')
+        _checkNumericPositive(revPeriod, 'revPeriod')
+        _checkCallable(offsetFunc, 'offsetFunc')
+        _checkCallable(positionFunc, 'positionFunc')
+        if orbit is not None:
+            if not isinstance(orbit, Orbit):
+                raise TypeError('orbit parameter must be an Orbit type', type(orbit))
+            self._orbit = orbit
+        if parent is not None:
+            if not isinstance(parent, Body):
+                raise TypeError('parent parameter must be a Body type', type(parent))
+            self._parent = parent
+
         self._name = name
         self._MU = MU
         self._Re = Re
         if not Rp:
+            _checkNumericPositive(Rp, 'Rp')
             self._flattening = (Re - Rp) / Re
             self._Rp = Rp
         else:
             self._flattening = 0
             self._Rp = Re
         self._revPeriod = revPeriod
-        if orbit is not None:
-            if not isinstance(orbit, Orbit):
-                raise TypeError('orbit parameter must be an Orbit type')
-        elif parent is not None:
-            if not isinstance(parent, Body):
-                raise TypeError('parent parameter must be a Body type')
-            self._parent = parent
-        self._orbit = orbit
-        _check_callable(offsetFunc, 'offsetFunc')
         self._offsetFunc = offsetFunc
-        _check_callable(positionFunc, 'positionFunc')
         self._positionFunc = positionFunc
 
     @property
     def name(self):
+        """Returns the name of the celestial body."""
         return self._name
 
     @property
     def mu(self):
+        """Returns the gravitational parameter of the celestial body."""
         return self._MU
 
     @property
     def equitorialRadius(self):
+        """Returns the equitorial radius of the celestial body."""
         return self._Re
 
     @property
     def polarRadius(self):
+        """Returns the polar radius of the celestial body."""
         return self._Rp
 
     @property
     def flattening(self):
+        """Returns the flattening ratio of the celestial body (Re - Rp) / Re."""
         return self._flattening
 
     @property
     def period(self):
+        """Returns the sidereal revolution period of the celestial body."""
         return self._revPeriod
 
     @property
     def orbit(self):
+        """Returns the Orbit of the celestial object, or None if one wasn't set."""
         return self._orbit
 
     @property
     def parent(self):
+        """Returns the parent body if it was set, otherwise None."""
         return self._parent
 
     def getOffsetAngle(self, time: JulianDate) -> float:
+        """Returns the offset angle of the prime-meridian of the body from the celestial x-axis at a given time."""
         return self._offsetFunc(time)
 
     def getPosition(self, time: JulianDate) -> Vector:
+        """Returns the position of the center of the celestial body relative to the Earth's center."""
         return self._positionFunc(time)
 
 
+"""Global Body object representing the Sun."""
 SUN_BODY = Body('Sun', SUN_MU, SUN_RADIUS, 0, lambda time: 0, getSunPosition)
 
+"""Global Body object representing the Earth."""
 EARTH_BODY = Body('Earth', EARTH_MU, EARTH_EQUITORIAL_RADIUS, 86164.090531, siderealTime,
                   lambda time: Vector((0, 0, 0)), Rp=EARTH_POLAR_RADIUS, parent=SUN_BODY)
 
 
-class _AnomalyDirection(Enum):
-    NEXT = 0
-    PREVIOUS = 1
-    NEAREST = 2
-
-
-_NEXT = _AnomalyDirection.NEXT
-_PREVIOUS = _AnomalyDirection.PREVIOUS
-_NEAREST = _AnomalyDirection.NEAREST
-
-
-class _Anomaly(Enum):
-    MEAN = 0
-    TRUE = 1
-
-
-_MEAN = _Anomaly.MEAN
-_TRUE = _Anomaly.TRUE
-
-# AnomalyDirection = Union[int]
-# NEXT = AnomalyDirection(0)
-# PREVIOUS = AnomalyDirection(1)
-# NEAREST = AnomalyDirection(2)
-# Anomaly = Union[int]
-# MEAN = Anomaly(0)
-# TRUE = Anomaly(1)
-
-
 class Orbitable(ABC):
+    """Abstract object to represent an orbitable object around a parent body. This provides the similar attributes and
+    methods of the Orbit and Satellite classes. An Orbit object is an Orbitable created from an Elements object, and
+    a Satellite object is an Orbitable created with a TwoLineElement object."""
     __slots__ = '_name', '_body'
 
-    NEXT = _NEXT
-    PREVIOUS = _PREVIOUS
-    NEAREST = _NEAREST
-    MEAN = _MEAN
-    TRUE = _TRUE
-
     def __init__(self, name: str, body: Body = EARTH_BODY):
+        """Initialize the orbitable with the common requirements name and parent body, which defaults to EARTH_BODY."""
         if not isinstance(name, str):
             raise TypeError('name parameter must be a str type')
         if not isinstance(body, Body):
@@ -381,30 +409,40 @@ class Orbitable(ABC):
 
     @property
     def name(self):
+        """Returns the name of the orbitable object."""
         return self._name
 
     @name.setter
     def name(self, value):
-        if not isinstance(value, str):
-            raise TypeError('value parameter must be a str type')
+        """Sets the name of the orbitable object."""
+        _checkStrType(value, 'value')
         self._name = value
 
     @property
     def body(self):
+        """Returns the parent body of the orbitable object."""
         return self._body
 
     @body.setter
     def body(self, value):
+        """Sets the parent body of the orbitable object."""
         if not isinstance(value, Body):
-            raise TypeError('value parameter must be a Body type')
+            raise TypeError('value parameter must be a Body type', type(value))
 
     @abstractmethod
-    def anomalyAt(self, time: JulianDate, anomalyType: _Anomaly = True) -> float:
+    def anomalyAt(self, time: JulianDate, anomalyType: str = 'true') -> float:
         pass
 
     @abstractmethod
-    def timeToAnomaly(self, anomaly: float, time: JulianDate, direction: _AnomalyDirection, anomalyType: _Anomaly) \
-            -> JulianDate:
+    def timeToNextAnomaly(self, anomaly: float, time: JulianDate, anomalyType: str = 'true') -> JulianDate:
+        pass
+
+    @abstractmethod
+    def timeToPreviousAnomaly(self, anomaly: float, time: JulianDate, anomalyType: str = 'true') -> JulianDate:
+        pass
+
+    @abstractmethod
+    def timeToNearestAnomaly(self, anomaly: float, time: JulianDate, anomalyType: str = 'true') -> JulianDate:
         pass
 
     @abstractmethod
@@ -428,70 +466,86 @@ class Orbitable(ABC):
         pass
 
 
-def _radius_at_periapsis(semiMajorAxis: float, eccentricity: float) -> float:
+def _radiusAtPeriapsis(semiMajorAxis: float, eccentricity: float) -> float:
+    """Computes periapsis from semi-major axis in kilometers and eccentricity."""
     return semiMajorAxis * (1 - eccentricity)
 
 
-def _radius_at_apoapsis(semiMajorAxis: float, eccentricity: float) -> float:
+def _radiusAtApoapsis(semiMajorAxis: float, eccentricity: float) -> float:
+    """Computes apoapsis from semi-major axis in kilometers and eccentricity."""
     return semiMajorAxis * (1 + eccentricity)
 
 
-def _mean_to_eccentric_anomaly(meanAnomaly: float, eccentricity: float) -> float:
+def _meanToEccentricAnomaly(meanAnomaly: float, eccentricity: float) -> float:
+    """Converts a mean anomaly in radians to an eccentric anomaly in radians."""
     Ej = meanAnomaly
     while True:
         numerator = Ej - (eccentricity * sin(Ej)) - meanAnomaly
         denominator = 1 - eccentricity * cos(Ej)
         Ej1 = Ej - (numerator / denominator)
         if abs(Ej1 - Ej) <= 1e-7:
-            return Ej1
+            break
         else:
             Ej = Ej1
+    return Ej1
 
 
-def _eccentric_to_true_anomaly(eccentricAnomaly: float, eccentricity: float) -> float:
+def _eccentricToTrueAnomaly(eccentricAnomaly: float, eccentricity: float) -> float:
+    """Converts an eccentric anomaly in radians to a true anomaly in radians."""
     beta = eccentricity / (1 + sqrt(1 - eccentricity * eccentricity))
     return eccentricAnomaly + 2 * atan2(beta * sin(eccentricAnomaly), 1 - beta * cos(eccentricAnomaly))
 
 
-def _mean_to_true_anomaly_newton(meanAnomaly: float, eccentricity: float) -> float:
-    eccAnom = _mean_to_eccentric_anomaly(meanAnomaly, eccentricity)
-    return _eccentric_to_true_anomaly(eccAnom, eccentricity)
+def _meanToTrueAnomalyNewton(meanAnomaly: float, eccentricity: float) -> float:
+    """Converts a mean anomaly in radians to a true anomaly in radians via Newton's method to solve Kepler's
+    equation."""
+    eccAnom = _meanToEccentricAnomaly(meanAnomaly, eccentricity)
+    return _eccentricToTrueAnomaly(eccAnom, eccentricity)
 
 
-def _mean_to_true_anomaly_fast(meanAnomaly: float, eccentricity: float) -> float:
-    return meanAnomaly + 2 * eccentricity * sin(meanAnomaly) \
-           + 1.25 * eccentricity * eccentricity * sin(2 * meanAnomaly)
+def _meanToTrueAnomalyFast(meanAnomaly: float, eccentricity: float) -> float:
+    """Converts a mean anomaly in radians to a true anomaly in radians via an approximation. The function is valid for
+    small eccentricity as error is on the order of (ecc^3)."""
+    return meanAnomaly + 2 * eccentricity * sin(meanAnomaly) + \
+        1.25 * eccentricity * eccentricity * sin(2 * meanAnomaly)
 
 
 # todo: come up with an analytical rational for this number
 _MAXIMUM_ECCENTRICITY = 0.17
 
 
-def _mean_to_true_anomaly(meanAnomaly: float, eccentricity: float) -> float:
+def _meanToTrueAnomaly(meanAnomaly: float, eccentricity: float) -> float:
+    """Computes a mean anomaly in radians to a true anomaly in radians."""
     if eccentricity < _MAXIMUM_ECCENTRICITY:
-        return _mean_to_true_anomaly_fast(meanAnomaly, eccentricity)
-    return _mean_to_true_anomaly_newton(meanAnomaly, eccentricity)
+        return _meanToTrueAnomalyFast(meanAnomaly, eccentricity)
+    return _meanToTrueAnomalyNewton(meanAnomaly, eccentricity)
 
 
-def _radius_at_anomaly(sma: float, eccentricity: float, trueAnomaly: float) -> float:
+def _radiusAtAnomaly(sma: float, eccentricity: float, trueAnomaly: float) -> float:
+    """Computes the radius of a satellite at a given position in its orbit. Semi-major axis is in kilometers and
+    trueAnomaly in radians."""
     numerator = sma * (1 - eccentricity * eccentricity)
     denominator = 1 + eccentricity * cos(trueAnomaly)
     return numerator / denominator
 
 
-def _flight_angle_at_anomaly(eccentricity: float, trueAnomaly: float) -> float:
+def _flightAngleAtAnomaly(eccentricity: float, trueAnomaly: float) -> float:
+    """Computes the flight angle between velocity and position vectors at a given true anomaly in radians."""
     numerator = eccentricity * sin(trueAnomaly)
     denominator = 1 + eccentricity * cos(trueAnomaly)
     return atan2(numerator, denominator)
 
 
-def _velocity_at_anomaly(sma: float, radius: float, mu: float) -> float:
+def _velocityAtAnomaly(sma: float, radius: float, mu: float) -> float:
+    """Compute the magnitude of the velocity at a certain position, where the position is specified by its radius
+    in kilometers. Semi-major axis is also in kilometers."""
     temp = (2 / radius) - (1 / sma)
     return sqrt(mu * temp)
 
 
-def _next_mean_anomaly(meanMotion: float, m0: float, epoch0: JulianDate, m1: float, time: JulianDate) -> JulianDate:
-    # meanMotion - rev / day; m0, m1 - radians
+def _nextMeanAnomaly(meanMotion: float, m0: float, epoch0: JulianDate, m1: float, time: JulianDate) -> JulianDate:
+    """Finds the time a satellite next achieves a mean anomaly based on the time of a previous anomaly and mean motion.
+    Anomalies are in radians and mean motion is in revolutions / day."""
     periapsisPass = epoch0.future(-m0 / (TWOPI * meanMotion))
     revolutions = (time - periapsisPass) * meanMotion
     m0 = (revolutions - floor(revolutions)) * TWOPI
@@ -501,8 +555,9 @@ def _next_mean_anomaly(meanMotion: float, m0: float, epoch0: JulianDate, m1: flo
     return time.future((dm / meanMotion) / TWOPI)
 
 
-def _previous_mean_anomaly(meanMotion: float, m0: float, epoch0: JulianDate, m1: float, time: JulianDate) -> JulianDate:
-    # meanMotion - rev / day; m0, m1 - radians
+def _previousMeanAnomaly(meanMotion: float, m0: float, epoch0: JulianDate, m1: float, time: JulianDate) -> JulianDate:
+    """Finds the time a satellite previously achieved a mean anomaly based on the time of a previous anomaly and mean
+    motion. Anomalies are in radians and mean motion is in revolutions / day."""
     periapsisPass = epoch0.future(-m0 / (TWOPI * meanMotion))
     revolutions = (time - periapsisPass) * meanMotion
     m0 = (revolutions - floor(revolutions)) * TWOPI
@@ -512,343 +567,370 @@ def _previous_mean_anomaly(meanMotion: float, m0: float, epoch0: JulianDate, m1:
     return time.future((dm / meanMotion) / TWOPI)
 
 
-def _next_true_anomaly(meanMotion: float, eccentricity: float, t0: float, epoch0: JulianDate,
-                       t1: float, time: JulianDate) -> JulianDate:
-    # meanMotion - rev / day; m0, m1 - radians
+def _nextTrueAnomaly(meanMotion: float, eccentricity: float, t0: float, epoch0: JulianDate,
+                     t1: float, time: JulianDate) -> JulianDate:
+    """Finds the time a satellite next achieves a true anomaly based on the time of a previous anomaly and mean motion.
+    Anomalies are in radians and mean motion is in revolutions / day."""
     m0 = _trueToMeanAnomaly(t0, eccentricity)
     m1 = _trueToMeanAnomaly(t1, eccentricity)
-    return _next_mean_anomaly(meanMotion, m0, epoch0, m1, time)
+    return _nextMeanAnomaly(meanMotion, m0, epoch0, m1, time)
 
 
-def _previous_true_anomaly(meanMotion: float, eccentricity: float, t0: float, epoch0: JulianDate,
-                           t1: float, time: JulianDate) -> JulianDate:
-    # meanMotion - rev / day; m0, m1 - radians
+def _previousTrueAnomaly(meanMotion: float, eccentricity: float, t0: float, epoch0: JulianDate,
+                         t1: float, time: JulianDate) -> JulianDate:
+    """Finds the time a satellite previously achieved a true anomaly based on the time of a previous anomaly and mean
+    motion. Anomalies are in radians and mean motion is in revolutions / day."""
     m0 = _trueToMeanAnomaly(t0, eccentricity)
     m1 = _trueToMeanAnomaly(t1, eccentricity)
-    return _previous_mean_anomaly(meanMotion, m0, epoch0, m1, time)
+    return _previousMeanAnomaly(meanMotion, m0, epoch0, m1, time)
 
 
-def _mean_anomaly_at(meanMotion: float, m0: float, epoch0: JulianDate, time: JulianDate) -> float:
-    # meanMotion - rev / day; m0 radians
+def _meanAnomalyAt(meanMotion: float, m0: float, epoch0: JulianDate, time: JulianDate) -> float:
+    """Computes the mean anomaly at a given time. Mean anomaly is in radians and mean motion is in revolutions / day."""
     dM = meanMotion * (time - epoch0) * 86400.0
     return (m0 + dM) % TWOPI
 
 
-def _true_anomaly_at(meanMotion: float, eccentricity: float, t0: float, epoch0: JulianDate, time: JulianDate) -> float:
-    # meanMotion - rev / day; t0 - radians
+def _trueAnomalyAt(meanMotion: float, eccentricity: float, t0: float, epoch0: JulianDate, time: JulianDate) -> float:
+    """Computes the true anomaly at a given time. True anomaly is in radians and mean motion is in revolutions / day."""
     m0 = _trueToMeanAnomaly(t0, eccentricity)
-    m1 = _mean_anomaly_at(meanMotion, m0, epoch0, time)
-    return _mean_to_true_anomaly(m1, eccentricity)
+    m1 = _meanAnomalyAt(meanMotion, m0, epoch0, time)
+    return _meanToTrueAnomaly(m1, eccentricity)
+
+
+def _timeToCheck(anomaly, time, anomalyType):
+    _checkStrType(anomalyType, 'anomalyType')
+    _checkJdType(time, 'time')
+    _checkNumericType(anomaly, 'anomaly')
 
 
 class Orbit(Orbitable):
+    """A class derived from the Orbitable abstract class that describes an orbitable object defined by a set of
+    orbital elements around a parent body."""
+
     __slots__ = '_elements', '_periapsis', '_apoapsis'
 
     def __init__(self, elements: Elements, name: str = '', body: Body = EARTH_BODY):
+        """Initializes an orbit from a set of orbital elements. Future and past positions can't be computed if the
+        epoch attribute was not set when instantiating and elements parameter."""
+
         if not isinstance(elements, Elements):
-            raise TypeError('elements parameter must be an Elements type')
-        if not isinstance(name, str):
-            raise TypeError('name parameter must be a str type')
+            raise TypeError('elements parameter must be an Elements type', type(elements))
+        _checkStrType(name, 'name')
         if not isinstance(body, Body):
-            raise TypeError('body parameter must be a Body type')
+            raise TypeError('body parameter must be a Body type', type(body))
         super().__init__(name, body)
         self._elements = elements
-        self._periapsis = _radius_at_periapsis(self._elements.sma, self._elements.ecc)
-        self._apoapsis = _radius_at_apoapsis(self._elements.sma, self._elements.ecc)
+        self._periapsis = _radiusAtPeriapsis(self._elements.sma, self._elements.ecc)
+        self._apoapsis = _radiusAtApoapsis(self._elements.sma, self._elements.ecc)
 
-    def anomalyAt(self, time: JulianDate, anomalyType: _Anomaly = _TRUE) -> float:
-        if not isinstance(time, JulianDate):
-            raise TypeError('time parameter must be a JulianDate type')
-        if not isinstance(anomalyType, _Anomaly):
-            raise TypeError('anomalyType parameter must be an Anomaly type')
+    def anomalyAt(self, time: JulianDate, anomalyType: str = 'true') -> float:
+        """Finds the anomaly in radians at a given time. Anomaly type must be 'true' or 'mean'."""
+        _checkJdType(time, 'time')
+        _checkStrType(anomalyType, 'anomalyType')
 
         meanMotion = _smaToMeanMotion(self._elements.sma, self._body.mu)
-        if anomalyType is _MEAN:
-            anomaly = _mean_anomaly_at(meanMotion, self._elements.meanAnomaly, self._elements.epoch, time)
-        elif anomalyType is _TRUE:
-            t0 = _mean_to_true_anomaly(self._elements.meanAnomaly, self._elements.ecc)
-            anomaly = _true_anomaly_at(meanMotion, self._elements.ecc, t0, self._elements.epoch, time)
+        if anomalyType.lower() == 'mean':
+            anomaly = _meanAnomalyAt(meanMotion, self._elements.meanAnomaly, self._elements.epoch, time)
+        elif anomalyType.lower() == 'true':
+            t0 = _meanToTrueAnomaly(self._elements.meanAnomaly, self._elements.ecc)
+            anomaly = _trueAnomalyAt(meanMotion, self._elements.ecc, t0, self._elements.epoch, time)
         else:
-            raise ValueError('anomalyType parameter must be MEAN or TRUE')
+            raise ValueError("anomalyType must be 'mean' or 'true'", anomalyType)
+
         return anomaly
 
-    def timeToAnomaly(self, anomaly: float, time: JulianDate, direction: _AnomalyDirection, anomalyType: _Anomaly) \
-            -> JulianDate:
-        # anomaly - radians, time can be None if direction is NEAREST
-        if not isinstance(anomalyType, _Anomaly):
-            raise TypeError('anomalyType parameter must be an Anomaly type')
-        if not isinstance(direction, _AnomalyDirection):
-            raise TypeError('direction parameter must be an AnomalyDirection type')
-        if direction in (_NEXT, _PREVIOUS):
-            if not isinstance(time, JulianDate):
-                raise TypeError('time parameter must be a JulianDate type')
-        elif direction is not _NEAREST:
-            raise ValueError('direction parameter must be NEXT, PREVIOUS, or NEAREST')
+    def timeToNextAnomaly(self, anomaly: float, time: JulianDate, anomalyType: str = 'true') -> JulianDate:
+        """Find the next time the orbitable achieves anomaly in radians. Anomaly types are 'true' and 'mean'."""
+        _timeToCheck(anomaly, time, anomalyType)
 
         meanMotion = _smaToMeanMotion(self._elements.sma, self._body.mu) * 86400 / TWOPI
-        if anomalyType is _TRUE:
-            t0 = _mean_to_true_anomaly(self._elements.meanAnomaly, self._elements.ecc)
-            if direction is _NEXT:
-                return _next_true_anomaly(meanMotion, self._elements.ecc, t0, self._elements.epoch, anomaly, time)
-            elif direction is _PREVIOUS:
-                return _previous_true_anomaly(meanMotion, self._elements.ecc, t0, self._elements.epoch, anomaly, time)
-            else:
-                return _nearestTrueAnomaly(meanMotion, self._elements.ecc, t0, self._elements.epoch, anomaly)
-        elif anomalyType is _MEAN:
-            if direction is _NEXT:
-                return _next_mean_anomaly(meanMotion, self._elements.meanAnomaly, self._elements.epoch, anomaly, time)
-            elif direction is _PREVIOUS:
-                return _previous_mean_anomaly(meanMotion, self._elements.meanAnomaly, self._elements.epoch, anomaly,
-                                              time)
-            else:
-                return _nearestMeanAnomaly(meanMotion, self._elements.meanAnomaly, self._elements.epoch, anomaly)
+        _anomalyType = anomalyType.lower()
+        if _anomalyType == 'true':
+            rtn = _nextTrueAnomaly(meanMotion, self._elements.ecc, self._elements.trueAnomaly, self._elements.epoch,
+                                   anomaly, time)
+        elif _anomalyType == 'false':
+            rtn = _nextMeanAnomaly(meanMotion, self._elements.meanAnomaly, self._elements.epoch, anomaly, time)
         else:
-            raise ValueError('anomalyType must be TRUE or MEAN')
+            raise ValueError("anomalyType must be 'mean' or 'true'", anomalyType)
+
+        return rtn
+
+    def timeToPreviousAnomaly(self, anomaly: float, time: JulianDate, anomalyType: str = 'true') -> JulianDate:
+        """Find the previous time the orbitable achieves anomaly in radians. Anomaly types are 'true' and 'mean'."""
+        _timeToCheck(anomaly, time, anomalyType)
+
+        meanMotion = _smaToMeanMotion(self._elements.sma, self._body.mu) * 86400 / TWOPI
+        _anomalyType = anomalyType.lower()
+        if _anomalyType == 'true':
+            rtn = _previousTrueAnomaly(meanMotion, self._elements.ecc, self._elements.trueAnomaly,
+                                       self._elements.epoch, anomaly, time)
+        elif _anomalyType == 'mean':
+            rtn = _previousMeanAnomaly(meanMotion, self._elements.meanAnomaly, self._elements.epoch, anomaly, time)
+        else:
+            raise ValueError("anomalyType must be 'mean' or 'true'", anomalyType)
+
+        return rtn
+
+    def timeToNearestAnomaly(self, anomaly: float, time: JulianDate, anomalyType: str = 'true') -> JulianDate:
+        """Find the nearest time the orbitable achieves anomaly in radians. Anomaly types are 'true' and 'mean'. The
+        time parameter here is not used, and can be None."""
+        if not isinstance(anomalyType, str):
+            raise TypeError('anomalyType parameter must be a str type', type(anomalyType))
+        _checkNumericType(anomaly, 'anomaly')
+
+        meanMotion = _smaToMeanMotion(self._elements.sma, self._body.mu) * 86400 / TWOPI
+        _anomalyType = anomalyType.lower()
+        if _anomalyType == 'true':
+            rtn = _nearestTrueAnomaly(meanMotion, self._elements.ecc, self._elements.trueAnomaly, self._elements.epoch,
+                                      anomaly)
+        elif _anomalyType == 'mean':
+            rtn = _nearestMeanAnomaly(meanMotion, self._elements.meanAnomaly, self._elements.epoch, anomaly)
+        else:
+            raise ValueError("anomalyType must be 'mean' or 'true'", anomalyType)
+
+        return rtn
 
     def getState(self, time: JulianDate) -> (Vector, Vector):
-        trueAnomaly = self._get_true_anomaly_at(time)
-        radius = _radius_at_anomaly(self._elements.sma, self._elements.ecc, trueAnomaly)
-        flightAngle = _flight_angle_at_anomaly(self._elements.ecc, trueAnomaly)
-        velocity = _velocity_at_anomaly(self._elements.sma, radius, self._body.mu)
+        """Returns the state vectors of the orbitable at a given time in kilometers and kilometers / second."""
+        _checkJdType(time, 'time')
 
-        rotationMatrix = getMatrixEuler(ZXZ, Angles(self._elements.raan, self._elements.inc,
-                                                    self._elements.aop + trueAnomaly))
-        # rotationMatrix = getEulerMatrix(ZXZ, EulerAngles(self._elements.raan, self._elements.inc,
-        #                                                  self._elements.aop + trueAnomaly))
+        # trueAnomaly = self._getTrueAnomalyAt(time)
+        radius = _radiusAtAnomaly(self._elements.sma, self._elements.ecc, self._elements.trueAnomaly)
+        flightAngle = _flightAngleAtAnomaly(self._elements.ecc, self._elements.trueAnomaly)
+        velocity = _velocityAtAnomaly(self._elements.sma, radius, self._body.mu)
+
+        angs = Angles(self._elements.raan, self._elements.inc, self._elements.aop + self._elements.trueAnomaly)
+        rotationMatrix = getMatrixEuler(ZXZ, angs)
         position = rotateMatrixFrom(rotationMatrix, Vector.e1) * radius
-        # rotationMatrix @= getMatrix(Axis.Z_AXIS, -flightAngle)
+        # since velocity is the flight angle away from 90 degrees from the position vector, rotating the first reference
+        # frame by the flight angle and taking the y-axis gives the velocity direction
         rotationMatrix = rotationMatrix @ getMatrixAxis(Z_AXIS, -flightAngle)
-        # rotationMatrix = rotationMatrix * getMatrix(Axis.Z_AXIS, -flightAngle)
         velocity = rotateMatrixFrom(rotationMatrix, Vector.e2) * velocity
 
         return position, velocity
 
     def getElements(self, time: JulianDate) -> Elements:
+        """Returns the orbital elements of the orbitable adjusted by the given time."""
+        _checkJdType(time, 'time')
+
         elements = deepcopy(self._elements)
         meanMotion = _smaToMeanMotion(self._elements.sma, self._body.mu)
-        elements.meanAnomaly = _mean_anomaly_at(meanMotion, self._elements.meanAnomaly, self._elements.epoch, time)
+        elements.meanAnomaly = _meanAnomalyAt(meanMotion, self._elements.meanAnomaly, self._elements.epoch, time)
         elements.epoch = time
         return elements
 
-    def setElements(self, elements: Elements):
-        if not isinstance(elements, Elements):
-            raise TypeError('elements parameter must be Elements type')
-        self._elements = elements
-
     def getReferenceFrame(self, time: JulianDate = None) -> ReferenceFrame:
-        # todo: put getting reference frame into helper method?
+        """Computes the perifocal reference frame of the orbitable at a given time. The y-axis is the eccentric vector,
+        which points towards periapsis, the z-axis points toward the angular momentum vector and the x-axis completes
+        the right-handed coordinate system."""
+
         return ReferenceFrame(ZXZ, Angles(self._elements.raan, self._elements.inc, self._elements.aop))
-        # return ReferenceFrame(ZXZ, EulerAngles(self._elements.raan, self._elements.inc, self._elements.aop))
 
     def getPeriapsis(self, time: JulianDate = None) -> float:
+        """Returns the periapsis, the lowest altitude, of the orbit."""
         return self._periapsis
 
     def getApoapsis(self, time: JulianDate = None) -> float:
+        """Returns the apoapsis, the highest altitude, of the orbit."""
         return self._apoapsis
 
     # todo: test this
     def impulse(self, time: JulianDate, prograde: float, normal: float, radial: float):
-        # prograde, normal and radial-out are positive
+        """Adjusts the orbit of an orbitable based on an impulse taking place at a given instance. Prograde is positive
+        in the direction of motion, normal is positive in the direction of the angular momentum vector and radial is
+        positive away from the parent body. All delta-v values are in kilometers / second."""
+
         position, velocity = self.getState(time)
         # x - radial out, y - prograde, z - normal
-        trueAnomaly = self._get_true_anomaly_at(time)
-        flightAngle = _flight_angle_at_anomaly(self._elements.ecc, trueAnomaly)
-        referenceFrame = ReferenceFrame(ZXZ, Angles(self._elements.raan, self._elements.inc,
-                                                    self._elements.aop + trueAnomaly - flightAngle))
-        # referenceFrame = ReferenceFrame(ZXZ, EulerAngles(self._elements.raan, self._elements.inc,
-        #                                                  self._elements.aop + trueAnomaly - flightAngle))
+        flightAngle = _flightAngleAtAnomaly(self._elements.ecc, self._elements.trueAnomaly)
+        angs = Angles(self._elements.raan, self._elements.inc, self._elements.aop +
+                      self._elements.trueAnomaly - flightAngle)
+        referenceFrame = ReferenceFrame(ZXZ, angs)
         progradeVector = referenceFrame.rotateFrom(Vector.e2)
         radialVector = referenceFrame.rotateFrom(Vector.e1)
         normalVector = referenceFrame.rotateFrom(Vector.e3)
 
         newVelocity = velocity + progradeVector * prograde + radialVector * radial + normalVector * normal
         self._elements = Elements.fromState(position, newVelocity, self._elements.epoch)
-        self._periapsis = _radius_at_periapsis(self._elements.sma, self._elements.ecc)
-        self._apoapsis = _radius_at_apoapsis(self._elements.sma, self._elements.ecc)
-
-    def _get_true_anomaly_at(self, time: JulianDate):
-        if not isinstance(time, JulianDate):
-            raise TypeError('time parameter must be a JulianDate type')
-        meanMotion = _smaToMeanMotion(self._elements.sma, self._body.mu)
-        trueAnomaly_0 = _mean_to_true_anomaly(self._elements.meanAnomaly, self._elements.ecc)
-        return _true_anomaly_at(meanMotion, self._elements.ecc, trueAnomaly_0, self._elements.epoch, time)
+        self._periapsis = _radiusAtPeriapsis(self._elements.sma, self._elements.ecc)
+        self._apoapsis = _radiusAtApoapsis(self._elements.sma, self._elements.ecc)
 
 
 class Satellite(Orbitable):
+    """Derived from the Orbitable class, a Satellite object is an orbitable described by a TwoLineElement object around
+    a parent body."""
     __slots__ = '_tle', '_propagator'
 
     def __init__(self, tle: TwoLineElement):
+        """Initializes the satellite object with a TLE."""
         if not isinstance(tle, TwoLineElement):
             raise TypeError('tle parameter must be a TwoLineElement type')
         super().__init__(tle.name, EARTH_BODY)
         self._tle = tle
-        # self._propagator = SGP4_Propagator(tle)
 
     @property
     def tle(self):
         return self._tle
 
-    def anomalyAt(self, time: JulianDate, anomalyType: _Anomaly = True) -> float:
-        if not isinstance(time, JulianDate):
-            raise TypeError('time parameter must be JulianDate type')
-        if not isinstance(anomalyType, _Anomaly):
-            raise TypeError('anomalyType parameter must be Anomaly type')
+    def anomalyAt(self, time: JulianDate, anomalyType: str = 'true') -> float:
+        """Finds the anomaly in radians at a given time. Anomaly type must be 'true' or 'mean'."""
+        _checkJdType(time, 'time')
+        _checkStrType(anomalyType, 'anomalyType')
 
-        # elements = _elements_from_tle(self._tle, time)
-        # elements = elementsFromTle(self._tle, time)
-        # if anomalyType is _TRUE:
-        #     return elements[-1]
-        # elif anomalyType is _MEAN:
-        #     return elements[-2]
-        # elements = Elements.fromTle(self._tle, time)
-        _, _, _, eccentricity, _, meanAnomaly = _elements_from_tle(self._tle, time)
-        if anomalyType is _TRUE:
-            # return _mean_to_true_anomaly(elements.meanAnomaly, elements.ecc)
-            return _mean_to_true_anomaly(meanAnomaly, eccentricity)
-        elif anomalyType is _MEAN:
-            # return elements.meanAnomaly
-            return meanAnomaly
+        _, _, _, eccentricity, _, meanAnomaly = _elementsFromTle(self._tle, time)
+        if anomalyType == 'true':
+            anomaly = _meanToTrueAnomaly(meanAnomaly, eccentricity)
+        elif anomalyType == 'mean':
+            anomaly = meanAnomaly
         else:
-            raise ValueError('anomalyType must be TRUE or MEAN')
+            raise ValueError("anomalyType must be 'mean' or 'true'", anomalyType)
 
-    def timeToAnomaly(self, anomaly: float, time: JulianDate, direction: _AnomalyDirection, anomalyType: _Anomaly) \
-            -> JulianDate:
-        if not isinstance(time, JulianDate):
-            raise TypeError('time parameter must be JulianDate type')
-        if not isinstance(anomalyType, _Anomaly):
-            raise TypeError('anomalyType parameter must be an Anomaly type')
-        if not isinstance(direction, _AnomalyDirection):
-            raise TypeError('direction parameter must be an AnomalyDirection type')
-        if direction not in (_NEXT, _PREVIOUS, _NEAREST):
-            raise ValueError('direction parameter must be NEXT, PREVIOUS or NEAREST')
+        return anomaly
 
-        # todo: determine if this is ideal using SGP4 states
-        # elements = Elements.fromTle(self._tle, time)
-        _, _, _, eccentricity, sma, meanAnomaly = _elements_from_tle(self._tle, time)
-        # _, _, _, eccentricity, sma, meanAnomaly, trueAnomaly = elementsFromTle(self._tle, time)
-        # meanMotion = _sma_to_mean_motion(elements.sma, self._body.mu) * 86400 / TWOPI
+    def timeToNextAnomaly(self, anomaly: float, time: JulianDate, anomalyType: str = 'true') -> JulianDate:
+        """Find the next time the satellite achieves anomaly in radians. Anomaly types are 'true' or 'mean'."""
+        _timeToCheck(anomaly, time, anomalyType)
+
+        _, _, _, eccentricity, sma, meanAnomaly = _elementsFromTle(self._tle, time)
         meanMotion = _smaToMeanMotion(sma, self._body.mu) * 86400 / TWOPI
-        if anomalyType is _TRUE:
-            # t0 = _mean_to_true_anomaly(elements.meanAnomaly, elements.ecc)
-            trueAnomaly = _mean_to_true_anomaly(meanAnomaly, eccentricity)
-            if direction is _NEXT:
-                # return _next_true_anomaly(meanMotion, elements.ecc, t0, time, anomaly, time)
-                return _next_true_anomaly(meanMotion, eccentricity, trueAnomaly, time, anomaly, time)
-            elif direction is _PREVIOUS:
-                # return _previous_true_anomaly(meanMotion, elements.ecc, t0, time, anomaly, time)
-                return _previous_true_anomaly(meanMotion, eccentricity, trueAnomaly, time, anomaly, time)
-            else:
-                # return _nearest_true_anomaly(meanMotion, elements.ecc, t0, time, anomaly)
-                return _nearestTrueAnomaly(meanMotion, eccentricity, trueAnomaly, time, anomaly)
-        elif anomalyType is _MEAN:
-            if direction is _NEXT:
-                # return _next_mean_anomaly(meanMotion, elements.meanAnomaly, time, anomaly, time)
-                return _next_mean_anomaly(meanMotion, meanAnomaly, time, anomaly, time)
-            elif direction is _PREVIOUS:
-                # return _previous_mean_anomaly(meanMotion, elements.meanAnomaly, time, anomaly, time)
-                return _previous_mean_anomaly(meanMotion, meanAnomaly, time, anomaly, time)
-            else:
-                # return _nearest_mean_anomaly(meanMotion, elements.meanAnomaly, time, anomaly)
-                return _nearestMeanAnomaly(meanMotion, meanAnomaly, time, anomaly)
+        _anomalyType = anomalyType.lower()
+        if _anomalyType == 'true':
+            trueAnomaly = _meanToTrueAnomaly(meanAnomaly, eccentricity)
+            rtn = _nextTrueAnomaly(meanMotion, eccentricity, trueAnomaly, time, anomaly, time)
+        elif _anomalyType == 'mean':
+            rtn = _nextMeanAnomaly(meanMotion, meanAnomaly, time, anomaly, time)
         else:
-            raise ValueError('anomalyType must be TRUE or MEAN')
+            raise ValueError("anomalyType must be 'mean' or 'true'", anomalyType)
+
+        return rtn
+
+    def timeToPreviousAnomaly(self, anomaly: float, time: JulianDate, anomalyType: str = 'true') -> JulianDate:
+        """Find the previous time the orbitable achieves anomaly in radians. Anomaly types are 'true' or 'mean'."""
+        _timeToCheck(anomaly, time, anomalyType)
+
+        _, _, _, eccentricity, sma, meanAnomaly = _elementsFromTle(self._tle, time)
+        meanMotion = _smaToMeanMotion(sma, self._body.mu) * 86400 / TWOPI
+        _anomalyType = anomalyType.lower()
+        if _anomalyType == 'true':
+            trueAnomaly = _meanToTrueAnomaly(meanAnomaly, eccentricity)
+            rtn = _previousTrueAnomaly(meanMotion, eccentricity, trueAnomaly, time, anomaly, time)
+        elif _anomalyType == 'mean':
+            rtn = _previousMeanAnomaly(meanMotion, meanAnomaly, time, anomaly, time)
+        else:
+            raise ValueError("anomalyType must be 'mean' or 'true'", anomalyType)
+
+        return rtn
+
+    def timeToNearestAnomaly(self, anomaly: float, time: JulianDate, anomalyType: str = 'true') -> JulianDate:
+        """Find the nearest time the orbitable achieves anomaly in radians. Anomaly types are 'true' or 'mean'."""
+        _timeToCheck(anomaly, time, anomalyType)
+
+        _, _, _, eccentricity, sma, meanAnomaly = _elementsFromTle(self._tle, time)
+        meanMotion = _smaToMeanMotion(sma, self._body.mu) * 86400 / TWOPI
+        _anomalyType = anomalyType.lower()
+        if _anomalyType == 'true':
+            trueAnomaly = _meanToTrueAnomaly(meanAnomaly, eccentricity)
+            rtn = _nearestTrueAnomaly(meanMotion, eccentricity, trueAnomaly, time, anomaly)
+        elif _anomalyType == 'mean':
+            rtn = _nearestMeanAnomaly(meanMotion, meanAnomaly, time, anomaly)
+        else:
+            raise ValueError("anomalyType must be 'mean' or 'true'", anomalyType)
+
+        return rtn
 
     def getState(self, time: JulianDate) -> (Vector, Vector):
-        if not isinstance(time, JulianDate):
-            raise TypeError('time parameter must be JulianDate type')
+        """Computes the position and velocity state vectors in kilometers and kilometers / second from the SGP4
+        model."""
+        _checkJdType(time, 'time')
 
-        # return _getState(self._tle, time)
         return getState(self._tle, time)
-        # rawState = self._propagator.getState(self._tle, time)
-        # return (EVector((rawState[0][0], rawState[0][1], rawState[0][2])),
-        #         EVector((rawState[1][0], rawState[1][1], rawState[1][2])))
 
     def getElements(self, time: JulianDate) -> Elements:
+        """Returns a set of stable orbital elements at a specified time. For oscillating elements see
+        Elements.fromState()."""
         return Elements.fromTle(self._tle, time)
 
     def getReferenceFrame(self, time: JulianDate = None) -> ReferenceFrame:
-        # elements = Elements.fromTle(self._tle, time)
+        """Generates a pyevspace.ReferenceFrame object representing the perifocal reference frame of the satellite's
+        orbit."""
         #  todo: compute the vectors from eccentric and angular momentum vectors ?
-        raan, inc, aop, *_ = _elements_from_tle(self._tle, time)
-        # raan, inc, aop, *_ = elementsFromTle(self._tle, time)
+        raan, inc, aop, *_ = _elementsFromTle(self._tle, time)
         return ReferenceFrame(ZXZ, Angles(raan, inc, aop))
-        # return ReferenceFrame(ZXZ, EulerAngles(raan, inc, aop))
 
     def getPeriapsis(self, time: JulianDate = None) -> float:
-        if not isinstance(time, JulianDate):
-            raise TypeError('time parameter must be JulianDate type')
-        # elements = Elements.fromTle(self._tle, time)
-        # _, _, _, eccentricity, sma, _ = _elements_from_tle(self._tle, time)
-        # return _radius_at_periapsis(sma, eccentricity)
+        """Computes the perigee (the smallest altitude) of the satellites orbit relative to the Earth's equitorial
+        radius."""
+        _checkJdType(time, 'time')
         return self._tle.perigee
 
     def getApoapsis(self, time: JulianDate = None) -> float:
-        if not isinstance(time, JulianDate):
-            raise TypeError('time parameter must be JulianDate type')
-        # elements = Elements.fromTle(self._tle, time)
-        # _, _, _, eccentricity, sma, _ = _elements_from_tle(self._tle, time)
-        # return _radius_at_apoapsis(sma, eccentricity)
+        """Computes the apogee (the highest altitude) of the satellites orbit relative to the Earth's equitorial
+        radius."""
+        _checkJdType(time, 'time')
         return self._tle.apogee
 
 
-def _mean_motion_to_sma(meanMotion: float, mu: float) -> float:
-    # meanMotion - rad / s
+def _meanMotionToSma(meanMotion: float, mu: float) -> float:
+    """Converts a mean motion in radians / second to semi-major axis in kilometers."""
     oneThird = 1 / 3
     return (mu ** oneThird) / (meanMotion ** (oneThird * 2))
 
 
-def _check_real_number(number: float, name: str):
-    if not isinstance(number, (int, float)):
-        raise TypeError(f'{name} parameter must be a real number')
-
-
 def meanMotionToSma(meanMotion: float, mu: float) -> float:
-    _check_real_number(meanMotion, 'meanMotion')
-    _check_real_number(mu, 'mu')
-    return _mean_motion_to_sma(meanMotion, mu)
+    """Converts a mean motion in radians / second to a semi-major axis in kilometers."""
+    _checkNumericType(meanMotion, 'meanMotion')
+    _checkNumericType(mu, 'mu')
+    return _meanMotionToSma(meanMotion, mu)
 
 
 def smaToMeanMotion(semiMajorAxis: float, mu: float) -> float:
-    _check_real_number(semiMajorAxis, 'semiMajorAxis')
-    _check_real_number(mu, 'mu')
+    """Converts a semi-major axis in kilometers to a mean motion in radians / second."""
+    _checkNumericType(semiMajorAxis, 'semiMajorAxis')
+    _checkNumericType(mu, 'mu')
     return _smaToMeanMotion(semiMajorAxis, mu)
 
 
 def meanToTrueAnomaly(meanAnomaly: float, eccentricity: float) -> float:
-    _check_real_number(meanAnomaly, 'meanAnomaly')
-    _check_real_number(eccentricity, 'eccentricity')
-    return _mean_to_true_anomaly(meanAnomaly, eccentricity)
+    """Converts a mean anomaly in radians to a true anomaly in radians."""
+    _checkNumericType(meanAnomaly, 'meanAnomaly')
+    _checkNumericType(eccentricity, 'eccentricity')
+    return _meanToTrueAnomaly(meanAnomaly, eccentricity)
 
 
 def meanToEccentricAnomaly(meanAnomaly: float, eccentricity: float) -> float:
-    _check_real_number(meanAnomaly, 'meanAnomaly')
-    _check_real_number(eccentricity, 'eccentricity')
-    return _mean_to_eccentric_anomaly(meanAnomaly, eccentricity)
+    """Converts a mean anomaly in radians to an eccentric anomaly in radians."""
+    _checkNumericType(meanAnomaly, 'meanAnomaly')
+    _checkNumericType(eccentricity, 'eccentricity')
+    return _meanToEccentricAnomaly(meanAnomaly, eccentricity)
 
 
 def eccentricToTrueAnomaly(eccentricAnomaly: float, eccentricity: float) -> float:
-    _check_real_number(eccentricAnomaly, 'eccentricAnomaly')
-    _check_real_number(eccentricity, 'eccentricity')
-    return _eccentric_to_true_anomaly(eccentricAnomaly, eccentricity)
+    """Converts an eccentric anomaly in radians to a true anomaly in radians."""
+    _checkNumericType(eccentricAnomaly, 'eccentricAnomaly')
+    _checkNumericType(eccentricity, 'eccentricity')
+    return _eccentricToTrueAnomaly(eccentricAnomaly, eccentricity)
 
 
 def trueToMeanAnomaly(trueAnomaly: float, eccentricity: float) -> float:
-    _check_real_number(trueAnomaly, 'trueAnomaly')
-    _check_real_number(eccentricity, 'eccentricity')
+    """Converts a true anomaly in radians to a mean anomaly in radians."""
+    _checkNumericType(trueAnomaly, 'trueAnomaly')
+    _checkNumericType(eccentricity, 'eccentricity')
     return _trueToMeanAnomaly(trueAnomaly, eccentricity)
 
 
 def trueToEccentricAnomaly(trueAnomaly: float, eccentricity: float) -> float:
-    _check_real_number(trueAnomaly, 'trueAnomaly')
-    _check_real_number(eccentricity, 'eccentricity')
+    """Converts a true anomaly in radians to an eccentric anomaly in radians."""
+    _checkNumericType(trueAnomaly, 'trueAnomaly')
+    _checkNumericType(eccentricity, 'eccentricity')
     return _trueToEccentricAnomaly(trueAnomaly, eccentricity)
 
 
 def eccentricToMeanAnomaly(eccentricAnomaly: float, eccentricity: float) -> float:
-    _check_real_number(eccentricAnomaly, 'eccentricAnomaly')
-    _check_real_number(eccentricity, 'eccentricity')
+    """Converts an eccentric anomaly in radians to a mean anomaly in radians."""
+    _checkNumericType(eccentricAnomaly, 'eccentricAnomaly')
+    _checkNumericType(eccentricity, 'eccentricity')
     return _eccentricToMeanAnomaly(eccentricAnomaly, eccentricity)
-
 
 # meanAnomalyAt
 # trueAnomalyAt

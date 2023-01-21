@@ -7,565 +7,10 @@ from pyevspace import Vector
 from sattrack.util.constants import TWOPI, AU
 from sattrack.util.conversions import atan3
 
-# DELTAT = 72.6
-
-
-# class Variable:
-#     # self computing variable
-#     __slots__ = '_args', '_value', '_callback', '_parent'
-#
-#     def __init__(self, callback, args, parent):
-#         self._value = None
-#         self._callback = callback
-#         self._args = args
-#         self._parent = parent
-#
-#     @property
-#     def value(self):
-#         if self._value is None:
-#             arguments = (self._parent[arg] for arg in self._args)
-#             self._value = self._callback(*arguments)
-#         return self._value
-#
-#
-# class Constant:
-#     # class with the same interface as sampa.Variable but has constant value and doesn't need a callback
-#     __slots__ = '_value'
-#
-#     def __init__(self, value):
-#         self._value = value
-#
-#     @property
-#     def value(self):
-#         return self._value
-
-
-# class Register:
-#     __slots__ = '_internalState'
-#
-#     def __init__(self, jd):
-#         # self._geo = geo
-#         JD, JDE, JC, JCE, JME = _generate_times(jd)
-#         # list all variables involved in the sampa
-#         self._internalState = {
-#             'JD': JD, 'JDE': JDE, 'JC': JC, 'JCE': JCE, 'JME': JME,
-#             # 'geoLatitude': Constant(radians(geo.latitude)), 'geoLongitude': Constant(radians(geo.longitude)),
-#             # 'elevation': Constant(geo.elevation),
-#             # MPA: 3.2
-#             'moonMeanLongitude': Variable(_mpa_moon_mean_longitude, ('JCE',), self),
-#             'moonMeanElongation': Variable(_mpa_moon_mean_elongation, ('JCE',), self),
-#             'sunMeanAnomaly': Variable(_mpa_sun_mean_anomaly, ('JCE',), self),
-#             'moonMeanAnomaly': Variable(_mpa_moon_mean_anomaly, ('JCE',), self),
-#             'moonArgumentLatitude': Variable(_mpa_moon_argument_latitude, ('JCE',), self),
-#             'ETerm': Variable(_mpa_E_term, ('JCE',), self),
-#             'lrProductTable': Variable(_mpa_lr_table, ('moonMeanElongation', 'sunMeanAnomaly', 'moonMeanAnomaly',
-#                                                        'moonArgumentLatitude', 'ETerm'), self),
-#             'lTerm': Variable(_mpa_l_term, ('lrProductTable',), self),
-#             'rTerm': Variable(_mpa_r_term, ('lrProductTable',), self),
-#             'bTerm': Variable(_mpa_b_term, ('moonMeanElongation', 'sunMeanAnomaly', 'moonMeanAnomaly',
-#                                             'moonArgumentLatitude', 'ETerm'), self),
-#             'a1Term': Variable(_mpa_a1_term, ('JCE',), self),
-#             'a2Term': Variable(_mpa_a2_term, ('JCE',), self),
-#             'a3Term': Variable(_mpa_a3_term, ('JCE',), self),
-#             'deltal': Variable(_mpa_delta_l, ('a1Term', 'a2Term', 'moonMeanLongitude', 'moonArgumentLatitude'), self),
-#             'deltab': Variable(_mpa_delta_b, ('a1Term', 'a3Term', 'moonMeanLongitude', 'moonMeanAnomaly',
-#                                               'moonArgumentLatitude'), self),
-#             'moonLongitude': Variable(_mpa_moon_longitude, ('moonMeanLongitude', 'lTerm', 'deltal'), self),
-#             'moonLatitude': Variable(_mpa_moon_latitude, ('bTerm', 'deltab'), self),
-#             'moonDistance': Variable(_mpa_moon_distance, ('rTerm',), self),
-#             'moonParallax': Variable(_mpa_moon_parallax, ('moonDistance',), self),
-#             'xValues': Variable(_x_values, ('JCE',), self),
-#             'xyProductTable': Variable(_xy_table, ('xValues',), self),
-#             'nutationLongitude': Variable(_nutation_longitude, ('JCE', 'xyProductTable'), self),
-#             'nutationObliquity': Variable(_nutation_obliquity, ('JCE', 'xyProductTable'), self),
-#             'meanObliquity': Variable(_mean_obliquity, ('JME',), self),
-#             'trueObliquity': Variable(_true_obliquity, ('meanObliquity', 'nutationObliquity'), self),
-#             'apparentMoonLongitude': Variable(_mpa_apparent_moon_longitude, ('moonLongitude', 'nutationLongitude'),
-#                                               self),
-#             'meanSiderealTime': Variable(_mean_sidereal_time, ('JD', 'JC'), self),
-#             'apparentSiderealTime': Variable(_apparent_sidereal_time, ('meanSiderealTime', 'nutationLongitude',
-#                                                                        'nutationObliquity'), self),
-#             'moonRightAscension': Variable(_right_ascension, ('moonLongitude', 'moonLatitude',
-#                                                               'trueObliquity'), self),
-#             'moonDeclination': Variable(_declination, ('moonLongitude', 'moonLatitude', 'trueObliquity'),
-#                                         self),
-#             'earthHeliocentricLongitude': Variable(_spa_earth_heliocentric_longitude, ('JME',), self),
-#             'earthHeliocentricLatitude': Variable(_spa_earth_heliocentric_latitude, ('JME',), self),
-#             'sunDistance': Variable(_spa_earth_heliocentric_radius, ('JME',), self),
-#             'sunLongitude': Variable(_spa_geocentric_longitude, ('earthHeliocentricLongitude',), self),
-#             'sunLatitude': Variable(_spa_geocentric_latitude, ('earthHeliocentricLatitude',), self),
-#             'sunAberrationCorrection': Variable(_spa_aberration_correction, ('sunDistance',), self),
-#             'apparentSunLongitude': Variable(_spa_apparent_sun_longitude, ('sunLongitude', 'nutationLongitude',
-#                                                                            'sunAberrationCorrection'), self),
-#             'sunRightAscension': Variable(_right_ascension, ('sunLongitude', 'sunLatitude', 'trueObliquity'), self),
-#             'sunDeclination': Variable(_declination, ('sunLongitude', 'sunLatitude', 'trueObliquity'), self),
-#             'equationOfTime': Variable(_equation_of_time,
-#                                        ('JME', 'sunRightAscension', 'nutationLongitude', 'nutationObliquity'), self),
-#         }
-#
-#     def __getitem__(self, item):
-#         return self._internalState[item].value
-
-
-# class RegisterTopocentric(Register):
-#
-#     def __init__(self, jd, geo):
-#         super().__init__(jd)
-#         self._internalState['geoLatitude'] = Constant(radians(geo.latitude))
-#         self._internalState['geoLongitude'] = Constant(radians(geo.longitude))
-#         self._internalState['elevation'] = Constant(geo.elevation)
-#         # todo: implement these correctly when able to
-#         self._internalState['pressure'] = Constant(0)
-#         self._internalState['temperature'] = Constant(10)
-#         self._internalState['slopeSurface'] = Constant(0)
-#         self._internalState['surfaceAzimuth'] = Constant(0)
-#         self._internalState['moonLocalHourAngle'] = Variable(_local_hour_angle, ('apparentSiderealTime', 'geoLongitude',
-#                                                                                  'moonRightAscension'), self)
-#         self._internalState['uTerm'] = Variable(_u_term, ('geoLatitude',), self)
-#         self._internalState['xTerm'] = Variable(_x_term, ('uTerm', 'geoLatitude', 'elevation'), self)
-#         self._internalState['yTerm'] = Variable(_y_term, ('uTerm', 'geoLatitude', 'elevation'), self)
-#         self._internalState['moonParallaxRightAscension'] = Variable(_parallax_right_ascension,
-#                                                                      ('xTerm', 'moonParallax', 'moonLocalHourAngle',
-#                                                                       'moonDeclination'), self)
-#         self._internalState['moonTopocentricRightAscension'] = Variable(_topocentric_right_ascension,
-#                                                                         ('moonRightAscension',
-#                                                                          'moonParallaxRightAscension'), self)
-#         self._internalState['moonTopocentricDeclination'] = Variable(_topocentric_declination,
-#                                                                      ('yTerm', 'moonDeclination', 'moonParallax',
-#                                                                       'moonParallaxRightAscension',
-#                                                                       'moonLocalHourAngle'), self)
-#         self._internalState['sunLocalHourAngle'] = Variable(_local_hour_angle, ('apparentSiderealTime', 'geoLongitude',
-#                                                                                 'sunRightAscension'), self)
-#         self._internalState['sunParallax'] = Variable(_spa_equitorial_parallax_sun, ('sunDistance',), self)
-#         self._internalState['sunParallaxRightAscension'] = Variable(_parallax_right_ascension,
-#                                                                     ('xTerm', 'sunParallax', 'sunLocalHourAngle',
-#                                                                      'sunDeclination'), self)
-#         self._internalState['sunTopocentricRightAscension'] = Variable(_topocentric_right_ascension,
-#                                                                        ('sunRightAscension',
-#                                                                         'sunParallaxRightAscension'), self)
-#         self._internalState['sunTopocentricDeclination'] = Variable(_topocentric_declination,
-#                                                                     ('yTerm', 'sunDeclination', 'sunParallax',
-#                                                                      'sunParallaxRightAscension', 'sunLocalHourAngle'),
-#                                                                     self)
-#         self._internalState['moonTopocentricHourAngle'] = Variable(_topocentric_local_hour_angle,
-#                                                                    ('moonLocalHourAngle', 'moonParallaxRightAscension'),
-#                                                                    self)
-#         self._internalState['sunTopocentricHourAngle'] = Variable(_topocentric_local_hour_angle,
-#                                                                   ('sunLocalHourAngle', 'sunParallaxRightAscension'),
-#                                                                   self)
-#         self._internalState['moonElevationAngleWithout'] = Variable(_topocentric_elevation_angle_without,
-#                                                                     ('geoLatitude', 'moonTopocentricDeclination',
-#                                                                      'moonTopocentricLocalHour'), self)
-#         self._internalState['sunElevationAngleWithout'] = Variable(_topocentric_elevation_angle_without,
-#                                                                    ('geoLatitude', 'sunTopocentricDeclination',
-#                                                                     'sunTopocentricHourAngle'), self)
-#         self._internalState['moonAtmosphericRefraction'] = Variable(_atmospheric_refraction_correction,
-#                                                                     ('pressure', 'temperature',
-#                                                                      'moonElevationAngleWithout'), self)
-#         self._internalState['sunAtmosphericRefraction'] = Variable(_atmospheric_refraction_correction,
-#                                                                    ('pressure', 'temperature',
-#                                                                     'sunElevationAngleWithout'), self)
-#         self._internalState['moonElevationAngle'] = Variable(_topocentric_elevation_angle,
-#                                                              ('moonElevationAngleWithout', 'moonAtmosphericRefraction'),
-#                                                              self)
-#         self._internalState['sunElevationAngle'] = Variable(_topocentric_elevation_angle,
-#                                                             ('sunElevationAngleWithout', 'sunAtmosphericRefraction'),
-#                                                             self)
-#         self._internalState['moonZenithAngle'] = Variable(_topocentric_zenith_angle, ('moonElevationAngle',), self)
-#         self._internalState['sunZenithAngle'] = Variable(_topocentric_zenith_angle, ('sunElevationAngle',), self)
-#         self._internalState['moonAstronomersAzimuth'] = Variable(_topocentric_astronomers_azimuth_angle,
-#                                                                  ('moonTopocentricHourAngle', 'geoLatitude',
-#                                                                   'moonTopocentricDeclination'), self)
-#         self._internalState['sunAstronomersAzimuth'] = Variable(_topocentric_astronomers_azimuth_angle,
-#                                                                 ('sunTopocentricHourAngle', 'geoLatitude',
-#                                                                  'sunTopocentricDeclination'), self)
-#         self._internalState['moonAzimuthAngle'] = Variable(_topocentric_azimuth_angle, ('moonAstronomersAzimuth',),
-#                                                            self)
-#         self._internalState['sunAzimuthAngle'] = Variable(_topocentric_azimuth_angle, ('sunAstronomersAzimuth',),
-#                                                           self)
-#         self._internalState['sunIncidenceAngle'] = Variable(_spa_incidence_angle,
-#                                                             ('sunZenithAngle', 'sunAstronomersAzimuth', 'slopeSurface',
-#                                                              'surfaceAzimuth'), self)
-
-
-'''
-     ------------------------------------------------------------------------------------
-    |       description of the variable names and their relation to the SPA and MPA      |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |     Register Variable Name    | Symbol | Algorithm |    Section     |    Units     |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |      moonMeanLongitude        |   L'   |    MPA    |     3.2.1      |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |      moonMeanElongation       |   D    |    MPA    |     3.2.2      |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |        sunMeanAnomaly         |   M    |    MPA    |     3.2.3      |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |       moonMeanAnomaly         |   M'   |    MPA    |     3.2.4      |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |    moonArgumentLatitude       |   F    |    MPA    |     3.2.5      |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |           ETerm               |   E    |    MPA    |    3.2.[6-8]   |   unit-less  |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |       lrProductTable          |  ----  |    MPA    |    3.2.[6-7]   |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |            lTerm              |   l    |    MPA    |     3.2.6      |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |            rTerm              |   r    |    MPA    |     3.2.7      |  kilometers  |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |            bTerm              |   b    |    MPA    |     3.2.8      |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |            a1Term             |   a1   |    MPA    |     3.2.8*     |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |            a2Term             |   a2   |    MPA    |     3.2.9      |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |            a3Term             |   a3   |    MPA    |     3.2.10     |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |            deltal             |   Δl   |    MPA    |     3.2.11     |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |            deltab             |   Δb   |    MPA    |     3.2.12     |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |        moonLongitude          |   λ'   |    MPA    |     3.2.13     |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |         moonLatitude          |   β    |    MPA    |     3.2.14     |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |         moonDistance          |   Δ    |    MPA    |     3.2.15     |  kilometers  |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |         moonParallax          |   π    |    MPA    |      3.3       |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |           xValues             |   Xi   |  MPA, SPA |    3.4[1-5]    |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |        xyProductTable         | Xi*Yij |  MPA, SPA |     3.4.6      | 1e-6 radians |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |       nutationLongitude       |   Δψ   |  MPA, SPA |     3.4.7      |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |       nutationObliquity       |   Δε   |  MPA, SPA |     3.4.8      |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |         meanObliquity         |   ε0   |  MPA, SPA |     3.5.1      |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |         trueObliquity         |   ε    |  MPA, SPA |     3.5.2      |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |     apparentMoonLongitude     |   λ    |    MPA    |      3.6       |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |       meanSiderealTime        |   ν0   |    MPA    |     3.7.1      |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |     apparentSiderealTime      |   ν    |    MPA    |     3.7.2      |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |      moonRightAscension       |   α    |    MPA    |      3.8       |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |       moonDeclination         |   δ    |    MPA    |      3.9       |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |      moonLocalHourAngle       |   H    |    MPA    |      3.10      |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |            uTerm              |   u    |  MPA, SPA | 3.11.1, 3.12.2 |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |            xTerm              |   x    |  MPA, SPA | 3.11.2, 3.12.3 |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |            yTerm              |   y    |  MPA, SPA | 3.11.3, 3.12.4 |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |   moonParallaxRightAscension  |   Δα   |    MPA    |     3.11.4     |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    | moonTopocentricRightAscension |   α'   |    MPA    |     3.11.5     |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |  moonTopocentricDeclination   |   δ'   |    MPA    |     3.11.6     |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |  earthHeliocentricLongitude   |   L    |    SPA    |    3.2.[4-6]   |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |   earthHeliocentricLatitude   |   B    |    SPA    |     3.2.7      |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |         sunDistance           |   R    |    SPA    |     3.2.8      |      AU      |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |         sunLongitude          |   Θ    |    SPA    |     3.3.1      |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |         sunLatitude           |   β    |    SPA    |     3.3.3      |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |    sunAberrationCorrection    |   Δτ   |    SPA    |      3.6       |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |      apparentSunLongitude     |   λ    |    SPA    |      3.7       |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |       sunRightAscension       |   α    |    SPA    |      3.9       |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |        sunDeclination         |   δ    |    SPA    |      3.10      |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |       sunLocalHourAngle       |   H    |    SPA    |      3.11      |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |          sunParallax          |   ξ    |    SPA    |     3.12.1     |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |   sunParallaxRightAscension   |   Δα   |    SPA    |     3.12.5     |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |  sunTopocentricRightAscension |   α'   |    SPA    |     3.12.6     |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |   sunTopocentricDeclination   |   δ'   |    SPA    |     3.12.7     |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |    moonTopocentricHourAngle   |   H'   |    MPA    |      3.12      |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |   moonElevationAngleWithout   |   e0   |    MPA    |     3.13.1     |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |   moonAtmosphericRefraction   |   Δe   |    MPA    |     3.13.2     |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |      moonElevationAngle       |   e    |    MPA    |     3.13.3     |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |        moonZenithAngle        |   θm   |    MPA    |     3.13.4     |   radians    
-     ------------------------------- -------- ----------- ---------------- --------------
-    |    moonAstronomersAzimuth     |   Γ    |    MPA    |     3.14.1     |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |       moonAzimuthAngle        |   Φm   |    MPA    |     3.14.2     |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |    sunTopocentricHourAngle    |   H'   |    SPA    |      3.13      |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |    sunElevationAngleWithout   |   e0   |    SPA    |     3.14.1     |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |    sunAtmosphericRefraction   |   Δe   |    SPA    |     3.14.2     |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |       sunElevationAngle       |   e    |    SPA    |     3.14.3     |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |         sunZenithAngle        |   θ    |    SPA    |     3.14.4     |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |     sunAstronomersAzimuth     |   Γ    |    SPA    |     3.15.1     |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |         sunAzimuthAngle       |   Φ    |    SPA    |     3.15.2     |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |        sunIncidenceAngle      |   I    |    SPA    |      3.16      |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-    |         equationOfTime        |   E    |    SPA    |       A.1      |   radians    |
-     ------------------------------- -------- ----------- ---------------- --------------
-'''
-
-
-'''class SampaComputer:
-    __slots__ = '_registry'
-
-    def __init__(self, jd: JulianDate = None):
-        if jd is not None and not isinstance(jd, JulianDate):
-            raise TypeError('jd parameter must be a JulianDate type')
-
-        if jd is None:
-            self._registry = {}
-        else:
-            self._registry = {jd: Register(jd)}
-
-    def __call__(self, jd: JulianDate, variableStr: str):
-        if not isinstance(jd, JulianDate):
-            raise TypeError('jd parameter must be a JulianDate type')
-
-        if jd not in self._registry:
-            self._registry[jd] = Register(jd)
-
-        return self._registry[jd][variableStr]
-
-    def __len__(self):
-        return len(self._registry)
-
-    def clear(self, jd=None):
-        if jd is not None and _check_jd(jd):
-            if jd in self._registry:
-                self._registry.pop(jd)
-        else:
-            self._registry = {}
-
-    def getSunPosition(self, jd: JulianDate):
-        _check_jd(jd)
-        rightAscension = self.__call__(jd, 'sunRightAscension')
-        declination = self.__call__(jd, 'sunDeclination')
-        sunDistance = self.__call__(jd, 'sunDistance')
-
-        return _celestial_coordinates_to_position_vector(rightAscension, declination, sunDistance)
-
-    def getSunCoordinates(self, jd: JulianDate):
-        _check_jd(jd)
-        rightAscension = self.__call__(jd, 'sunRightAscension') * 12 / pi
-        declination = degrees(self.__call__(jd, 'sunDeclination'))
-        return CelestialCoordinates(rightAscension, declination)
-
-    def getSunTopocentricCoordinates(self, jd: JulianDate):
-        _check_jd(jd)
-        toposRightAscension = self.__call__(jd, 'sunTopocentricRightAscension') * 12 / pi
-        toposDeclination = degrees(self.__call__(jd, 'sunTopocentricDeclination'))
-        return CelestialCoordinates(toposRightAscension, toposDeclination)
-
-    def getSunPositionTimes(self, jd: JulianDate, target=None):
-        pass
-
-    def getPrecisePositionTimes(self, jd: JulianDate, target=None, epsilon=1e-5):
-        pass
-
-    def getMoonPosition(self, jd: JulianDate):
-        _check_jd(jd)
-        rightAscension = self.__call__(jd, 'moonRightAscension')
-        declination = self.__call__(jd, 'moonDeclination')
-        moonDistance = self.__call__(jd, 'moonDistance')
-
-        return _celestial_coordinates_to_position_vector(rightAscension, declination, moonDistance)
-
-    # broad getters here (position, rise/set time)
-
-    def nutationLongitude(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'nutationLongitude')
-
-    def nutationObliquity(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'nutationObliquity')
-
-    def meanObliquity(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'meanObliquity')
-
-    def trueObliquity(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'trueObliquity')
-
-    def meanSiderealTime(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'meanSiderealTime')
-
-    def apparentSiderealTime(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'apparentSiderealTime')
-
-    def moonLongitude(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'moonLongitude')
-
-    def moonLatitude(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'moonLatitude')
-
-    def moonDistance(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'moonDistance')
-
-    def moonParallax(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'moonParallax')
-
-    def moonApparentLongitude(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'apparentMoonLongitude')
-
-    def moonRightAscension(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'moonRightAscension')
-
-    def moonDeclination(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'moonDeclination')
-
-    def sunDistance(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'sunDistance')
-
-    def sunLongitude(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'sunLongitude')
-
-    def sunLatitude(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'sunLatitude')
-
-    def sunAberrationCorrection(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'sunAberrationCorrection')
-
-    def sunRightAscension(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'sunRightAscension')
-
-    def sunDeclination(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'sunDeclination')
-
-    def sunParallax(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'sunParallax')
-
-    def equationOfTime(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'equationOfTime')
-
-
-class SampaTopocentricComputer(SampaComputer):
-    __slots__ = '_geo'
-
-    def __init__(self, geo: GeoPosition, jd: JulianDate = None):
-        if not isinstance(geo, GeoPosition):
-            raise TypeError('geo parameter must be GeoPosition type')
-        self._geo = geo
-        super().__init__(jd)
-        if jd is not None:
-            self._registry = {jd: RegisterTopocentric(jd, geo)}
-
-    def __call__(self, jd: JulianDate, variableStr: str):
-        if not isinstance(jd, JulianDate):
-            raise TypeError('jd parameter must be a JulianDate type')
-
-        if jd not in self._registry:
-            self._registry[jd] = Register(jd)
-
-        return self._registry[jd][variableStr]
-
-    def moonLocalHourAngle(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'moonLocalHourAngle')
-
-    def moonTopocentricRightAscension(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'moonTopocentricRightAscension')
-
-    def moonTopocentricDeclination(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'moonTopocentricDeclination')
-
-    def moonTopocentricHourAngle(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'moonTopocentricHourAngle')
-
-    def moonElevationAngle(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'moonElevationAngle')
-
-    def moonZenithAngle(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'moonZenithAngle')
-
-    def moonAzimuthAngle(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'moonAzimuthAngle')
-
-    def sunLocalHourAngle(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'sunLocalHourAngle')
-
-    def sunTopocentricRightAscension(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'sunTopocentricRightAscension')
-
-    def sunTopocentricDeclination(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'sunTopocentricDeclination')
-
-    def sunTopocentricHourAngle(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'sunTopocentricHourAngle')
-
-    def sunElevationAngle(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'sunElevationAngle')
-
-    def sunZenithAngle(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'sunZenithAngle')
-
-    def sunAzimuthAngle(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'sunAzimuthAngle')
-
-    def sunIncidenceAngle(self, jd: JulianDate):
-        _check_jd(jd)
-        return self.__call__(jd, 'sunIncidenceAngle')'''
-
 
 @total_ordering
 class TwilightType(Enum):
+    """Enumerated type for describing specified times of the day defined by the sun's elevation angle."""
     Day = 0
     Civil = 1
     Nautical = 2
@@ -582,11 +27,9 @@ class TwilightType(Enum):
             return self.value == other.value
         return NotImplemented
 
-
 # def getTwilightType(jd: JulianDate, geo: GeoPosition):
 #     # todo: get sun position in the most efficient way
 #     computer = SampaComputer(jd)
-
 
 
 # def _generate_times(jd: JulianDate):
@@ -602,47 +45,47 @@ class TwilightType(Enum):
 #         raise TypeError('jd parameter must be JulianDate type')
 #     return True
 
-
-def _mpa_moon_mean_longitude(JCE):
-    # radians
-    longitude = 3.8103408236 \
-                + JCE * (8399.709111634 + JCE * (-2.75517675712e-5 + JCE * (3.2390431537e-8 + JCE * -2.6771317176e-10)))
+def _mpaMoonMeanLongitude(JCE):
+    """Computes the moon's mean longitude in radians via the MPA."""
+    longitude = 3.8103408236 + \
+        JCE * (8399.709111634 + JCE * (-2.75517675712e-5 + JCE * (3.2390431537e-8 + JCE * -2.6771317176e-10)))
     return longitude % TWOPI
 
 
-def _mpa_moon_mean_elongation(JCE):
-    # radians
-    elongation = 5.19846652984 \
-                 + JCE * (7771.37714483 + JCE * (
+def _mpaMoonMeanElongation(JCE):
+    """Computes the moon's mean elongation in radians via the MPA."""
+    elongation = 5.19846652984 + \
+        JCE * (7771.37714483 + JCE * (
                   -3.284535119328e-5 + JCE * (3.197346706519e-8 + JCE * 1.5436512200896e-10)))
     return elongation % TWOPI
 
 
-def _mpa_sun_mean_anomaly(JCE):
-    # radians
+def _mpaSunMeanAnomaly(JCE):
+    """Computes the sun's mean anomaly in radians via the MPA."""
     anomaly = 6.24006012726 + JCE * (628.301955167 + JCE * (-2.68082573106e-6 + JCE * 7.126701723129e-10))
     return anomaly % TWOPI
 
 
-def _mpa_moon_mean_anomaly(JCE):
-    # 3.2.4 (M'), radians
-    anomaly = 2.355555636854 \
-              + JCE * (8328.691424759 + JCE * (0.000152566211 + JCE * (2.50409511183e-7 + JCE * -1.1863303779189e-9)))
+def _mpaMoonMeanAnomaly(JCE):
+    """Computes the moon's mean anomaly via 3.2.4 (M') in the MPA in radians."""
+    anomaly = 2.355555636854 + \
+        JCE * (8328.691424759 + JCE * (0.000152566211 + JCE * (2.50409511183e-7 + JCE * -1.1863303779189e-9)))
     return anomaly % TWOPI
 
 
-def _mpa_moon_argument_latitude(JCE):
-    # 3.2.5 (F), radians
-    return 1.62790515798 \
-           + JCE * (8433.46615806 + JCE * (-6.37725855386e-5 + JCE * (-4.949884435605e-9 + JCE * 2.021671533973e-11)))
+def _mpaMoonArgumentLatitude(JCE):
+    """Computes the moon's argument of latitude via 3.2.5 (F) in the MPA in radians."""
+    return 1.62790515798 +\
+        JCE * (8433.46615806 + JCE * (-6.37725855386e-5 + JCE * (-4.949884435605e-9 + JCE * 2.021671533973e-11)))
 
 
-def _mpa_E_term(JCE):
-    # 3.2.6 (E)
+def _mpaETerm(JCE):
+    """Computes the E term via 3.2.6 (E) in the MPA."""
     return 1 + JCE * (-0.002516 + JCE * -0.0000074)
 
 
-def _mpa_lr_table(moonMeanElongation, sunMeanAnomaly, moonMeanAnomaly, moonLatitude, E):
+def _mpaLRTable(moonMeanElongation, sunMeanAnomaly, moonMeanAnomaly, moonLatitude, E):
+    """Computes the values from the lr table in the MPA."""
     # todo: not sure if the lr table values are unit-less, if not change to radians
     # parameters are D, M, M', F
     productTable = []
@@ -653,24 +96,24 @@ def _mpa_lr_table(moonMeanElongation, sunMeanAnomaly, moonMeanAnomaly, moonLatit
     return productTable
 
 
-def _mpa_l_term(productTable):
-    # 3.2.6 (l), in radians
+def _mpaLTerm(productTable):
+    """Computes the L term via 3.2.6 (l) in the MPA in radians."""
     lTerm = 0.0
     for rowNumber, (product, lAdjust, l, _) in enumerate(productTable):
         lTerm += l * lAdjust * sin(product)
     return radians(lTerm / 1000000)
 
 
-def _mpa_r_term(productTable):
-    # 3.2.7 (r), in radians
+def _mpaRTerm(productTable):
+    """Computes the R term via 3.2.7 (r) in the MPA in radians."""
     rTerm = 0.0
     for rowNumber, (product, rAdjust, _, r) in enumerate(productTable):
         rTerm += r * rAdjust * cos(product)
     return rTerm / 1000
 
 
-def _mpa_b_term(moonMeanElongation, sunMeanAnomaly, moonMeanAnomaly, moonLatitude, E):
-    # 3.2.8 first (b), in radians
+def _mpaBTerm(moonMeanElongation, sunMeanAnomaly, moonMeanAnomaly, moonLatitude, E):
+    """Computes the B term via 3.2.8 (b) in the MPA in radians."""
     bTerm = 0.0
     for di, mi, miPrime, fi, bi in _MPA_B_TERM_TABLE:
         bAdjust = E ** abs(mi)
@@ -679,59 +122,60 @@ def _mpa_b_term(moonMeanElongation, sunMeanAnomaly, moonMeanAnomaly, moonLatitud
     return radians(bTerm / 1000000)
 
 
-def _mpa_a1_term(JCE):
+def _mpaA1Term(JCE):
+    """Computes the a1 term via 3.2.8 in the MPA."""
     # 3.2.8 second
     return 2.0900317792632 + 2.301199165462 * JCE
 
 
-def _mpa_a2_term(JCE):
-    # 3.2.9
+def _mpaA2Term(JCE):
+    """Computes the a2 term via 3.2.9 in the MPA."""
     return 0.926595299884 + 8364.7398477329 * JCE
 
 
-def _mpa_a3_term(JCE):
-    # 3.2.10
+def _mpaA3Term(JCE):
+    """Computes the a3 term via 3.2.10 in the MPA."""
     return 5.470734540376 + 8399.6847252966 * JCE
 
 
-def _mpa_delta_l(a1, a2, moonMeanLongitude, moonLatitude):
-    # 3.2.11 (deltal) in radians
+def _mpaDeltaL(a1, a2, moonMeanLongitude, moonLatitude):
+    """Computes the delta-l term via 3.2.11 (deltal) in the MPA in radians."""
     # todo: divide each constant by 1000000
     return (69.0801317939 * sin(a1) + 34.2433599241 * sin(moonMeanLongitude - moonLatitude) + 5.550147021342
             * sin(a2)) / 1000000
 
 
-def _mpa_delta_b(a1, a3, moonMeanLongitude, moonMeanAnomaly, moonLatitude):
-    # 3.2.12 (deltab) in radians
+def _mpaDeltaB(a1, a3, moonMeanLongitude, moonMeanAnomaly, moonLatitude):
+    """Computes the delta-b term via 3.2.12 (deltab) in the MPA in radians."""
     # todo: divide each constant by 1000000
-    deltab = -39.00810878207 * sin(moonMeanLongitude) + 6.667157742618 * sin(a3) + 3.05432619099 \
-             * (sin(a1 - moonLatitude) + sin(a1 + moonLatitude)) + 2.21656815003 \
-             * sin(moonMeanLongitude - moonMeanAnomaly) - 2.00712863979 * sin(moonMeanLongitude + moonMeanAnomaly)
+    deltab = -39.00810878207 * sin(moonMeanLongitude) + 6.667157742618 * sin(a3) + 3.05432619099 * \
+        (sin(a1 - moonLatitude) + sin(a1 + moonLatitude)) + 2.21656815003 *\
+        sin(moonMeanLongitude - moonMeanAnomaly) - 2.00712863979 * sin(moonMeanLongitude + moonMeanAnomaly)
     return deltab / 1000000
 
 
-def _mpa_moon_longitude(moonMeanLongitude, lTerm, deltal):
-    # 3.2.13 (lambda') in radians
+def _mpaMoonLongitude(moonMeanLongitude, lTerm, deltal):
+    """Computes the moon's longitude via 3.2.13 (lambda') in the MPA in radians."""
     return (moonMeanLongitude + lTerm + deltal) % TWOPI
 
 
-def _mpa_moon_latitude(bTerm, deltab):
-    # 3.2.14 (beta) in radians
+def _mpaMoonLatitude(bTerm, deltab):
+    """Computes the moon's latitude via 3.2.14 (beta) in the MPA in radians."""
     return (bTerm + deltab) % TWOPI
 
 
-def _mpa_moon_distance(rTerm):
-    # 3.2.16 (delta) in kilometers
+def _mpaMoonDistance(rTerm):
+    """Computes the moon's distance via 3.2.16 (delta) in the MPA in kilometers."""
     return 385000.56 + rTerm
 
 
-def _mpa_moon_parallax(moonDistance):
-    # 3.3 in radians
+def _mpaMoonParallax(moonDistance):
+    """Computes the moon's parallax angle via 3.3 in the MPA in radians."""
     return asin(6378.14 / moonDistance)
 
 
-def _x_values(JCE):
-    # 3.4 in radians
+def _xValues(JCE):
+    """Computes the x-values via 3.4 in the SAMPA in radians."""
     xTerms = []
     for a, b, c, d in _X_TABLE:
         i = a + JCE * (b + JCE * (c + JCE * d))
@@ -739,36 +183,35 @@ def _x_values(JCE):
     return xTerms
 
 
-def _xy_table(xValues):
+def _xyTable(xValues):
+    """Computes the product table from x and y values in the SAMPA."""
     productTable = []
-    # for row in _Nutation_Table:
     for row in _Y_TABLE:
         iSum = 0
-        # for xj, yij in zip(xValues, row[:4]):
         for xj, yij in zip(xValues, row):
             iSum += xj * yij
         productTable.append(iSum)
     return productTable
 
 
-def _nutation_longitude(JCE, xyTable):
-    # 3.4.7 in radians
+def _nutationLongitude(JCE, xyTable):
+    """Computes the nutation in longitude via 3.4.7 in the SaMPA in radians."""
     dPsi = 0
     for (a, b, *_), xyProduct in zip(_NUTATION_TABLE, xyTable):
         dPsi += (a + b * JCE) * sin(xyProduct)
     return radians(dPsi / 36000000)
 
 
-def _nutation_obliquity(JCE, xyTable):
-    # 3.4.8 in radians
+def _nutationObliquity(JCE, xyTable):
+    """Computes the nutation in obliquity via 3.4.8 in the SAMPA in radians."""
     dEpsilon = 0
     for (_, _, c, d), xyProduct in zip(_NUTATION_TABLE, xyTable):
         dEpsilon += (c + d * JCE) * cos(xyProduct)
     return radians(dEpsilon / 36000000)
 
 
-def _mean_obliquity(JME):
-    # 3.5.1 (e0) in radians
+def _meanObliquity(JME):
+    """Computes the mean obliquity via 3.5.1 (e0) in the SAMPA in radians."""
     U = JME / 10
     return 0.4090928042223 + U \
         * (-0.022693789043 + U
@@ -781,79 +224,79 @@ def _mean_obliquity(JME):
                              * (0.0001351175729 + U * (2.80707121362e-5 + U * 1.187793518718e-5)))))))))
 
 
-def _true_obliquity(meanObliquity, nutationObliquity):
-    # 3.5.2 (epsilon) in radians
+def _trueObliquity(meanObliquity, nutationObliquity):
+    """Computes the true obliquity via 3.5.2 (epsilon) in the SAMPA in radians."""
     return meanObliquity + nutationObliquity
 
 
-def _mpa_apparent_moon_longitude(moonLongitude, nutationLongitude):
-    # 3.6 (lambda) in radians
+def _mpaApparentMoonLongitude(moonLongitude, nutationLongitude):
+    """Computes the apparent moon longitude via 3.6 (lambda) in the SAMPA in radians."""
     return moonLongitude + nutationLongitude
 
 
-def _mean_sidereal_time(JD, JC):
-    # 3.7.1 (v0) in radians
+def _meanSiderealTime(JD, JC):
+    """Computes the mean sidereal time via 3.7.1 (v0) in the SAMPA in radians."""
     return 4.8949612127358 + 6.300388098985 * (JD - 2451545) + JC * JC * (6.770708127139e-6 + JC * -4.50872966157e-10)
 
 
-def _apparent_sidereal_time(meanSiderealTime, nutationLongitude, nutationObliquity):
-    # 3.7.2 (v) in radians
+def _apparentSiderealTime(meanSiderealTime, nutationLongitude, nutationObliquity):
+    """Computes the apparent sidereal time via 3.7.2 (v) in the SAMPA in radians."""
     return (meanSiderealTime + nutationLongitude * cos(nutationObliquity)) % TWOPI
 
 
 def _right_ascension(longitude, latitude, trueObliquity):
-    # 3.8.1 (alpha) in radians (0, TWOPI)
+    """Computes the right-ascension via 3.8.1 (alpha) in the SAMPA in radians."""
     alpha = atan2(sin(longitude) * cos(trueObliquity) - tan(latitude) * sin(trueObliquity), cos(longitude))
     return alpha if alpha >= 0 else alpha + TWOPI
 
 
 def _declination(longitude, latitude, trueObliquity):
-    # 3.9 (delta) in radians (-90, 90)
+    """Computes the declination via 3.9 (delta) in the SAMPA in radians."""
     return asin(sin(latitude) * cos(trueObliquity) + cos(latitude) * sin(trueObliquity) * sin(longitude))
 
 
-def _local_hour_angle(apparentSiderealTime, geoLongitude, rightAscension):
-    # 3.10 (H) in radians
+def _localHourAngle(apparentSiderealTime, geoLongitude, rightAscension):
+    """Computes the local hour angle via 3.10 (H) in the SAMPA in radians."""
     return apparentSiderealTime + geoLongitude - rightAscension
 
 
-def _u_term(geoLatitude):
+def _uTerm(geoLatitude):
     # 3.11.1 (u) in radians
     return atan(0.99664719 * tan(geoLatitude))
 
 
-def _x_term(uTerm, geoLatitude, elevation):
+def _xTerm(uTerm, geoLatitude, elevation):
     # 3.11.2 (x) in radians
     return cos(uTerm) + (elevation / 6378140) * cos(geoLatitude)
 
 
-def _y_term(uTerm, geoLatitude, elevation):
+def _yTerm(uTerm, geoLatitude, elevation):
     # 3.11.3 (y), in radians
     return 0.99664719 * sin(uTerm) + (elevation / 6378140) * sin(geoLatitude)
 
 
-def _parallax_right_ascension(xTerm, parallax, hourAngle, declination):
+def _parallaxRightAscension(xTerm, parallax, hourAngle, declination):
     # 3.11.4 (deltaAlpha) in radians
     return atan2(-xTerm * sin(parallax) * sin(hourAngle), cos(declination) - xTerm * sin(parallax) * cos(hourAngle))
 
 
-def _topocentric_right_ascension(rightAscension, parallax):
+def _topocentricRightAscension(rightAscension, parallax):
     # 3.11.5 (alpha') in radians
     return rightAscension + parallax
 
 
-def _topocentric_declination(yTerm, declination, parallax, rightAscensionParallax, hourAngle):
+def _topocentricDeclination(yTerm, declination, parallax, rightAscensionParallax, hourAngle):
     # 3.11.6 (delta') in radians
     return atan2((sin(declination) - yTerm * sin(parallax)) * cos(rightAscensionParallax),
                  cos(declination) - yTerm * sin(parallax) * cos(hourAngle))
 
 
-def _topocentric_hour_angle(hourAngle, rightAscensionParallax):
+def _topocentricHourAngle(hourAngle, rightAscensionParallax):
     # 3.12 (H') in radians
     return hourAngle - rightAscensionParallax
 
 
-def _spa_expand_tables(table, JME):
+def _spaExpandTables(table, JME):
     # 3.2.1 - 3.2.3
     computedTable = []
     for subTable in table:
@@ -864,100 +307,100 @@ def _spa_expand_tables(table, JME):
     return computedTable
 
 
-def _spa_sum_expanded_table(table, JME):
+def _spaSumExpandedTable(table, JME):
     # 3.2.4 - 3.2.5
-    expandedTable = _spa_expand_tables(table, JME)
+    expandedTable = _spaExpandTables(table, JME)
     rowSum = 0
     for power, i in enumerate(expandedTable):
         rowSum += i * JME ** power
     return rowSum
 
 
-def _spa_earth_heliocentric_longitude(JME):
+def _spaEarthHeliocentricLongitude(JME):
     # 3.2.6 (L), in radians
-    return (_spa_sum_expanded_table(_SPA_L_TABLE, JME) / 1e8) % TWOPI
+    return (_spaSumExpandedTable(_SPA_L_TABLE, JME) / 1e8) % TWOPI
 
 
-def _spa_earth_heliocentric_latitude(JME):
+def _spaEarthHeliocentricLatitude(JME):
     # 3.2.7 (B), in radians
-    B = (_spa_sum_expanded_table(_SPA_B_TABLE, JME) / 1e8) % TWOPI
+    B = (_spaSumExpandedTable(_SPA_B_TABLE, JME) / 1e8) % TWOPI
     return B if B < pi else B - TWOPI
 
 
-def _spa_earth_heliocentric_radius(JME):
+def _spaEarthHeliocentricRadius(JME):
     # 3.2.8 (R), in AU
-    return _spa_sum_expanded_table(_SPA_R_TABLE, JME) / 1e8
+    return _spaSumExpandedTable(_SPA_R_TABLE, JME) / 1e8
 
 
-def _spa_geocentric_longitude(helioLongitude):
+def _spaGeocentricLongitude(helioLongitude):
     # 3.3.1 (THETA), in radians
     return (helioLongitude + pi) % TWOPI
 
 
-def _spa_geocentric_latitude(helioLatitude):
+def _spaGeocentricLatitude(helioLatitude):
     # 3.3.3 (beta), in radians
     return -helioLatitude
 
 
-def _spa_aberration_correction(sunDistance):
+def _spaAberrationCorrection(sunDistance):
     # 3.6 (deltaTau), in radians
     return -0.357614473075 / (3600 * sunDistance)
 
 
-def _spa_apparent_sun_longitude(geocentricLongitude, nutationLongitude, aberrationCorrection):
+def _spaApparentSunLongitude(geocentricLongitude, nutationLongitude, aberrationCorrection):
     # 3.7 (lambda), in radians
     return geocentricLongitude + nutationLongitude + aberrationCorrection
 
 
-def _spa_equitorial_parallax_sun(sunDistance):
+def _spaEquitorialParallaxSun(sunDistance):
     # 3.12.1 (ksi), in radians
     return 0.15348425442038 / (3600 * sunDistance)
 
 
-def _topocentric_local_hour_angle(hourAngle, parallaxRightAscension):
+def _topocentricLocalHourAngle(hourAngle, parallaxRightAscension):
     # 3.12, 3.12.5 (H'), in radians
     # todo: valid range here?
     return hourAngle - parallaxRightAscension
 
 
-def _topocentric_elevation_angle_without(geoLatitude, topoDeclination, topoHourAngle):
+def _topocentricElevationAngleWithout(geoLatitude, topoDeclination, topoHourAngle):
     # 3.13.1, 3.14.1 (e0), in radians
     return asin(sin(geoLatitude)*sin(topoDeclination) + cos(geoLatitude)*cos(topoDeclination)*cos(topoHourAngle))
 
 
-def _atmospheric_refraction_correction(pressure, temperature, e0):
+def _atmosphericRefractionCorrection(pressure, temperature, e0):
     # 3.13.2, 3.14.2 (deltae), in radians
     denominator = 60 * tan(e0 + (10.3 / (e0 + 5.11)))
     return (pressure / 1010) * (283 / (273 + temperature)) * (0.01780235837034 / denominator)
 
 
-def _topocentric_elevation_angle(e0, atmosphericCorrection):
+def _topocentricElevationAngle(e0, atmosphericCorrection):
     # 3.13.3, 3.14.3 (e), in radians
     return e0 + atmosphericCorrection
 
 
-def _topocentric_zenith_angle(elevationAngle):
+def _topocentricZenithAngle(elevationAngle):
     # 3.13.4, 3.14.4 (THETAm), in radians
     return pi/2 - elevationAngle
 
 
-def _topocentric_astronomers_azimuth_angle(topoHourAngle, geoLatitude, topoDeclination):
+def _topocentricAstronomersAzimuthAngle(topoHourAngle, geoLatitude, topoDeclination):
     # 3.14.1, 3.15.1 (GAMMA), in radians
     return atan3(sin(topoHourAngle), cos(topoHourAngle)*sin(geoLatitude) - tan(topoDeclination)*cos(geoLatitude))
 
 
-def _topocentric_azimuth_angle(astronomersAngle):
+def _topocentricAzimuthAngle(astronomersAngle):
     # 3.14.2, 3.15.2 (PHIm), in radians
     return (astronomersAngle + pi) % TWOPI
 
 
-def _spa_incidence_angle(zenithAngle, astronomersAzimuth, slopeSurface, surfaceAzimuth):
+def _spaIncidenceAngle(zenithAngle, astronomersAzimuth, slopeSurface, surfaceAzimuth):
     # 3.16 (I), in radians
     return acos(cos(zenithAngle)*cos(slopeSurface)
                 + sin(slopeSurface)*sin(zenithAngle)*cos(astronomersAzimuth-surfaceAzimuth))
 
 
-def _equation_of_time(JME, sunRightAscension, nutationLongitude, nutationObliquity):
+def _equationOfTime(JME, sunRightAscension, nutationLongitude, nutationObliquity):
     # A.1 (E), in radians
     sunMeanLongitude = 4.895063110817 + JME \
                        * (6283.3196674757 + JME
@@ -967,8 +410,8 @@ def _equation_of_time(JME, sunRightAscension, nutationLongitude, nutationObliqui
     return E % TWOPI
 
 
-def _celestial_coordinates_to_position_vector(rightAscension, declination, sunDistance):
-    # radians and kilometers, return kilometers
+def _celestialCoordinatesToPositionVector(rightAscension, declination, sunDistance):
+    """Computes the sun's position vector with celestial coordinates in radians and distance in kilometers."""
     zComp = sin(declination)
     xComp = sqrt((cos(declination) ** 2) / (1 + (tan(rightAscension) ** 2)))
     if pi / 2 < rightAscension < 3 * pi / 2:
@@ -979,8 +422,8 @@ def _celestial_coordinates_to_position_vector(rightAscension, declination, sunDi
     return Vector((xComp, yComp, zComp)) * sunDistance * AU
 
 
-def _get_twilight_type(topocentricPositionVector):
-    # vector in kilometers
+def _getTwilightType(topocentricPositionVector):
+    """Converts a solar position vector in kilometers to the equivalent twilight type."""
     sunAngle = degrees(asin(topocentricPositionVector[2] / topocentricPositionVector.mag()))
 
     if sunAngle < -18:
@@ -1492,3 +935,567 @@ _MPA_B_TERM_TABLE = [
     [4, -1, 0, -1, 115],
     [2, -2, 0, 1, 107]
 ]
+
+'''This is saved in case the idea may be used later:'''
+
+# DELTAT = 72.6
+
+
+# class Variable:
+#     # self computing variable
+#     __slots__ = '_args', '_value', '_callback', '_parent'
+#
+#     def __init__(self, callback, args, parent):
+#         self._value = None
+#         self._callback = callback
+#         self._args = args
+#         self._parent = parent
+#
+#     @property
+#     def value(self):
+#         if self._value is None:
+#             arguments = (self._parent[arg] for arg in self._args)
+#             self._value = self._callback(*arguments)
+#         return self._value
+#
+#
+# class Constant:
+#     # class with the same interface as sampa.Variable but has constant value and doesn't need a callback
+#     __slots__ = '_value'
+#
+#     def __init__(self, value):
+#         self._value = value
+#
+#     @property
+#     def value(self):
+#         return self._value
+
+
+# class Register:
+#     __slots__ = '_internalState'
+#
+#     def __init__(self, jd):
+#         # self._geo = geo
+#         JD, JDE, JC, JCE, JME = _generate_times(jd)
+#         # list all variables involved in the sampa
+#         self._internalState = {
+#             'JD': JD, 'JDE': JDE, 'JC': JC, 'JCE': JCE, 'JME': JME,
+#             # 'geoLatitude': Constant(radians(geo.latitude)), 'geoLongitude': Constant(radians(geo.longitude)),
+#             # 'elevation': Constant(geo.elevation),
+#             # MPA: 3.2
+#             'moonMeanLongitude': Variable(_mpa_moon_mean_longitude, ('JCE',), self),
+#             'moonMeanElongation': Variable(_mpa_moon_mean_elongation, ('JCE',), self),
+#             'sunMeanAnomaly': Variable(_mpa_sun_mean_anomaly, ('JCE',), self),
+#             'moonMeanAnomaly': Variable(_mpa_moon_mean_anomaly, ('JCE',), self),
+#             'moonArgumentLatitude': Variable(_mpa_moon_argument_latitude, ('JCE',), self),
+#             'ETerm': Variable(_mpa_E_term, ('JCE',), self),
+#             'lrProductTable': Variable(_mpa_lr_table, ('moonMeanElongation', 'sunMeanAnomaly', 'moonMeanAnomaly',
+#                                                        'moonArgumentLatitude', 'ETerm'), self),
+#             'lTerm': Variable(_mpa_l_term, ('lrProductTable',), self),
+#             'rTerm': Variable(_mpa_r_term, ('lrProductTable',), self),
+#             'bTerm': Variable(_mpa_b_term, ('moonMeanElongation', 'sunMeanAnomaly', 'moonMeanAnomaly',
+#                                             'moonArgumentLatitude', 'ETerm'), self),
+#             'a1Term': Variable(_mpa_a1_term, ('JCE',), self),
+#             'a2Term': Variable(_mpa_a2_term, ('JCE',), self),
+#             'a3Term': Variable(_mpa_a3_term, ('JCE',), self),
+#             'deltal': Variable(_mpa_delta_l, ('a1Term', 'a2Term', 'moonMeanLongitude', 'moonArgumentLatitude'), self),
+#             'deltab': Variable(_mpa_delta_b, ('a1Term', 'a3Term', 'moonMeanLongitude', 'moonMeanAnomaly',
+#                                               'moonArgumentLatitude'), self),
+#             'moonLongitude': Variable(_mpa_moon_longitude, ('moonMeanLongitude', 'lTerm', 'deltal'), self),
+#             'moonLatitude': Variable(_mpa_moon_latitude, ('bTerm', 'deltab'), self),
+#             'moonDistance': Variable(_mpa_moon_distance, ('rTerm',), self),
+#             'moonParallax': Variable(_mpa_moon_parallax, ('moonDistance',), self),
+#             'xValues': Variable(_x_values, ('JCE',), self),
+#             'xyProductTable': Variable(_xy_table, ('xValues',), self),
+#             'nutationLongitude': Variable(_nutation_longitude, ('JCE', 'xyProductTable'), self),
+#             'nutationObliquity': Variable(_nutation_obliquity, ('JCE', 'xyProductTable'), self),
+#             'meanObliquity': Variable(_mean_obliquity, ('JME',), self),
+#             'trueObliquity': Variable(_true_obliquity, ('meanObliquity', 'nutationObliquity'), self),
+#             'apparentMoonLongitude': Variable(_mpa_apparent_moon_longitude, ('moonLongitude', 'nutationLongitude'),
+#                                               self),
+#             'meanSiderealTime': Variable(_mean_sidereal_time, ('JD', 'JC'), self),
+#             'apparentSiderealTime': Variable(_apparent_sidereal_time, ('meanSiderealTime', 'nutationLongitude',
+#                                                                        'nutationObliquity'), self),
+#             'moonRightAscension': Variable(_right_ascension, ('moonLongitude', 'moonLatitude',
+#                                                               'trueObliquity'), self),
+#             'moonDeclination': Variable(_declination, ('moonLongitude', 'moonLatitude', 'trueObliquity'),
+#                                         self),
+#             'earthHeliocentricLongitude': Variable(_spa_earth_heliocentric_longitude, ('JME',), self),
+#             'earthHeliocentricLatitude': Variable(_spa_earth_heliocentric_latitude, ('JME',), self),
+#             'sunDistance': Variable(_spa_earth_heliocentric_radius, ('JME',), self),
+#             'sunLongitude': Variable(_spa_geocentric_longitude, ('earthHeliocentricLongitude',), self),
+#             'sunLatitude': Variable(_spa_geocentric_latitude, ('earthHeliocentricLatitude',), self),
+#             'sunAberrationCorrection': Variable(_spa_aberration_correction, ('sunDistance',), self),
+#             'apparentSunLongitude': Variable(_spa_apparent_sun_longitude, ('sunLongitude', 'nutationLongitude',
+#                                                                            'sunAberrationCorrection'), self),
+#             'sunRightAscension': Variable(_right_ascension, ('sunLongitude', 'sunLatitude', 'trueObliquity'), self),
+#             'sunDeclination': Variable(_declination, ('sunLongitude', 'sunLatitude', 'trueObliquity'), self),
+#             'equationOfTime': Variable(_equation_of_time,
+#                                        ('JME', 'sunRightAscension', 'nutationLongitude', 'nutationObliquity'), self),
+#         }
+#
+#     def __getitem__(self, item):
+#         return self._internalState[item].value
+
+
+# class RegisterTopocentric(Register):
+#
+#     def __init__(self, jd, geo):
+#         super().__init__(jd)
+#         self._internalState['geoLatitude'] = Constant(radians(geo.latitude))
+#         self._internalState['geoLongitude'] = Constant(radians(geo.longitude))
+#         self._internalState['elevation'] = Constant(geo.elevation)
+#         # todo: implement these correctly when able to
+#         self._internalState['pressure'] = Constant(0)
+#         self._internalState['temperature'] = Constant(10)
+#         self._internalState['slopeSurface'] = Constant(0)
+#         self._internalState['surfaceAzimuth'] = Constant(0)
+#         self._internalState['moonLocalHourAngle'] = Variable(_local_hour_angle, ('apparentSiderealTime',
+#                                                                                  'geoLongitude',
+#                                                                                  'moonRightAscension'), self)
+#         self._internalState['uTerm'] = Variable(_u_term, ('geoLatitude',), self)
+#         self._internalState['xTerm'] = Variable(_x_term, ('uTerm', 'geoLatitude', 'elevation'), self)
+#         self._internalState['yTerm'] = Variable(_y_term, ('uTerm', 'geoLatitude', 'elevation'), self)
+#         self._internalState['moonParallaxRightAscension'] = Variable(_parallax_right_ascension,
+#                                                                      ('xTerm', 'moonParallax', 'moonLocalHourAngle',
+#                                                                       'moonDeclination'), self)
+#         self._internalState['moonTopocentricRightAscension'] = Variable(_topocentric_right_ascension,
+#                                                                         ('moonRightAscension',
+#                                                                          'moonParallaxRightAscension'), self)
+#         self._internalState['moonTopocentricDeclination'] = Variable(_topocentric_declination,
+#                                                                      ('yTerm', 'moonDeclination', 'moonParallax',
+#                                                                       'moonParallaxRightAscension',
+#                                                                       'moonLocalHourAngle'), self)
+#         self._internalState['sunLocalHourAngle'] = Variable(_local_hour_angle, ('apparentSiderealTime',
+#                                                                                 'geoLongitude',
+#                                                                                 'sunRightAscension'), self)
+#         self._internalState['sunParallax'] = Variable(_spa_equitorial_parallax_sun, ('sunDistance',), self)
+#         self._internalState['sunParallaxRightAscension'] = Variable(_parallax_right_ascension,
+#                                                                     ('xTerm', 'sunParallax', 'sunLocalHourAngle',
+#                                                                      'sunDeclination'), self)
+#         self._internalState['sunTopocentricRightAscension'] = Variable(_topocentric_right_ascension,
+#                                                                        ('sunRightAscension',
+#                                                                         'sunParallaxRightAscension'), self)
+#         self._internalState['sunTopocentricDeclination'] = Variable(_topocentric_declination,
+#                                                                     ('yTerm', 'sunDeclination', 'sunParallax',
+#                                                                      'sunParallaxRightAscension',
+#                                                                      'sunLocalHourAngle'),
+#                                                                     self)
+#         self._internalState['moonTopocentricHourAngle'] = Variable(_topocentric_local_hour_angle,
+#                                                                    ('moonLocalHourAngle',
+#                                                                    'moonParallaxRightAscension'),
+#                                                                    self)
+#         self._internalState['sunTopocentricHourAngle'] = Variable(_topocentric_local_hour_angle,
+#                                                                   ('sunLocalHourAngle', 'sunParallaxRightAscension'),
+#                                                                   self)
+#         self._internalState['moonElevationAngleWithout'] = Variable(_topocentric_elevation_angle_without,
+#                                                                     ('geoLatitude', 'moonTopocentricDeclination',
+#                                                                      'moonTopocentricLocalHour'), self)
+#         self._internalState['sunElevationAngleWithout'] = Variable(_topocentric_elevation_angle_without,
+#                                                                    ('geoLatitude', 'sunTopocentricDeclination',
+#                                                                     'sunTopocentricHourAngle'), self)
+#         self._internalState['moonAtmosphericRefraction'] = Variable(_atmospheric_refraction_correction,
+#                                                                     ('pressure', 'temperature',
+#                                                                      'moonElevationAngleWithout'), self)
+#         self._internalState['sunAtmosphericRefraction'] = Variable(_atmospheric_refraction_correction,
+#                                                                    ('pressure', 'temperature',
+#                                                                     'sunElevationAngleWithout'), self)
+#         self._internalState['moonElevationAngle'] = Variable(_topocentric_elevation_angle,
+#                                                              ('moonElevationAngleWithout',
+#                                                              'moonAtmosphericRefraction'),
+#                                                              self)
+#         self._internalState['sunElevationAngle'] = Variable(_topocentric_elevation_angle,
+#                                                             ('sunElevationAngleWithout', 'sunAtmosphericRefraction'),
+#                                                             self)
+#         self._internalState['moonZenithAngle'] = Variable(_topocentric_zenith_angle, ('moonElevationAngle',), self)
+#         self._internalState['sunZenithAngle'] = Variable(_topocentric_zenith_angle, ('sunElevationAngle',), self)
+#         self._internalState['moonAstronomersAzimuth'] = Variable(_topocentric_astronomers_azimuth_angle,
+#                                                                  ('moonTopocentricHourAngle', 'geoLatitude',
+#                                                                   'moonTopocentricDeclination'), self)
+#         self._internalState['sunAstronomersAzimuth'] = Variable(_topocentric_astronomers_azimuth_angle,
+#                                                                 ('sunTopocentricHourAngle', 'geoLatitude',
+#                                                                  'sunTopocentricDeclination'), self)
+#         self._internalState['moonAzimuthAngle'] = Variable(_topocentric_azimuth_angle, ('moonAstronomersAzimuth',),
+#                                                            self)
+#         self._internalState['sunAzimuthAngle'] = Variable(_topocentric_azimuth_angle, ('sunAstronomersAzimuth',),
+#                                                           self)
+#         self._internalState['sunIncidenceAngle'] = Variable(_spa_incidence_angle,
+#                                                             ('sunZenithAngle', 'sunAstronomersAzimuth',
+#                                                             'slopeSurface',
+#                                                              'surfaceAzimuth'), self)
+
+
+'''
+     ------------------------------------------------------------------------------------
+    |       description of the variable names and their relation to the SPA and MPA      |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |     Register Variable Name    | Symbol | Algorithm |    Section     |    Units     |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |      moonMeanLongitude        |   L'   |    MPA    |     3.2.1      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |      moonMeanElongation       |   D    |    MPA    |     3.2.2      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |        sunMeanAnomaly         |   M    |    MPA    |     3.2.3      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |       moonMeanAnomaly         |   M'   |    MPA    |     3.2.4      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |    moonArgumentLatitude       |   F    |    MPA    |     3.2.5      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |           ETerm               |   E    |    MPA    |    3.2.[6-8]   |   unit-less  |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |       lrProductTable          |  ----  |    MPA    |    3.2.[6-7]   |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |            lTerm              |   l    |    MPA    |     3.2.6      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |            rTerm              |   r    |    MPA    |     3.2.7      |  kilometers  |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |            bTerm              |   b    |    MPA    |     3.2.8      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |            a1Term             |   a1   |    MPA    |     3.2.8*     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |            a2Term             |   a2   |    MPA    |     3.2.9      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |            a3Term             |   a3   |    MPA    |     3.2.10     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |            deltal             |   Δl   |    MPA    |     3.2.11     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |            deltab             |   Δb   |    MPA    |     3.2.12     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |        moonLongitude          |   λ'   |    MPA    |     3.2.13     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |         moonLatitude          |   β    |    MPA    |     3.2.14     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |         moonDistance          |   Δ    |    MPA    |     3.2.15     |  kilometers  |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |         moonParallax          |   π    |    MPA    |      3.3       |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |           xValues             |   Xi   |  MPA, SPA |    3.4[1-5]    |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |        xyProductTable         | Xi*Yij |  MPA, SPA |     3.4.6      | 1e-6 radians |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |       nutationLongitude       |   Δψ   |  MPA, SPA |     3.4.7      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |       nutationObliquity       |   Δε   |  MPA, SPA |     3.4.8      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |         meanObliquity         |   ε0   |  MPA, SPA |     3.5.1      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |         trueObliquity         |   ε    |  MPA, SPA |     3.5.2      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |     apparentMoonLongitude     |   λ    |    MPA    |      3.6       |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |       meanSiderealTime        |   ν0   |    MPA    |     3.7.1      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |     apparentSiderealTime      |   ν    |    MPA    |     3.7.2      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |      moonRightAscension       |   α    |    MPA    |      3.8       |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |       moonDeclination         |   δ    |    MPA    |      3.9       |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |      moonLocalHourAngle       |   H    |    MPA    |      3.10      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |            uTerm              |   u    |  MPA, SPA | 3.11.1, 3.12.2 |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |            xTerm              |   x    |  MPA, SPA | 3.11.2, 3.12.3 |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |            yTerm              |   y    |  MPA, SPA | 3.11.3, 3.12.4 |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |   moonParallaxRightAscension  |   Δα   |    MPA    |     3.11.4     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    | moonTopocentricRightAscension |   α'   |    MPA    |     3.11.5     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |  moonTopocentricDeclination   |   δ'   |    MPA    |     3.11.6     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |  earthHeliocentricLongitude   |   L    |    SPA    |    3.2.[4-6]   |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |   earthHeliocentricLatitude   |   B    |    SPA    |     3.2.7      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |         sunDistance           |   R    |    SPA    |     3.2.8      |      AU      |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |         sunLongitude          |   Θ    |    SPA    |     3.3.1      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |         sunLatitude           |   β    |    SPA    |     3.3.3      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |    sunAberrationCorrection    |   Δτ   |    SPA    |      3.6       |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |      apparentSunLongitude     |   λ    |    SPA    |      3.7       |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |       sunRightAscension       |   α    |    SPA    |      3.9       |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |        sunDeclination         |   δ    |    SPA    |      3.10      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |       sunLocalHourAngle       |   H    |    SPA    |      3.11      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |          sunParallax          |   ξ    |    SPA    |     3.12.1     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |   sunParallaxRightAscension   |   Δα   |    SPA    |     3.12.5     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |  sunTopocentricRightAscension |   α'   |    SPA    |     3.12.6     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |   sunTopocentricDeclination   |   δ'   |    SPA    |     3.12.7     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |    moonTopocentricHourAngle   |   H'   |    MPA    |      3.12      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |   moonElevationAngleWithout   |   e0   |    MPA    |     3.13.1     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |   moonAtmosphericRefraction   |   Δe   |    MPA    |     3.13.2     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |      moonElevationAngle       |   e    |    MPA    |     3.13.3     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |        moonZenithAngle        |   θm   |    MPA    |     3.13.4     |   radians    
+     ------------------------------- -------- ----------- ---------------- --------------
+    |    moonAstronomersAzimuth     |   Γ    |    MPA    |     3.14.1     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |       moonAzimuthAngle        |   Φm   |    MPA    |     3.14.2     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |    sunTopocentricHourAngle    |   H'   |    SPA    |      3.13      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |    sunElevationAngleWithout   |   e0   |    SPA    |     3.14.1     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |    sunAtmosphericRefraction   |   Δe   |    SPA    |     3.14.2     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |       sunElevationAngle       |   e    |    SPA    |     3.14.3     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |         sunZenithAngle        |   θ    |    SPA    |     3.14.4     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |     sunAstronomersAzimuth     |   Γ    |    SPA    |     3.15.1     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |         sunAzimuthAngle       |   Φ    |    SPA    |     3.15.2     |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |        sunIncidenceAngle      |   I    |    SPA    |      3.16      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+    |         equationOfTime        |   E    |    SPA    |       A.1      |   radians    |
+     ------------------------------- -------- ----------- ---------------- --------------
+'''
+
+
+'''class SampaComputer:
+    __slots__ = '_registry'
+
+    def __init__(self, jd: JulianDate = None):
+        if jd is not None and not isinstance(jd, JulianDate):
+            raise TypeError('jd parameter must be a JulianDate type')
+
+        if jd is None:
+            self._registry = {}
+        else:
+            self._registry = {jd: Register(jd)}
+
+    def __call__(self, jd: JulianDate, variableStr: str):
+        if not isinstance(jd, JulianDate):
+            raise TypeError('jd parameter must be a JulianDate type')
+
+        if jd not in self._registry:
+            self._registry[jd] = Register(jd)
+
+        return self._registry[jd][variableStr]
+
+    def __len__(self):
+        return len(self._registry)
+
+    def clear(self, jd=None):
+        if jd is not None and _check_jd(jd):
+            if jd in self._registry:
+                self._registry.pop(jd)
+        else:
+            self._registry = {}
+
+    def getSunPosition(self, jd: JulianDate):
+        _check_jd(jd)
+        rightAscension = self.__call__(jd, 'sunRightAscension')
+        declination = self.__call__(jd, 'sunDeclination')
+        sunDistance = self.__call__(jd, 'sunDistance')
+
+        return _celestial_coordinates_to_position_vector(rightAscension, declination, sunDistance)
+
+    def getSunCoordinates(self, jd: JulianDate):
+        _check_jd(jd)
+        rightAscension = self.__call__(jd, 'sunRightAscension') * 12 / pi
+        declination = degrees(self.__call__(jd, 'sunDeclination'))
+        return CelestialCoordinates(rightAscension, declination)
+
+    def getSunTopocentricCoordinates(self, jd: JulianDate):
+        _check_jd(jd)
+        toposRightAscension = self.__call__(jd, 'sunTopocentricRightAscension') * 12 / pi
+        toposDeclination = degrees(self.__call__(jd, 'sunTopocentricDeclination'))
+        return CelestialCoordinates(toposRightAscension, toposDeclination)
+
+    def getSunPositionTimes(self, jd: JulianDate, target=None):
+        pass
+
+    def getPrecisePositionTimes(self, jd: JulianDate, target=None, epsilon=1e-5):
+        pass
+
+    def getMoonPosition(self, jd: JulianDate):
+        _check_jd(jd)
+        rightAscension = self.__call__(jd, 'moonRightAscension')
+        declination = self.__call__(jd, 'moonDeclination')
+        moonDistance = self.__call__(jd, 'moonDistance')
+
+        return _celestial_coordinates_to_position_vector(rightAscension, declination, moonDistance)
+
+    # broad getters here (position, rise/set time)
+
+    def nutationLongitude(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'nutationLongitude')
+
+    def nutationObliquity(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'nutationObliquity')
+
+    def meanObliquity(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'meanObliquity')
+
+    def trueObliquity(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'trueObliquity')
+
+    def meanSiderealTime(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'meanSiderealTime')
+
+    def apparentSiderealTime(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'apparentSiderealTime')
+
+    def moonLongitude(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'moonLongitude')
+
+    def moonLatitude(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'moonLatitude')
+
+    def moonDistance(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'moonDistance')
+
+    def moonParallax(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'moonParallax')
+
+    def moonApparentLongitude(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'apparentMoonLongitude')
+
+    def moonRightAscension(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'moonRightAscension')
+
+    def moonDeclination(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'moonDeclination')
+
+    def sunDistance(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunDistance')
+
+    def sunLongitude(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunLongitude')
+
+    def sunLatitude(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunLatitude')
+
+    def sunAberrationCorrection(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunAberrationCorrection')
+
+    def sunRightAscension(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunRightAscension')
+
+    def sunDeclination(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunDeclination')
+
+    def sunParallax(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunParallax')
+
+    def equationOfTime(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'equationOfTime')
+
+
+class SampaTopocentricComputer(SampaComputer):
+    __slots__ = '_geo'
+
+    def __init__(self, geo: GeoPosition, jd: JulianDate = None):
+        if not isinstance(geo, GeoPosition):
+            raise TypeError('geo parameter must be GeoPosition type')
+        self._geo = geo
+        super().__init__(jd)
+        if jd is not None:
+            self._registry = {jd: RegisterTopocentric(jd, geo)}
+
+    def __call__(self, jd: JulianDate, variableStr: str):
+        if not isinstance(jd, JulianDate):
+            raise TypeError('jd parameter must be a JulianDate type')
+
+        if jd not in self._registry:
+            self._registry[jd] = Register(jd)
+
+        return self._registry[jd][variableStr]
+
+    def moonLocalHourAngle(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'moonLocalHourAngle')
+
+    def moonTopocentricRightAscension(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'moonTopocentricRightAscension')
+
+    def moonTopocentricDeclination(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'moonTopocentricDeclination')
+
+    def moonTopocentricHourAngle(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'moonTopocentricHourAngle')
+
+    def moonElevationAngle(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'moonElevationAngle')
+
+    def moonZenithAngle(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'moonZenithAngle')
+
+    def moonAzimuthAngle(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'moonAzimuthAngle')
+
+    def sunLocalHourAngle(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunLocalHourAngle')
+
+    def sunTopocentricRightAscension(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunTopocentricRightAscension')
+
+    def sunTopocentricDeclination(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunTopocentricDeclination')
+
+    def sunTopocentricHourAngle(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunTopocentricHourAngle')
+
+    def sunElevationAngle(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunElevationAngle')
+
+    def sunZenithAngle(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunZenithAngle')
+
+    def sunAzimuthAngle(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunAzimuthAngle')
+
+    def sunIncidenceAngle(self, jd: JulianDate):
+        _check_jd(jd)
+        return self.__call__(jd, 'sunIncidenceAngle')'''

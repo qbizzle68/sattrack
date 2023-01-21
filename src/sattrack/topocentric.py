@@ -1,32 +1,33 @@
 import json
-from math import radians, pi, asin, cos, acos, sqrt, sin, degrees
+from math import radians, asin, cos, acos, sqrt, sin, degrees
 from operator import index
 
-from pyevspace import Vector, vang, norm, cross, dot, ZYX, getMatrixEuler, Angles, rotateEulerTo, rotateOffsetFrom
-from sattrack._topocentric import _to_topocentric
+from pyevspace import Vector, vang, norm, cross, dot, ZYX, getMatrixEuler, Angles, rotateOffsetFrom
+from sattrack.sgp4 import computeEccentricVector
+
+from sattrack._coordinates import _computePositionVector, _computeZenithVector
+from sattrack._orbit import _trueAnomalyFromState, _trueToMeanAnomaly, \
+    _smaToMeanMotion, _nearestTrueAnomaly, _vectorAlmostEqual
+from sattrack._topocentric import _toTopocentricOffset, _toTopocentric
+from sattrack.coordinates import GeoPosition
 from sattrack.eclipse import getShadowTimes, Shadow
 from sattrack.exceptions import PassConstraintException, NoPassException
+from sattrack.orbit import Orbitable, Elements
+from sattrack.spacetime.juliandate import JulianDate
+from sattrack.spacetime.sidereal import earthOffsetAngle
 # from sattrack.rotation.order import ZYX
 # from sattrack.rotation.rotation import getEulerMatrix, EulerAngles, rotateOrderTo, \
 #     undoRotateToThenOffset
 from sattrack.sun import getSunTimes
-from sattrack.spacetime.juliandate import JulianDate
-from sattrack.spacetime.sidereal import earthOffsetAngle
-from sattrack._coordinates import _compute_position_vector, _compute_zenith_vector
-from sattrack._orbit import _trueAnomalyFromState, _trueToMeanAnomaly, \
-    _smaToMeanMotion, _nearestTrueAnomaly
-from sattrack.coordinates import GeoPosition
-from sattrack.orbit import Orbitable, Elements
-from sattrack.util.constants import TWOPI, EARTH_MU
+from sattrack.util.constants import TWOPI
 from sattrack.util.conversions import atan3
-from sattrack.sgp4 import computeEccentricVector, elementsFromState
 
 __all__ = ('PositionInfo', 'SatellitePass', 'SatellitePassConstraints', 'getNextPass', 'getPassList', 'toTopocentric',
            'fromTopocentric', 'getAltitude', 'getAzimuth', 'azimuthAngleString')
 
 
-def _azimuth_angle_string(azimuth):
-    # azimuth in degrees
+def _azimuthAngleString(azimuth):
+    """Converts an azimuth angle in degrees to a compass direction string."""
     if azimuth > 348.25 or azimuth <= 11.25:
         return 'N'
     elif azimuth <= 33.75:
@@ -61,25 +62,36 @@ def _azimuth_angle_string(azimuth):
         return 'NNW'
 
 
-def _check_real_type(param, paramName: str):
+def _checkNumericType(param, paramName: str):
+    """Checks if a parameter type is numeric"""
     if not isinstance(param, (int, float)):
-        raise TypeError(f'{paramName} parameter must be a real number')
+        raise TypeError(f'{paramName} parameter must be a numeric type', type(param))
+    return param
+
+
+def _checkJdType(param, paramName: str):
+    """Checks if a parameter type is a JulianDate type."""
+    if not isinstance(param, JulianDate):
+        raise TypeError(f'{paramName} parameter must be a JulianDate type', type(param))
     return param
 
 
 class PositionInfo:
+    """A class to hold information regarding a single point in on overhead orbital pass."""
 
     __slots__ = '_altitude', '_azimuth', '_direction', '_time', '_illuminated', '_unobscured', '_visible'
 
     def __init__(self, altitude: float, azimuth: float, time: JulianDate, illuminated: bool = False,
                  unobscured: bool = False):
-        if not isinstance(time, JulianDate):
-            raise TypeError('time parameter must be a JulianDate type')
+        """Initializes the PositionInfo at a specific time with an altitude and azimuth in degrees. Illuminated refers
+        to if the satellite is in sunlight and unobscured refers to the viewer being unobscured by sunlight from
+        the view geo-position. Both values default to zero and the visible attribute is derived from a combination of
+        these values."""
 
-        self._altitude = _check_real_type(altitude, 'altitude')
-        self._azimuth = _check_real_type(azimuth, 'azimuth')
-        self._direction = _azimuth_angle_string(azimuth)
-        self._time = time
+        self._altitude = _checkNumericType(altitude, 'altitude')
+        self._azimuth = _checkNumericType(azimuth, 'azimuth')
+        self._direction = _azimuthAngleString(azimuth)
+        self._time = _checkJdType(time, 'time')
         self._illuminated = index(illuminated)
         self._unobscured = index(unobscured)
         self._visible = self._illuminated and self._unobscured
@@ -105,46 +117,60 @@ class PositionInfo:
 
     @property
     def altitude(self):
+        """Return the altitude of the position in degrees.."""
         return self._altitude
 
     @property
     def azimuth(self):
+        """Return the azimuth of the position in degrees."""
         return self._azimuth
 
     @property
     def direction(self):
+        """Return the compass direction of the position as a string."""
         return self._direction
 
     @property
     def time(self):
+        """Return the time of the position."""
         return self._time
 
     @property
     def illuminated(self):
+        """Return a boolean value of if the position is illuminated by sunlight."""
         return self._illuminated
 
     @property
     def unobscured(self):
+        """Return a boolean value of if the viewer of the position is unobscured by daylight."""
         return self._unobscured
 
     @property
     def visible(self):
+        """Return if the position is visible i.e. illuminated and unobscured."""
         return self._visible
 
 
-def _check_info_type(param, paramName: str):
+def _checkInfoType(param, paramName: str):
+    """Checks if the param type is a PositionInfo."""
     if not isinstance(param, PositionInfo):
         raise TypeError(f'{paramName} parameter must be PositionInfo type')
     return param
 
 
-def _check_info_type_none(param, paramName: str):
+def _checkInfoTypeNone(param, paramName: str):
+    """Checks if the param type is a PositionInfo if it's not None."""
     if param is not None:
-        return _check_info_type(param, paramName)
+        return _checkInfoType(param, paramName)
     return param
 
 
 class SatellitePass:
+    """An object that holds multiple PositionInfos used to describe an entire satellite pass. All passes have a rise,
+    set and maximum altitude PositionInfos. Some passes have other information significant to its viewing like first and
+    last visible, first and last illuminated and first and last unobscured. These later PositionInfos are not required,
+    and shouldn't be used when another PositionInfo shares the same information, e.g. the last visible PositionInfo
+    shouldn't be set if it's the same as setInfo."""
 
     __slots__ = '_riseInfo', '_setInfo', '_maxInfo', '_firstUnobscured', '_lastUnobscured', '_firstIlluminated', \
                 '_lastIlluminated', '_illuminated', '_unobscured', '_visible', '_name'
@@ -152,13 +178,16 @@ class SatellitePass:
     def __init__(self, riseInfo: PositionInfo, setInfo: PositionInfo, maxInfo: PositionInfo, *,
                  firstUnobscuredInfo: PositionInfo = None, lastUnobscuredInfo: PositionInfo = None,
                  firstIlluminatedInfo: PositionInfo = None, lastIlluminatedInfo: PositionInfo = None, name: str = ''):
-        self._riseInfo = _check_info_type(riseInfo, 'riseInfo')
-        self._setInfo = _check_info_type(setInfo, 'setInfo')
-        self._maxInfo = _check_info_type(maxInfo, 'maxInfo')
-        self._firstUnobscured = _check_info_type_none(firstUnobscuredInfo, 'firstUnobscuredInfo')
-        self._lastUnobscured = _check_info_type_none(lastUnobscuredInfo, 'lastUnobscuredInfo')
-        self._firstIlluminated = _check_info_type_none(firstIlluminatedInfo, 'firstIlluminatedInfo')
-        self._lastIlluminated = _check_info_type_none(lastIlluminatedInfo, 'lastIlluminatedInfo')
+        """Initialize a SatellitePass with the respective PositionInfos. All non-required infos are keyword only and
+        default to None."""
+
+        self._riseInfo = _checkInfoType(riseInfo, 'riseInfo')
+        self._setInfo = _checkInfoType(setInfo, 'setInfo')
+        self._maxInfo = _checkInfoType(maxInfo, 'maxInfo')
+        self._firstUnobscured = _checkInfoTypeNone(firstUnobscuredInfo, 'firstUnobscuredInfo')
+        self._lastUnobscured = _checkInfoTypeNone(lastUnobscuredInfo, 'lastUnobscuredInfo')
+        self._firstIlluminated = _checkInfoTypeNone(firstIlluminatedInfo, 'firstIlluminatedInfo')
+        self._lastIlluminated = _checkInfoTypeNone(lastIlluminatedInfo, 'lastIlluminatedInfo')
         if firstIlluminatedInfo is not None or riseInfo.illuminated:
             self._illuminated = True
         else:
@@ -189,7 +218,8 @@ class SatellitePass:
             'visible': self._visible
         }.items()
 
-    def _get_infos(self):
+    def _getInfos(self):
+        """Returns the PositionInfos as a list of tuples with their names and values."""
         return [
             ('rise', self._riseInfo),
             ('set', self._setInfo),
@@ -201,18 +231,19 @@ class SatellitePass:
         ]
 
     def __str__(self):
+        """Returns a human readably text table with the pass information."""
         width = 97
         if self._name == '':
             title = '{:^{w}}'.format('Pass details at {}'.format(self._maxInfo.time.date()), w=width)
         else:
             title = '{:^{w}}'.format('Pass details for {}, at {}'.format(self._name, self._maxInfo.time.date()),
                                      w=width)
-        heading = ' {:^17} | {:^12} | altitude | {:^12} | illuminated | unobscured | visible '\
+        heading = ' {:^17} | {:^12} | altitude | {:^12} | illuminated | unobscured | visible ' \
             .format('instance', 'time', 'azimuth')
         lineBreak = '-' * width
         string = title + '\n' + heading + '\n'
 
-        infos = [i for i in self._get_infos() if i[1] is not None]
+        infos = [i for i in self._getInfos() if i[1] is not None]
         infos.sort(key=lambda o: o[1].time.value)
 
         for name, info in infos:
@@ -224,46 +255,58 @@ class SatellitePass:
 
     @property
     def riseInfo(self):
+        """Returns the PositionInfo for the rise time of the pass."""
         return self._riseInfo
 
     @property
     def setInfo(self):
+        """Returns the PositionInfo for the set time of the pass."""
         return self._setInfo
 
     @property
     def maxInfo(self):
+        """Returns the PositionInfo for the time the pass reaches maximum altitude."""
         return self._maxInfo
 
     @property
     def firstUnobscuredInfo(self):
+        """Returns the PositionInfo for the first unobscured time of the pass."""
         return self._firstUnobscured
 
     @property
     def lastUnobscuredInfo(self):
+        """Returns the PositionInfo for the last unobscured time of the pass."""
         return self._lastUnobscured
 
     @property
     def firstIlluminatedInfo(self):
+        """Returns the PositionInfo for the first illuminated time of the pass."""
         return self._firstIlluminated
 
     @property
     def lastIlluminatedInfo(self):
+        """Returns the PositionInfo for the last illuminated time of the pass."""
         return self._lastIlluminated
 
     @property
     def unobscured(self):
+        """Returns True if the pass is unobscured by daylight, False otherwise."""
         return self._unobscured
 
     @property
     def illuminated(self):
+        """Returns True if the satellite is illuminated by sunlight during the pass, False otherwise."""
         return self._illuminated
 
     @property
     def visible(self):
+        """Returns True if the satellite pass is visible, False otherwise."""
         return self._visible
 
 
-def _check_altitudes(minAlt, maxAlt):
+def _checkAltitudes(minAlt, maxAlt):
+    """Checks if minimum and maximum altitude constraints are valid."""
+
     if minAlt is not None and maxAlt is not None and minAlt > maxAlt:
         raise PassConstraintException('Cannot set a minimum altitude constraint less than a maximum altitude '
                                       'constraint.')
@@ -273,7 +316,9 @@ def _check_altitudes(minAlt, maxAlt):
         raise ValueError('maxAltitude cannot be below 0 degrees')
 
 
-def _check_duration(minDur, maxDur):
+def _checkDuration(minDur, maxDur):
+    """Checks if minimum and maximum pass duration constraints are valid."""
+
     if minDur is not None and maxDur is not None and minDur > maxDur:
         raise PassConstraintException('Cannot set a minimum duration constraint longer than a maximum duration'
                                       'constraint.')
@@ -282,16 +327,21 @@ def _check_duration(minDur, maxDur):
 
 
 class SatellitePassConstraints:
+    """A set of constraints for filtering satellite passes based on certain criteria. The possible constraints are
+    minium or maximum altitudes or durations, and whether or not passes are illuminated, unobscured or visible."""
 
     __slots__ = '_minAltitude', '_maxAltitude', '_minDuration', '_maxDuration', '_illuminated', '_unobscured', \
                 '_visible'
 
     def __init__(self, *, minAltitude: float = None, maxAltitude: float = None, minDuration: float = None,
                  maxDuration: float = None, illuminated: bool = None, unobscured: bool = None, visible: bool = None):
-        _check_real_type(minAltitude, 'minAltitude')
-        _check_real_type(maxAltitude, 'maxAltitude')
-        _check_altitudes(minAltitude, maxAltitude)
-        _check_duration(minDuration, maxDuration)
+        """Initializes the SatellitePassConstraints object with the given constraints, all of which are keyword only.
+        Altitudes are in degrees and durations are in minutes."""
+
+        _checkNumericType(minAltitude, 'minAltitude')
+        _checkNumericType(maxAltitude, 'maxAltitude')
+        _checkAltitudes(minAltitude, maxAltitude)
+        _checkDuration(minDuration, maxDuration)
         self._minAltitude = minAltitude
         self._maxAltitude = maxAltitude
         self._minDuration = minDuration
@@ -302,98 +352,120 @@ class SatellitePassConstraints:
 
     @property
     def minAltitude(self):
+        """Returns the minimum altitude constraint in degrees."""
         return self._minAltitude
 
     @minAltitude.setter
     def minAltitude(self, value):
-        _check_real_type(value, 'value')
-        _check_altitudes(value, self._maxAltitude)
+        """Sets the minimum altitude constraint in degrees."""
+        _checkNumericType(value, 'value')
+        _checkAltitudes(value, self._maxAltitude)
         self._minAltitude = value
 
     @minAltitude.deleter
     def minAltitude(self):
+        """Removes the minimum altitude constraint."""
         self._minAltitude = None
 
     @property
     def maxAltitude(self):
+        """Returns the maximum altitude constraint in degrees."""
         return self._maxAltitude
 
     @maxAltitude.setter
     def maxAltitude(self, value):
-        _check_real_type(value, 'value')
-        _check_altitudes(self._minAltitude, value)
+        """Sets the maximum altitude constraint in degrees."""
+        _checkNumericType(value, 'value')
+        _checkAltitudes(self._minAltitude, value)
         self._maxAltitude = value
 
     @maxAltitude.deleter
     def maxAltitude(self):
+        """Removes the maximum altitude constraint."""
         self._maxAltitude = None
 
     @property
     def minDuration(self):
+        """Returns the minimum pass duration in minutes."""
         return self._minDuration
 
     @minDuration.setter
     def minDuration(self, value):
-        _check_real_type(value, 'value')
-        _check_duration(value, self._maxDuration)
+        """Sets the minimum pass duration in minutes."""
+        _checkNumericType(value, 'value')
+        _checkDuration(value, self._maxDuration)
         self._minDuration = value
 
     @minDuration.deleter
     def minDuration(self):
+        """Removes the minimum pass duration constraint."""
         self._minDuration = None
 
     @property
     def maxDuration(self):
+        """Returns the maximum pass duration in minutes."""
         return self._maxDuration
 
     @maxDuration.setter
     def maxDuration(self, value):
-        _check_real_type(value, 'value')
-        _check_duration(self._minDuration, value)
+        """Sets the maximum pass duration in minutes."""
+        _checkNumericType(value, 'value')
+        _checkDuration(self._minDuration, value)
         self._maxDuration = value
 
     @maxDuration.deleter
     def maxDuration(self):
+        """Removes the maximum pass duration constraint."""
         self._maxDuration = None
 
     @property
     def illuminated(self):
+        """Returns the illuminated pass constraint."""
         return self._illuminated
 
     @illuminated.setter
     def illuminated(self, value):
+        """Sets the illuminated pass constraint."""
         self._illuminated = index(value)
 
     @illuminated.deleter
     def illuminated(self):
+        """Removes the illuminated pass constraint."""
         self._illuminated = None
 
     @property
     def unobscured(self):
+        """Returns the unobscured pass constraint."""
         return self._unobscured
 
     @unobscured.setter
     def unobscured(self, value):
+        """Sets the unobscured pass constraint."""
         self._unobscured = index(value)
 
     @unobscured.deleter
     def unobscured(self):
+        """Removes the unobscured pass constraint."""
         self._unobscured = None
 
     @property
     def visible(self):
+        """Returns the visible pass constraint."""
         return self._visible
 
     @visible.setter
     def visible(self, value):
+        """Sets the visible pass constraint."""
         self._visible = index(value)
 
     @visible.deleter
     def visible(self):
+        """Removes the visible pass constraint."""
         self._unobscured = None
 
 
-def __max_pass_anomalies(position, velocity, mu, pVector, ecc):
+def __maxPassAnomalies(position, velocity, mu, pVector, ecc):
+    """Compute the anomalies as they are used in the max pass finder methods."""
     # eccentricVector = _compute_eccentric_vector(position, velocity, mu)
     eccentricVector = computeEccentricVector(position, velocity, mu)
     trueAnomaly_n = _trueAnomalyFromState(position, velocity, mu)
@@ -406,15 +478,18 @@ def __max_pass_anomalies(position, velocity, mu, pVector, ecc):
     return trueAnomaly_n, trueAnomaly_n1, meanAnomaly_n, meanAnomaly_n1
 
 
-def _get_p_vector(geo: GeoPosition, position: Vector, velocity: Vector, time: JulianDate) -> Vector:
+def _getPVector(geo: GeoPosition, position: Vector, velocity: Vector, time: JulianDate) -> Vector:
+    """Computes the 'P-Vector', the shortest vector between a geo-position and the line formed by the intersection of
+    the horizontal plane of the geo-position and the orbital plane. This is the vector that points towards the highest
+    point of the orbital path if it's above a viewer's horizon."""
     latitude = radians(geo.latitude)
     longitude = radians(geo.longitude)
     elevation = geo.elevation
 
     # zenith vector for geo-position
-    zeta = _compute_zenith_vector(latitude, longitude, elevation, time)
+    zeta = _computeZenithVector(latitude, longitude, elevation, time)
     # position vector for geo-position
-    gamma = _compute_position_vector(latitude, longitude, elevation, time)
+    gamma = _computePositionVector(latitude, longitude, elevation, time)
     # normalized angular momentum, vector equation for orbital plane
     lamb = norm(cross(position, velocity))
 
@@ -433,14 +508,15 @@ def _get_p_vector(geo: GeoPosition, position: Vector, velocity: Vector, time: Ju
     return r + v * t
 
 
-def _orbit_altitude(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> float:
+def _orbitAltitude(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> float:
+    """Computes the altitude of the orbital path above or below the geo-position's horizontal reference frame."""
+
     state = satellite.getState(time)
     elements = satellite.getElements(time)
 
-    gamma = _compute_position_vector(radians(geo.latitude), radians(geo.longitude), geo.elevation, time)
-    pVector = _get_p_vector(geo, *state, time)
+    gamma = _computePositionVector(radians(geo.latitude), radians(geo.longitude), geo.elevation, time)
+    pVector = _getPVector(geo, *state, time)
 
-    # eccentricVector = _compute_eccentric_vector(*state, satellite.body.mu)
     eccentricVector = computeEccentricVector(*state, satellite.body.mu)
     trueAnomaly = vang(eccentricVector, pVector)
     pSat = norm(pVector) * ((elements.sma * (1 - elements.ecc * elements.ecc)) / (1 + elements.ecc * cos(trueAnomaly)))
@@ -449,9 +525,12 @@ def _orbit_altitude(satellite: Orbitable, geo: GeoPosition, time: JulianDate) ->
     return angle if pSat.mag2() > pVector.mag2() else -angle
 
 
-def _time_to_plane(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> JulianDate:
+def _timeToPlane(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> JulianDate:
+    """Estimates the time it takes for the orbital path to be level with a geo-position's horizontal reference frame,
+    which begins the opportunity for overhead satellite passes."""
+
     jd = time
-    alt = _orbit_altitude(satellite, geo, time)
+    alt = _orbitAltitude(satellite, geo, time)
     if alt > 0:
         return jd
 
@@ -459,50 +538,57 @@ def _time_to_plane(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> 
         # todo: find an analytical guess of this dt
         dt = -alt / 360
         jd = jd.future(dt)
-        alt = _orbit_altitude(satellite, geo, jd)
+        alt = _orbitAltitude(satellite, geo, jd)
     return jd
 
 
-def _next_pass_max_approx(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> JulianDate:
-    if _orbit_altitude(satellite, geo, time) < 0:
-        tn = _time_to_plane(satellite, geo, time)
-    else:
-        tn = time
+# def _nextPassMaxApprox(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> JulianDate:
+#     """Approximates the time of the next satellite pass. For circular orbits this usually approximates the point the
+#     satellite achieves its maximum altitude above the horizon."""
+#
+#     # if the orbital plane is not above, find the time it appears overhead to start looking for passes
+#     if _orbitAltitude(satellite, geo, time) < 0:
+#         tn = _timeToPlane(satellite, geo, time)
+#     else:
+#         tn = time
+#
+#     # get variables needed for computations
+#     mu = satellite.body.mu
+#     elements = satellite.getElements(time)
+#     ecc = elements.ecc
+#     # mean motion in radians / day
+#     meanMotion = _smaToMeanMotion(elements.sma, mu) * 86400
+#
+#     # find the first guess of when the satellites position occupies the 'p-vector'
+#     state = satellite.getState(tn)
+#     pVector = _getPVector(geo, *state, tn)
+#     _, _, meanAnomaly_n, meanAnomaly_n1 = __maxPassAnomalies(*state, mu, pVector, ecc)
+#     dma = meanAnomaly_n1 - meanAnomaly_n
+#     if meanAnomaly_n1 < meanAnomaly_n:
+#         dma += TWOPI
+#     tn = tn.future(dma / meanMotion)
+#
+#     # update state and pVector for the while loop condition, this should be a do-while =(
+#     state = satellite.getState(tn)
+#     pVector = _getPVector(geo, *state, tn)
+#     while vang(state[0], pVector) > 4.85e-6:  # one arc-second
+#         trueAnomaly_n, trueAnomaly_n1, meanAnomaly_n, meanAnomaly_n1 = __maxPassAnomalies(*state, mu, pVector, ecc)
+#         dma = meanAnomaly_n1 - meanAnomaly_n
+#         if trueAnomaly_n1 <= trueAnomaly_n:
+#             if (trueAnomaly_n - trueAnomaly_n1) >= pi:
+#                 dma += TWOPI
+#         else:
+#             if (trueAnomaly_n1 - trueAnomaly_n) > pi:
+#                 dma -= TWOPI
+#         tn = tn.future(dma / meanMotion)
+#         state = satellite.getState(tn)
+#         pVector = _getPVector(geo, *state, tn)
+#
+#     return tn
 
-    mu = satellite.body.mu
-    elements = satellite.getElements(time)
-    ecc = elements.ecc
-    # mean motion in radians / day
-    meanMotion = _smaToMeanMotion(elements.sma, mu) * 86400
 
-    state = satellite.getState(tn)
-    pVector = _get_p_vector(geo, *state, tn)
-    _, _, meanAnomaly_n, meanAnomaly_n1 = __max_pass_anomalies(*state, mu, pVector, ecc)
-    dma = meanAnomaly_n1 - meanAnomaly_n
-    if meanAnomaly_n1 < meanAnomaly_n:
-        dma += TWOPI
-    tn = tn.future(dma / meanMotion)
-
-    state = satellite.getState(tn)
-    pVector = _get_p_vector(geo, *state, tn)
-    while vang(state[0], pVector) > 4.85e-6:  # one arc-second
-        trueAnomaly_n, trueAnomaly_n1, meanAnomaly_n, meanAnomaly_n1 = __max_pass_anomalies(*state, mu, pVector, ecc)
-        dma = meanAnomaly_n1 - meanAnomaly_n
-        if trueAnomaly_n1 <= trueAnomaly_n:
-            if (trueAnomaly_n - trueAnomaly_n1) >= pi:
-                dma += TWOPI
-        else:
-            if (trueAnomaly_n1 - trueAnomaly_n) > pi:
-                dma -= TWOPI
-        tn = tn.future(dma / meanMotion)
-        print("dma: ", dma, "tn: ", tn)
-        state = satellite.getState(tn)
-        pVector = _get_p_vector(geo, *state, tn)
-
-    return tn
-
-def _vector_almost_equal(vec1, vec2, epsilon=1e-5):
-    return dot(vec1, vec2) > (1 - epsilon)
+# def _vector_almost_equal(vec1, vec2, epsilon=1e-5):
+#     return dot(vec1, vec2) > (1 - epsilon)
 
     # for v1, v2 in zip(vec1, vec2):
     #     if abs(v1 - v2) > epsilon:
@@ -511,8 +597,9 @@ def _vector_almost_equal(vec1, vec2, epsilon=1e-5):
     # return True
 
 
-def _next_pass_max_approx_fix(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> JulianDate:
-    '''this line is to count towards the doc'''
+def _nextPassMaxApproxFix(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> JulianDate:
+    """Approximates the time of the next satellite pass. For circular orbits this usually approximates the point the
+    satellite achieves its maximum altitude above the horizon."""
     '''
     move the time forward until geo is under the plane
     
@@ -539,32 +626,29 @@ def _next_pass_max_approx_fix(satellite: Orbitable, geo: GeoPosition, time: Juli
             - would need to understand how pVector changes relative to surface
     '''
 
-    if _orbit_altitude(satellite, geo, time) < 0:
-        tn = _time_to_plane(satellite, geo, time)
+    # if the orbital plane is not above, find the time it appears overhead to start looking for passes
+    if _orbitAltitude(satellite, geo, time) < 0:
+        tn = _timeToPlane(satellite, geo, time)
     else:
         tn = time
 
+    # get variables needed for computations
     mu = satellite.body.mu
     state = satellite.getState(tn)
-    # elements = elementsFromState(*state)
     elements = Elements.fromState(*state, tn)
     # mean motion in radians / day
-    # meanMotion = _sma_to_mean_motion(elements[4], mu) * 86400
     meanMotion = _smaToMeanMotion(elements.sma, mu) * 86400
-
-    pVector = _get_p_vector(geo, *state, tn)
+    pVector = _getPVector(geo, *state, tn)
     eccVector = computeEccentricVector(*state, mu)
     angularMomentumNorm = norm(cross(*state))
 
-    #todo: replace the methods when the vector equality works
+    # find the first guess of when the satellites position occupies the 'p-vector'
+    # todo: replace the methods when the vector equality works
     taPVector = vang(eccVector, pVector)
-    if not _vector_almost_equal(norm(cross(eccVector, pVector)), angularMomentumNorm):
+    if not _vectorAlmostEqual(norm(cross(eccVector, pVector)), angularMomentumNorm):
         taPVector = TWOPI - taPVector
 
-    # todo: replace this with values from elements variable
-    # maPVector = _true_to_mean_anomaly(taPVector, elements[3])
     maPVector = _trueToMeanAnomaly(taPVector, elements.ecc)
-    # maPosition = elements[-2]
     maPosition = elements.meanAnomaly
 
     dma = maPVector - maPosition
@@ -572,51 +656,54 @@ def _next_pass_max_approx_fix(satellite: Orbitable, geo: GeoPosition, time: Juli
         dma += TWOPI
 
     tn = tn.future(dma / meanMotion)
-    state = satellite.getState(tn)
-    pVector = _get_p_vector(geo, *state, tn)
 
-    while vang(state[0], pVector) > 4.58e-6:    # 1 arc second
-        # elements = elementsFromState(*state)
+    # update the state and pVector for the while loop condition, this should be a do-while =(
+    state = satellite.getState(tn)
+    pVector = _getPVector(geo, *state, tn)
+    while vang(state[0], pVector) > 4.58e-6:  # 1 arc second
         elements = Elements.fromState(*state, tn)
         # mean motion in radians / day
-        # meanMotion = _sma_to_mean_motion(elements[4], mu) * 86400
         meanMotion = _smaToMeanMotion(elements.sma, mu) * 86400
-
         eccVector = computeEccentricVector(*state, mu)
         angularMomentumNorm = norm(cross(*state))
 
+        # find the position when the satellite occupies the 'p-vector'
         taPVector = vang(eccVector, pVector)
-        if not _vector_almost_equal(norm(cross(eccVector, pVector)), angularMomentumNorm):
+        if not _vectorAlmostEqual(norm(cross(eccVector, pVector)), angularMomentumNorm):
             taPVector = TWOPI - taPVector
 
-        # maPVector = _true_to_mean_anomaly(taPVector, elements[3])
         maPVector = _trueToMeanAnomaly(taPVector, elements.ecc)
-        # maPosition = elements[-2]
         maPosition = elements.meanAnomaly
 
+        # adjust the time based on the anomalies found above
         dma = maPVector - maPosition
         if dma < 0:
             dma += TWOPI
 
         tn = tn.future(dma / meanMotion)
         state = satellite.getState(tn)
-        pVector = _get_p_vector(geo, *state, tn)
+        pVector = _getPVector(geo, *state, tn)
 
     return tn
 
 
-def _compute_altitude(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> float:
+def _computeAltitude(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> float:
+    """Computes the altitude in radians of the highest point of an orbital path above a geo-position's horizontal
+    reference frame."""
+
     position = satellite.getState(time)[0]
-    topocentricPosition = _to_topocentric(position, geo, time)
+    topocentricPosition = _toTopocentricOffset(position, geo, time)
     return asin(topocentricPosition[2] / topocentricPosition.mag())
 
 
-def _max_pass_refine(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> JulianDate:
+def _maxPassRefine(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> JulianDate:
+    """Refines the original time approximation of the maximum altitude of a satellite pass."""
+
     # todo: utilize the dadt values to future time increase and make this a more analytical guess
     oneSecond = 1 / 86400
-    altitude = _compute_altitude(satellite, geo, time)
-    futureAltitude = _compute_altitude(satellite, geo, time.future(oneSecond))
-    pastAltitude = _compute_altitude(satellite, geo, time.future(-oneSecond))
+    altitude = _computeAltitude(satellite, geo, time)
+    futureAltitude = _computeAltitude(satellite, geo, time.future(oneSecond))
+    pastAltitude = _computeAltitude(satellite, geo, time.future(-oneSecond))
 
     parity = 0  # to please the editor
     if altitude >= futureAltitude and altitude >= pastAltitude:
@@ -627,29 +714,33 @@ def _max_pass_refine(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -
         parity = -1
 
     jd = time
-    nextAltitude = _compute_altitude(satellite, geo, time.future(parity * oneSecond))
+    nextAltitude = _computeAltitude(satellite, geo, time.future(parity * oneSecond))
     while altitude < nextAltitude:
         jd = jd.future(parity * oneSecond)
-        altitude = _compute_altitude(satellite, geo, jd)
-        nextAltitude = _compute_altitude(satellite, geo, jd.future(parity * oneSecond))
+        altitude = _computeAltitude(satellite, geo, jd)
+        nextAltitude = _computeAltitude(satellite, geo, jd.future(parity * oneSecond))
 
     return jd
 
 
-def _next_pass_max(satellite: Orbitable, geo: GeoPosition, time: JulianDate, timeout: float) -> JulianDate:
-    nextMax = _next_pass_max_approx_fix(satellite, geo, time)
-    altitude = _orbit_altitude(satellite, geo, nextMax)
+def _nextPassMax(satellite: Orbitable, geo: GeoPosition, time: JulianDate, timeout: float) -> JulianDate:
+    """Computes the time of maximum altitude of the next satellite pass."""
+
+    nextMax = _nextPassMaxApproxFix(satellite, geo, time)
+    altitude = _orbitAltitude(satellite, geo, nextMax)
     while altitude < 0:
         if nextMax - time < timeout:
-            nextMax = _next_pass_max_approx_fix(satellite, geo, nextMax.future(0.001))
-            altitude = _orbit_altitude(satellite, geo, nextMax)
+            nextMax = _nextPassMaxApproxFix(satellite, geo, nextMax.future(0.001))
+            altitude = _orbitAltitude(satellite, geo, nextMax)
         else:
             # todo: make a more specific exception type for this
             raise NoPassException('timed out looking for next pass')
-    return _max_pass_refine(satellite, geo, nextMax)
+    return _maxPassRefine(satellite, geo, nextMax)
 
 
-def _rise_set_times_approx(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> (JulianDate, JulianDate):
+def _riseSetTimesApprox(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> (JulianDate, JulianDate):
+    """Computes the approximate rise and set times of a satellite above a geo-position's horizon."""
+
     elements = satellite.getElements(time)
     mu = satellite.body.mu
     ecc = elements.ecc
@@ -659,7 +750,6 @@ def _rise_set_times_approx(satellite: Orbitable, geo: GeoPosition, time: JulianD
 
     state = satellite.getState(time)
     hNorm = norm(cross(*state))
-    # u = norm(_compute_eccentric_vector(*state, mu)) * a
     u = norm(computeEccentricVector(*state, mu)) * a
     v = norm(cross(hNorm, u)) * b
     ce = -norm(u) * c
@@ -667,8 +757,8 @@ def _rise_set_times_approx(satellite: Orbitable, geo: GeoPosition, time: JulianD
     latitude = radians(geo.latitude)
     longitude = radians(geo.longitude)
     elevation = geo.elevation
-    zeta = _compute_zenith_vector(latitude, longitude, elevation, time)
-    gamma = _compute_position_vector(latitude, longitude, elevation, time)
+    zeta = _computeZenithVector(latitude, longitude, elevation, time)
+    gamma = _computePositionVector(latitude, longitude, elevation, time)
 
     dotZU = dot(zeta, u)
     dotZV = dot(zeta, v)
@@ -698,56 +788,47 @@ def _rise_set_times_approx(satellite: Orbitable, geo: GeoPosition, time: JulianD
     return jd2, jd1
 
 
-'''this method gives us some issues. it is not uncommon for an infinite loop to occur
-while approaching the horizon. the altitude oscillates around 0, never converging. A
-brute force fix could be to take a proportion of the approximated time, but would 
-converge much more slowly. Current idea is to interpolate the 'right' dt term after
-actually computing the future value before looping to the next iteration.'''
-# todo: can we account for earth's rotation here? will that be more accurate/fix our issues?
+# todo: can we account for earth's rotation here? will that be more accurate?
 
-def _horizon_time_refine(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> JulianDate:
+def _horizonTimeRefine(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> JulianDate:
+    """Refines a rise or set time to find the exact time a satellite's altitude is zero."""
+
     # needed to add a proportional governor because of cases oscillating around the zero altitude
     # todo: look into a pid loop for this
     p = 1.0
     iterCount = 0
 
     state = satellite.getState(time)
-    topocentricPosition = _to_topocentric(state[0], geo, time)
+    topocentricPosition = _toTopocentricOffset(state[0], geo, time)
     altitude = asin(topocentricPosition[2] / topocentricPosition.mag())
     while abs(altitude) > 4.85e-6:  # one arc-second
         iterCount += 1
         if iterCount % 10 == 0:
             p /= 2
 
-        topocentricVelocity = rotateEulerTo(
-            ZYX,
-            Angles(
-                radians(geo.longitude) + earthOffsetAngle(time),
-                radians(90 - geo.latitude),
-                0.0
-            ),
-            state[1]
-        )
-
+        topocentricVelocity = _toTopocentric(state[1], geo, time)
         dz = topocentricPosition.mag() * altitude
         dt = (-dz / topocentricVelocity[2]) / 86400
         time = time.future(dt * p)
 
         state = satellite.getState(time)
-        topocentricPosition = _to_topocentric(state[0], geo, time)
+        topocentricPosition = _toTopocentricOffset(state[0], geo, time)
         altitude = asin(topocentricPosition[2] / topocentricPosition.mag())
     return time
 
 
-def _rise_set_times(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> (JulianDate, JulianDate):
-    riseTime, setTime = _rise_set_times_approx(satellite, geo, time)
-    riseTime = _horizon_time_refine(satellite, geo, riseTime)
-    setTime = _horizon_time_refine(satellite, geo, setTime)
+def _riseSetTimes(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> (JulianDate, JulianDate):
+    """Computes the rise and set time of the satellite pass where time is a time during the pass."""
+
+    riseTime, setTime = _riseSetTimesApprox(satellite, geo, time)
+    riseTime = _horizonTimeRefine(satellite, geo, riseTime)
+    setTime = _horizonTimeRefine(satellite, geo, setTime)
     return riseTime, setTime
 
 
-def _get_special_times(riseTime: JulianDate, setTime: JulianDate, beginTime: JulianDate, finishTime: JulianDate)\
+def _getSpecialTimes(riseTime: JulianDate, setTime: JulianDate, beginTime: JulianDate, finishTime: JulianDate) \
         -> (JulianDate, JulianDate, bool, bool):
+    """Computes the first and last times for the 'special' events in a pass (illuminated or unobscured)."""
     firstTime = riseTime
     lastTime = setTime
     #   rise and set sandwich begin time
@@ -775,10 +856,12 @@ def _get_special_times(riseTime: JulianDate, setTime: JulianDate, beginTime: Jul
     return firstTime, lastTime, isFirst, isLast
 
 
-def _derive_basic_info(satellite: Orbitable, geo: GeoPosition, time: JulianDate, isIlluminated: bool,
-                       isUnobscured: bool) -> PositionInfo:
+def _deriveBasicInfo(satellite: Orbitable, geo: GeoPosition, time: JulianDate, isIlluminated: bool,
+                     isUnobscured: bool) -> PositionInfo:
+    """Creates a PositionInfo object for a given event during a pass."""
+
     position = satellite.getState(time)[0]
-    topocentricPosition = _to_topocentric(position, geo, time)
+    topocentricPosition = _toTopocentricOffset(position, geo, time)
     altitude = degrees(asin(topocentricPosition[2] / topocentricPosition.mag()))
     azimuth = degrees(atan3(topocentricPosition[1], -topocentricPosition[0]))
     return PositionInfo(altitude, azimuth, time, isIlluminated, isUnobscured)
@@ -786,6 +869,10 @@ def _derive_basic_info(satellite: Orbitable, geo: GeoPosition, time: JulianDate,
 
 def getNextPass(satellite: Orbitable, geo: GeoPosition, timeOrPass: JulianDate | SatellitePass,
                 timeout: float = 7) -> SatellitePass:
+    """Computes the next satellite pass after a given time or another SatellitePass object. In the case of the latter
+    the pass times in the SatellitePass are used to find the next pass. For multiple passes over a specific duration
+    see getPassList()."""
+
     if not isinstance(satellite, Orbitable):
         raise TypeError('satellite parameter must be Orbitable subtype')
     if not isinstance(geo, GeoPosition):
@@ -796,9 +883,9 @@ def getNextPass(satellite: Orbitable, geo: GeoPosition, timeOrPass: JulianDate |
         time = timeOrPass.maxInfo.time.future(0.001)
     else:
         raise TypeError('timeOrPass parameter must be JulianDate or SatellitePass type')
-    nextPassTime = _next_pass_max(satellite, geo, time, timeout)
+    nextPassTime = _nextPassMax(satellite, geo, time, timeout)
 
-    riseTime, setTime = _rise_set_times(satellite, geo, nextPassTime)
+    riseTime, setTime = _riseSetTimes(satellite, geo, nextPassTime)
     enterTime, exitTime = getShadowTimes(satellite, nextPassTime, Shadow.PENUMBRA)
     # todo: if timezone of riseTime is different than the timezone of geo, then the rise/set times may be for the
     #   wrong day and the unobscured values may be wrong.
@@ -807,33 +894,33 @@ def getNextPass(satellite: Orbitable, geo: GeoPosition, timeOrPass: JulianDate |
     sunRiseTime, sunSetTime = getSunTimes(riseTime, geo)
 
     firstIlluminatedTime, lastIlluminatedTime, riseIlluminated, setIlluminated \
-        = _get_special_times(riseTime, setTime, enterTime, exitTime)
+        = _getSpecialTimes(riseTime, setTime, enterTime, exitTime)
     firstUnobscuredTime, lastUnobscuredTime, riseUnobscured, setUnobscured \
-        = _get_special_times(riseTime, setTime, sunRiseTime, sunSetTime)
+        = _getSpecialTimes(riseTime, setTime, sunRiseTime, sunSetTime)
     maxIlluminated = not (enterTime <= nextPassTime <= exitTime)
     maxUnobscured = (nextPassTime < sunRiseTime) or (nextPassTime >= sunSetTime)
 
-    riseInfo = _derive_basic_info(satellite, geo, riseTime, riseIlluminated, riseUnobscured)
-    setInfo = _derive_basic_info(satellite, geo, setTime, setIlluminated, setUnobscured)
-    maxInfo = _derive_basic_info(satellite, geo, nextPassTime, maxIlluminated, maxUnobscured)
+    riseInfo = _deriveBasicInfo(satellite, geo, riseTime, riseIlluminated, riseUnobscured)
+    setInfo = _deriveBasicInfo(satellite, geo, setTime, setIlluminated, setUnobscured)
+    maxInfo = _deriveBasicInfo(satellite, geo, nextPassTime, maxIlluminated, maxUnobscured)
 
     firstIlluminatedInfo = lastIlluminatedInfo = firstUnobscuredInfo = lastUnobscuredInfo = None
     if firstIlluminatedTime is not None and firstIlluminatedTime != riseTime:
-        firstIlluminatedInfo = _derive_basic_info(satellite, geo, firstIlluminatedTime, True,
-                                                  firstIlluminatedTime < sunRiseTime
-                                                  or firstIlluminatedTime >= sunSetTime)
+        firstIlluminatedInfo = _deriveBasicInfo(satellite, geo, firstIlluminatedTime, True,
+                                                firstIlluminatedTime < sunRiseTime
+                                                or firstIlluminatedTime >= sunSetTime)
     if lastIlluminatedTime is not None and lastIlluminatedTime != setTime:
-        lastIlluminatedInfo = _derive_basic_info(satellite, geo, lastIlluminatedTime, True,
-                                                 lastIlluminatedTime < sunRiseTime
-                                                 or lastIlluminatedTime >= sunSetTime)
+        lastIlluminatedInfo = _deriveBasicInfo(satellite, geo, lastIlluminatedTime, True,
+                                               lastIlluminatedTime < sunRiseTime
+                                               or lastIlluminatedTime >= sunSetTime)
     if firstUnobscuredTime is not None and firstUnobscuredTime == sunSetTime:
-        firstUnobscuredInfo = _derive_basic_info(satellite, geo, firstUnobscuredTime,
-                                                 firstUnobscuredTime < enterTime
-                                                 or firstUnobscuredTime >= exitTime, True)
+        firstUnobscuredInfo = _deriveBasicInfo(satellite, geo, firstUnobscuredTime,
+                                               firstUnobscuredTime < enterTime
+                                               or firstUnobscuredTime >= exitTime, True)
     if lastUnobscuredTime is not None and lastUnobscuredTime == sunRiseTime:
-        lastUnobscuredInfo = _derive_basic_info(satellite, geo, lastUnobscuredTime,
-                                                lastUnobscuredTime < enterTime
-                                                or lastUnobscuredTime >= exitTime, True)
+        lastUnobscuredInfo = _deriveBasicInfo(satellite, geo, lastUnobscuredTime,
+                                              lastUnobscuredTime < enterTime
+                                              or lastUnobscuredTime >= exitTime, True)
 
     np = SatellitePass(riseInfo, setInfo, maxInfo,
                        firstUnobscuredInfo=firstUnobscuredInfo,
@@ -847,6 +934,17 @@ def getNextPass(satellite: Orbitable, geo: GeoPosition, timeOrPass: JulianDate |
 
 # todo: pass a PassConstraints into this?
 def getPassList(satellite: Orbitable, geo: GeoPosition, start: JulianDate, duration: float) -> tuple[SatellitePass]:
+    """Generate a list of SatellitePass objects over a duration of time in solar days."""
+
+    if not isinstance(satellite, Orbitable):
+        raise TypeError('satellite parameter must be Orbitable subtype', type(satellite))
+    if not isinstance(geo, GeoPosition):
+        raise TypeError('geo parameter must be GeoPosition type', type(geo))
+    _checkJdType(start, 'start')
+    _checkNumericType(duration, 'duration')
+    if duration < 0:
+        raise ValueError('duration parameter must not be negative', duration)
+
     passList = []
     # offset the initial small step forward between computations
     nextTime = start.future(-0.001)
@@ -864,6 +962,8 @@ def getPassList(satellite: Orbitable, geo: GeoPosition, start: JulianDate, durat
 
 
 def toTopocentric(vector: Vector, geo: GeoPosition, time: JulianDate) -> Vector:
+    """Converts a vector to a topocentric reference frame defined by a geo-position at a specified time."""
+
     if not isinstance(vector, Vector):
         raise TypeError('vector parameter must be EVector type')
     if not isinstance(geo, GeoPosition):
@@ -871,10 +971,11 @@ def toTopocentric(vector: Vector, geo: GeoPosition, time: JulianDate) -> Vector:
     if not isinstance(time, JulianDate):
         raise TypeError('time parameter must be JulianDate type')
 
-    return _to_topocentric(vector, geo, time)
+    return _toTopocentricOffset(vector, geo, time)
 
 
-def fromTopocentric(vector: Vector, time: JulianDate, geo: GeoPosition) -> Vector:
+def fromTopocentric(vector: Vector, geo: GeoPosition, time: JulianDate) -> Vector:
+    """Converts a vector from a topocentric reference frame defined by a geo-position at a specified time."""
     if not isinstance(vector, Vector):
         raise TypeError('vector parameter must be EVector type')
     if not isinstance(geo, GeoPosition):
@@ -891,20 +992,13 @@ def fromTopocentric(vector: Vector, time: JulianDate, geo: GeoPosition) -> Vecto
             0.0
         )
     )
-    # matrix = getEulerMatrix(
-    #     ZYX,
-    #     EulerAngles(
-    #         radians(geo.longitude) + earthOffsetAngle(time),
-    #         radians(90 - geo.latitude),
-    #         0.0
-    #     )
-    # )
 
-    # return undoRotateToThenOffset(matrix, geoVector, vector)
     return rotateOffsetFrom(matrix, geoVector, vector)
 
 
 def getAltitude(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> float:
+    """Returns the altitude of an orbitable from a geo-position at a specified time."""
+
     if not isinstance(satellite, Orbitable):
         raise TypeError('satellite parameter must be Orbitable subtype')
     if not isinstance(geo, GeoPosition):
@@ -913,12 +1007,14 @@ def getAltitude(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> flo
         raise TypeError('time parameter must be JulianDate type')
 
     position = satellite.getState(time)[0]
-    topocentricPosition = _to_topocentric(position, geo, time)
+    topocentricPosition = _toTopocentricOffset(position, geo, time)
     arg = topocentricPosition[2] / topocentricPosition.mag()
     return degrees(asin(arg))
 
 
 def getAzimuth(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> float:
+    """Returns the azimuth of an orbitable from a geo-position at a specified time."""
+
     if not isinstance(satellite, Orbitable):
         raise TypeError('satellite parameter must be Orbitable subtype')
     if not isinstance(geo, GeoPosition):
@@ -927,16 +1023,17 @@ def getAzimuth(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> floa
         raise TypeError('time parameter must be JulianDate type')
 
     position = satellite.getState(time)[0]
-    topocentricPosition = _to_topocentric(position, geo, time)
+    topocentricPosition = _toTopocentricOffset(position, geo, time)
     return degrees(atan3(topocentricPosition[1], -topocentricPosition[0]))
 
 
 def azimuthAngleString(azimuth: float) -> str:
+    """Returns a compass direction string from an azimuth in degrees."""
+
     # azimuth in degrees
-    _check_real_type(azimuth, 'azimuth')
+    _checkNumericType(azimuth, 'azimuth')
     if not (0 <= azimuth <= 360):
         raise ValueError('azimuth angle must be between 0 and 360 degrees')
-    return _azimuth_angle_string(azimuth)
-
+    return _azimuthAngleString(azimuth)
 
 # todo: create alt-az type and methods for it

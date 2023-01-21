@@ -1,15 +1,16 @@
 from enum import Enum
 from functools import total_ordering
 from math import sin, cos, pi, radians, tan, asin, sqrt, degrees, acos
+from operator import index
 
 from pyevspace import Vector
-from sattrack._sampa import _spa_earth_heliocentric_radius, _mean_sidereal_time, _apparent_sidereal_time, \
-    _spa_earth_heliocentric_longitude, _spa_geocentric_longitude, _spa_earth_heliocentric_latitude, \
-    _spa_geocentric_latitude, _x_values, _xy_table, _nutation_longitude, _nutation_obliquity, _mean_obliquity, \
-    _true_obliquity, _right_ascension, _declination, _spa_equitorial_parallax_sun, _u_term, _x_term, _y_term, \
-    _local_hour_angle, _parallax_right_ascension, _topocentric_right_ascension, _topocentric_declination, \
-    _topocentric_local_hour_angle
-from sattrack._topocentric import _to_topocentric
+from sattrack._sampa import _spaEarthHeliocentricRadius, _meanSiderealTime, _apparentSiderealTime, \
+    _spaEarthHeliocentricLongitude, _spaGeocentricLongitude, _spaEarthHeliocentricLatitude, \
+    _spaGeocentricLatitude, _xValues, _xyTable, _nutationLongitude, _nutationObliquity, _meanObliquity, \
+    _trueObliquity, _right_ascension, _declination, _spaEquitorialParallaxSun, _uTerm, _xTerm, _yTerm, \
+    _localHourAngle, _parallaxRightAscension, _topocentricRightAscension, _topocentricDeclination, \
+    _topocentricLocalHourAngle
+from sattrack._topocentric import _toTopocentricOffset
 
 from sattrack.exceptions import SunRiseSetException
 from sattrack.spacetime.juliandate import JulianDate
@@ -33,7 +34,8 @@ class Twilight(Enum):
         return NotImplemented
 
 
-def _generate_times(jd: JulianDate):
+def _generateTimes(jd: JulianDate):
+    """Generates the times needed for the SAMPA: JD, JDE, JC, JCE, JME."""
     JD = jd.value
     JDE = JD + DELTAT / 86400
     JC = (JD - 2451545) / 36525
@@ -41,48 +43,54 @@ def _generate_times(jd: JulianDate):
     return JD, JDE, JC, JCE, JCE / 10
 
 
-def _compute_jme(time: JulianDate) -> float:
+def _computeJme(time: JulianDate) -> float:
+    """Computes the JME term for the SAMPA."""
     JDE = time.value + DELTAT / 86400
     return (JDE - 2451545) / 36525
 
 
-def __sun_primary_bundle(jd: JulianDate):
-    # returns exactly in this order: L, B, deltaPsi, deltaEpsilon, epsilon
-    _, _, _, JCE, JME = _generate_times(jd)
+def __sunPrimaryBundle(jd: JulianDate):
+    """Computes the primary data bundle for computing sun angles. Return order is L, B, deltaPsi, deltaEpsilon,
+    epsilon."""
+    _, _, _, JCE, JME = _generateTimes(jd)
 
-    heliocentricLongitude = _spa_earth_heliocentric_longitude(JME)
-    longitude = _spa_geocentric_longitude(heliocentricLongitude)
-    heliocentricLatitude = _spa_earth_heliocentric_latitude(JME)
-    latitude = _spa_geocentric_latitude(heliocentricLatitude)
+    heliocentricLongitude = _spaEarthHeliocentricLongitude(JME)
+    longitude = _spaGeocentricLongitude(heliocentricLongitude)
+    heliocentricLatitude = _spaEarthHeliocentricLatitude(JME)
+    latitude = _spaGeocentricLatitude(heliocentricLatitude)
 
-    xValues = _x_values(JCE)
-    xyTable = _xy_table(xValues)
-    nutationLongitude = _nutation_longitude(JCE, xyTable)
-    nutationObliquity = _nutation_obliquity(JCE, xyTable)
+    xValues = _xValues(JCE)
+    xyTable = _xyTable(xValues)
+    nutationLongitude = _nutationLongitude(JCE, xyTable)
+    nutationObliquity = _nutationObliquity(JCE, xyTable)
 
-    meanObliquity = _mean_obliquity(JME)
-    trueObliquity = _true_obliquity(meanObliquity, nutationObliquity)
+    meanObliquity = _meanObliquity(JME)
+    trueObliquity = _trueObliquity(meanObliquity, nutationObliquity)
 
     # including nutationObliquity in this even though im not sure well need it because it could be useful
     # as it's expensive to compute independently
     return longitude, latitude, nutationLongitude, nutationObliquity, trueObliquity
 
 
-def __sun_primary_bundle_right_ascension(primaryBundle):
+def __sunPrimaryBundleRightAscension(primaryBundle):
+    """Computes the sun right-ascension from the primary data bundle."""
     (longitude, latitude, _, _, trueObliquity) = primaryBundle
 
     return _right_ascension(longitude, latitude, trueObliquity)
 
 
-def __sun_primary_bundle_declination(primaryBundle):
+def __sunPrimaryBundleDeclination(primaryBundle):
+    """Computes the sun declination from the primary data bundle."""
     (longitude, latitude, _, _, trueObliquity) = primaryBundle
 
     return _declination(longitude, latitude, trueObliquity)
 
 
-def __sun_secondary_bundle(primaryBundle, jd, geo):
+def __sunSecondaryBundle(primaryBundle, jd, geo):
+    """Computes the secondary data bundle for computing sun angles. Return order is hour angle, right-ascension,
+    parallax, right-ascension, declination, x-term, y-term, sun parallax."""
     # get independent values
-    JD, JDE, JC, JCE, JME = _generate_times(jd)
+    JD, JDE, JC, JCE, JME = _generateTimes(jd)
     geoLatitude = radians(geo.latitude)
     geoLongitude = radians(geo.longitude)
     elevation = geo.elevation * 1000
@@ -90,57 +98,61 @@ def __sun_secondary_bundle(primaryBundle, jd, geo):
     longitude, latitude, nutationLongitude, nutationObliquity, _ = primaryBundle
 
     # compute right-ascension and declination
-    rightAscension = __sun_primary_bundle_right_ascension(primaryBundle)
-    declination = __sun_primary_bundle_declination(primaryBundle)
+    rightAscension = __sunPrimaryBundleRightAscension(primaryBundle)
+    declination = __sunPrimaryBundleDeclination(primaryBundle)
 
     # compute middle tier dependent variables
-    meanSiderealTime = _mean_sidereal_time(JD, JC)
-    apparentSiderealTime = _apparent_sidereal_time(meanSiderealTime, nutationLongitude, nutationObliquity)
-    sunDistance = _spa_earth_heliocentric_radius(JME)
-    sunParallax = _spa_equitorial_parallax_sun(sunDistance)
-    uTerm = _u_term(geoLatitude)
-    xTerm = _x_term(uTerm, geoLatitude, elevation)
-    yTerm = _y_term(uTerm, geoLatitude, elevation)
+    meanSiderealTime = _meanSiderealTime(JD, JC)
+    apparentSiderealTime = _apparentSiderealTime(meanSiderealTime, nutationLongitude, nutationObliquity)
+    sunDistance = _spaEarthHeliocentricRadius(JME)
+    sunParallax = _spaEquitorialParallaxSun(sunDistance)
+    uTerm = _uTerm(geoLatitude)
+    xTerm = _xTerm(uTerm, geoLatitude, elevation)
+    yTerm = _yTerm(uTerm, geoLatitude, elevation)
 
     # compute directly used dependent variables
-    hourAngle = _local_hour_angle(apparentSiderealTime, geoLongitude, rightAscension)
-    rightAscensionParallax = _parallax_right_ascension(xTerm, sunParallax, hourAngle, declination)
+    hourAngle = _localHourAngle(apparentSiderealTime, geoLongitude, rightAscension)
+    rightAscensionParallax = _parallaxRightAscension(xTerm, sunParallax, hourAngle, declination)
 
     return hourAngle, rightAscensionParallax, rightAscension, declination, xTerm, yTerm, sunParallax
 
 
-def __sun_secondary_bundle_right_ascension(secondaryBundle):
+def __sunSecondaryBundleRightAscension(secondaryBundle):
+    """Computes the topocentric right-ascension from the secondary bundle."""
     _, rightAscensionParallax, rightAscension, *_ = secondaryBundle
-    return _topocentric_right_ascension(rightAscension, rightAscensionParallax)
+    return _topocentricRightAscension(rightAscension, rightAscensionParallax)
 
 
-def __sun_secondary_bundle_declination(secondaryBundle):
+def __sunSecondaryBundleDeclination(secondaryBundle):
+    """Computes the topocentric declination from the secondary bundle."""
     hourAngle, rightAscensionParallax, _, declination, xTerm, yTerm, sunParallax = secondaryBundle
-    return _topocentric_declination(yTerm, declination, sunParallax, rightAscensionParallax, hourAngle)
+    return _topocentricDeclination(yTerm, declination, sunParallax, rightAscensionParallax, hourAngle)
 
 
 # todo: do we need this as a private method?
-def _sun_celestial_coordinates(jd, geo=None):
+def _sunCelestialCoordinates(jd, geo=None):
+    """Computes the celestial coordinates of the sun at a given time. If geo is not None signals the topocentric
+    celestial coordinates."""
     # geo not being None signals topocentric
-    primaryBundle = __sun_primary_bundle(jd)
+    primaryBundle = __sunPrimaryBundle(jd)
 
     if geo is None:
-        rightAscension = __sun_primary_bundle_right_ascension(primaryBundle)
-        declination = __sun_primary_bundle_declination(primaryBundle)
+        rightAscension = __sunPrimaryBundleRightAscension(primaryBundle)
+        declination = __sunPrimaryBundleDeclination(primaryBundle)
     else:
-        secondaryBundle = __sun_secondary_bundle(primaryBundle, jd, geo)
-        rightAscension = __sun_secondary_bundle_right_ascension(secondaryBundle)
-        declination = __sun_secondary_bundle_declination(secondaryBundle)
+        secondaryBundle = __sunSecondaryBundle(primaryBundle, jd, geo)
+        rightAscension = __sunSecondaryBundleRightAscension(secondaryBundle)
+        declination = __sunSecondaryBundleDeclination(secondaryBundle)
 
     return rightAscension, declination
 
 
-def _sun_position_vector(time: JulianDate) -> Vector:
-    # _, _, _, _, JME = _generate_times(time)
-    JME = _compute_jme(time)
+def _sunPositionVector(time: JulianDate) -> Vector:
+    """Computes the sun position vector at a given time."""
+    JME = _computeJme(time)
 
-    rightAscension, declination = _sun_celestial_coordinates(time)
-    sunDistance = _spa_earth_heliocentric_radius(JME)
+    rightAscension, declination = _sunCelestialCoordinates(time)
+    sunDistance = _spaEarthHeliocentricRadius(JME)
 
     zComp = sin(declination)
     xComp = sqrt((cos(declination) ** 2) / (1 + (tan(rightAscension) ** 2)))
@@ -153,13 +165,14 @@ def _sun_position_vector(time: JulianDate) -> Vector:
 
 
 def getTwilight(geo: GeoPosition, time: JulianDate) -> Twilight:
+    """Gets the twilight type for a geo-position at a given time."""
     if not isinstance(time, JulianDate):
         raise TypeError('time parameter must be JulianDate type')
     if not isinstance(geo, GeoPosition):
         raise TypeError('geo parameter must be GeoPosition type')
 
-    sunPosition = _sun_position_vector(time)
-    sunSEZ = _to_topocentric(sunPosition, geo, time)
+    sunPosition = _sunPositionVector(time)
+    sunSEZ = _toTopocentricOffset(sunPosition, geo, time)
     sunAngle = degrees(asin(sunSEZ[2] / sunSEZ.mag()))
 
     if sunAngle < -18:
@@ -175,14 +188,18 @@ def getTwilight(geo: GeoPosition, time: JulianDate) -> Twilight:
 
 
 def getSunTimes(jd: JulianDate, geo: GeoPosition) -> (JulianDate, JulianDate, JulianDate):
+    """Computes the sunrise, sunset and transit times for a geo-position on a given date."""
+
     if not isinstance(jd, JulianDate):
         raise TypeError('jd parameter must be JulianDate type')
     if not isinstance(geo, GeoPosition):
         raise TypeError('geo parameter must be GeoPosition type')
-    return _sun_angles(jd, geo, -0.01454441043328608)[:-1]
+    return _sunAngles(jd, geo, -0.01454441043328608)[:-1]
 
 
-def _sun_angles(jd, geo, target):
+def _sunAngles(jd: JulianDate, geo: GeoPosition, target: float) -> (JulianDate, JulianDate, JulianDate):
+    """Computes the first and last time the sun achieves a certain altitude angle as well as the transit time for a
+    given date. Target angle is in radians."""
     # todo: adjust this based solely on position relative to UT?
     tzOffset = jd.timezone / 24.0
     localVal = jd.value + tzOffset
@@ -190,10 +207,10 @@ def _sun_angles(jd, geo, target):
     if localVal - int(localVal) < 0.5:
         num -= 1
     time = JulianDate.fromNumber(num + 0.5 - tzOffset, jd.timezone)
-    JD, _, JC, *_ = _generate_times(time)
-    _, _, nutationLongitude, nutationObliquity, _ = __sun_primary_bundle(time)
-    meanSiderealTime = _mean_sidereal_time(JD, JC)
-    apparentSiderealTime = _apparent_sidereal_time(meanSiderealTime, nutationLongitude, nutationObliquity)
+    JD, _, JC, *_ = _generateTimes(time)
+    _, _, nutationLongitude, nutationObliquity, _ = __sunPrimaryBundle(time)
+    meanSiderealTime = _meanSiderealTime(JD, JC)
+    apparentSiderealTime = _apparentSiderealTime(meanSiderealTime, nutationLongitude, nutationObliquity)
 
     geoLatitude = radians(geo.latitude)
     geoLongitude = radians(geo.longitude)
@@ -202,14 +219,14 @@ def _sun_angles(jd, geo, target):
     time_m1 = time.future(dt - 1)
     time_0 = time.future(dt)
     time_p1 = time.future(dt + 1)
-    primaryBundle_m1 = __sun_primary_bundle(time_m1)
-    primaryBundle_0 = __sun_primary_bundle(time_0)
-    primaryBundle_p1 = __sun_primary_bundle(time_p1)
+    primaryBundle_m1 = __sunPrimaryBundle(time_m1)
+    primaryBundle_0 = __sunPrimaryBundle(time_0)
+    primaryBundle_p1 = __sunPrimaryBundle(time_p1)
 
     # A.2.2
-    alpha_m1, delta_m1 = _sun_celestial_coordinates(time_m1)
-    alpha_0, delta_0 = _sun_celestial_coordinates(time_0)
-    alpha_p1, delta_p1 = _sun_celestial_coordinates(time_p1)
+    alpha_m1, delta_m1 = _sunCelestialCoordinates(time_m1)
+    alpha_0, delta_0 = _sunCelestialCoordinates(time_0)
+    alpha_p1, delta_p1 = _sunCelestialCoordinates(time_p1)
 
     # A.2.3
     m0 = (alpha_0 - geoLongitude - apparentSiderealTime) / TWOPI
@@ -276,62 +293,69 @@ def _sun_angles(jd, geo, target):
 
 
 def getSunPosition(time: JulianDate) -> Vector:
-    # _check_jd(jd)
-    # _, _, _, _, JME = _generate_times(jd)
-    # rightAscension, declination = _sun_celestial_coordinates(jd)
-    # sunDistance = _spa_earth_heliocentric_radius(JME)
-    #
-    # zComp = sin(declination)
-    # xComp = sqrt((cos(declination) ** 2) / (1 + (tan(rightAscension) ** 2)))
-    # if pi / 2 < rightAscension < 3 * pi / 2:
-    #     xComp = -xComp
-    # yComp = xComp * tan(rightAscension)
-    # yComp = abs(yComp) if rightAscension < pi else -abs(yComp)
-    #
-    # return EVector(xComp, yComp, zComp) * sunDistance * AU
+    """Computes the sun position vector for a given time."""
+
     if not isinstance(time, JulianDate):
         raise TypeError('time parameter must be JulianDate type')
-    return _sun_position_vector(time)
+    return _sunPositionVector(time)
 
 
 def getSunCelestialCoordinates(jd: JulianDate, geo: GeoPosition = None) -> CelestialCoordinates:
+    """Computes the Sun's celestial coordinates at a given time. If geo is not None the topocentric coordinates are
+    computed instead."""
+
     # geo enables topocentric coordinates
-    rightAscensionRadians, declinationRadians = _sun_celestial_coordinates(jd, geo)
+    if not isinstance(jd, JulianDate):
+        raise TypeError('jd parameter must be a JulianDate type', type(jd))
+    if geo is not None and not isinstance(geo, GeoPosition):
+        raise TypeError('geo parameter must be a GeoPosition type', type(geo))
+    rightAscensionRadians, declinationRadians = _sunCelestialCoordinates(jd, geo)
     return CelestialCoordinates(rightAscensionRadians * 12 / pi, degrees(declinationRadians))
 
 
 def getSunHourAngle(jd: JulianDate, geo: GeoPosition, topocentric=False) -> CelestialCoordinates:
+    """Computes the sun's hour angle relative to a geo-position, in radians. Setting topocentric to True computes
+    topocentric hour angle."""
+
     # todo: can we just implement the _sun_hour_angle body directly here? do we need it elsewhere?
     # todo: create a radians to time units conversion constant
-    hourAngle = _sun_hour_angle(jd, geo, topocentric) * 12 / pi
+    if not isinstance(jd, JulianDate):
+        raise TypeError('jd parameter must be a JulianDate type', type(jd))
+    if not isinstance(geo, GeoPosition):
+        raise TypeError('geo parameter must be a GeoPosition type', type(geo))
+    topocentric = index(topocentric)
+    hourAngle = _sunHourAngle(jd, geo, topocentric) * 12 / pi
     return hourAngle if hourAngle > 0 else hourAngle + 24
 
 
-def __sun_primary_bundle_hour_angle(primaryBundle, jd, geo):
-    JD, _, JC, *_ = _generate_times(jd)
+def __sunPrimaryBundleHourAngle(primaryBundle, jd: JulianDate, geo: GeoPosition) -> float:
+    """Computes the local hour angle from a primary data bundle."""
+    JD, _, JC, *_ = _generateTimes(jd)
     _, _, nutationLongitude, nutationObliquity, _ = primaryBundle
 
-    rightAscension = __sun_primary_bundle_right_ascension(primaryBundle)
-    meanSiderealTime = _mean_sidereal_time(JD, JC)
-    apparentSiderealTime = _apparent_sidereal_time(meanSiderealTime, nutationLongitude, nutationObliquity)
+    rightAscension = __sunPrimaryBundleRightAscension(primaryBundle)
+    meanSiderealTime = _meanSiderealTime(JD, JC)
+    apparentSiderealTime = _apparentSiderealTime(meanSiderealTime, nutationLongitude, nutationObliquity)
 
-    return _local_hour_angle(apparentSiderealTime, radians(geo.longitude), rightAscension)
+    return _localHourAngle(apparentSiderealTime, radians(geo.longitude), rightAscension)
 
 
-def __sun_secondary_bundle_hour_angle(secondaryBundle):
+def __sunSecondaryBundleHourAngle(secondaryBundle):
+    """Computes a topocentric hour angle from a secondary data bundle."""
     hourAngle, rightAscensionParallax, *_ = secondaryBundle
-    return _topocentric_local_hour_angle(hourAngle, rightAscensionParallax)
+    return _topocentricLocalHourAngle(hourAngle, rightAscensionParallax)
 
 
 # todo: do we need this as a private method?
-def _sun_hour_angle(jd, geo, topocentric=False):
-    primaryBundle = __sun_primary_bundle(jd)
+def _sunHourAngle(jd, geo, topocentric=False):
+    """Logic for computing the correct solar hour angle."""
+    primaryBundle = __sunPrimaryBundle(jd)
 
     if topocentric is True:
-        secondaryBundle = __sun_secondary_bundle(primaryBundle, jd, geo)
-        hourAngle = __sun_secondary_bundle_hour_angle(secondaryBundle)
+        secondaryBundle = __sunSecondaryBundle(primaryBundle, jd, geo)
+        hourAngle = __sunSecondaryBundleHourAngle(secondaryBundle)
     else:
-        hourAngle = __sun_primary_bundle_hour_angle(primaryBundle, jd, geo)
+        hourAngle = __sunPrimaryBundleHourAngle(primaryBundle, jd, geo)
 
     return hourAngle
 

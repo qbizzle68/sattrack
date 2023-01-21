@@ -12,7 +12,6 @@ from sattrack.eclipse import *
 from sattrack.exceptions import *
 from sattrack.moon import *
 from sattrack.orbit import *
-from sattrack.sampa import *
 from sattrack.sun import *
 from sattrack.tle import *
 from sattrack.topocentric import *
