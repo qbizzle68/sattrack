@@ -4,7 +4,7 @@ import math as _math
 
 from sattrack._coordinates import _computeZenithVector, _computePositionVector, _radiusAtLat, \
     _geodeticToGeocentric
-from sattrack.util.constants import EARTH_FLATTENING
+from sattrack.util.constants import EARTH_FLATTENING, TWOPI
 from pyevspace import Vector
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
@@ -125,6 +125,11 @@ class GeoPosition(Coordinates):
     def getRadius(self) -> float:
         """Returns the radius of the position including elevation in kilometers."""
         return _radiusAtLat(self._lat) + self._elevation
+
+    def getVelocityVector(self):
+        """Computes the velocity vector in kilometers / second of the GeoPosition in the topocentric reference frame."""
+        vel = self.getRadius() * TWOPI / 86164.090531
+        return Vector(0, vel, 0)
 
     def getGeocentricLatitude(self) -> float:
         """Computes the geocentric latitude of the position."""
