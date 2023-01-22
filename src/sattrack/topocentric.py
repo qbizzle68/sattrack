@@ -20,7 +20,8 @@ from sattrack.util.constants import TWOPI
 from sattrack.util.conversions import atan3
 
 __all__ = ('PositionInfo', 'SatellitePass', 'SatellitePassConstraints', 'getNextPass', 'getPassList', 'toTopocentric',
-           'fromTopocentric', 'getAltitude', 'getAzimuth', 'azimuthAngleString', 'timeToHorizon')
+           'fromTopocentric', 'getAltitude', 'getAzimuth', 'azimuthAngleString', 'toTopocentricPosition',
+           'toTopocentricVelocity')
 
 
 def _azimuthAngleString(azimuth):
@@ -461,24 +462,11 @@ class SatellitePassConstraints:
         self._unobscured = None
 
 
-def __maxPassAnomalies(position, velocity, mu, pVector, ecc):
-    """Compute the anomalies as they are used in the max pass finder methods."""
-    # eccentricVector = _compute_eccentric_vector(position, velocity, mu)
-    eccentricVector = computeEccentricVector(position, velocity, mu)
-    trueAnomaly_n = _trueAnomalyFromState(position, velocity, mu)
-    # todo: use eccentricVector.mag() if we know it's accurate
-    meanAnomaly_n = _trueToMeanAnomaly(trueAnomaly_n, ecc)
-    trueAnomaly_n1 = vang(eccentricVector, pVector)
-    if norm(cross(eccentricVector, pVector)) != norm(cross(position, velocity)):
-        trueAnomaly_n1 = TWOPI - trueAnomaly_n1
-    meanAnomaly_n1 = _trueToMeanAnomaly(trueAnomaly_n1, ecc)
-    return trueAnomaly_n, trueAnomaly_n1, meanAnomaly_n, meanAnomaly_n1
-
-
 def _getPVector(geo: GeoPosition, position: Vector, velocity: Vector, time: JulianDate) -> Vector:
     """Computes the 'P-Vector', the shortest vector between a geo-position and the line formed by the intersection of
     the horizontal plane of the geo-position and the orbital plane. This is the vector that points towards the highest
     point of the orbital path if it's above a viewer's horizon."""
+
     latitude = radians(geo.latitude)
     longitude = radians(geo.longitude)
     elevation = geo.elevation
@@ -539,62 +527,7 @@ def _timeToPlane(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> Ju
     return jd
 
 
-# def _nextPassMaxApprox(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> JulianDate:
-#     """Approximates the time of the next satellite pass. For circular orbits this usually approximates the point the
-#     satellite achieves its maximum altitude above the horizon."""
-#
-#     # if the orbital plane is not above, find the time it appears overhead to start looking for passes
-#     if _orbitAltitude(satellite, geo, time) < 0:
-#         tn = _timeToPlane(satellite, geo, time)
-#     else:
-#         tn = time
-#
-#     # get variables needed for computations
-#     mu = satellite.body.mu
-#     elements = satellite.getElements(time)
-#     ecc = elements.ecc
-#     # mean motion in radians / day
-#     meanMotion = _smaToMeanMotion(elements.sma, mu) * 86400
-#
-#     # find the first guess of when the satellites position occupies the 'p-vector'
-#     state = satellite.getState(tn)
-#     pVector = _getPVector(geo, *state, tn)
-#     _, _, meanAnomaly_n, meanAnomaly_n1 = __maxPassAnomalies(*state, mu, pVector, ecc)
-#     dma = meanAnomaly_n1 - meanAnomaly_n
-#     if meanAnomaly_n1 < meanAnomaly_n:
-#         dma += TWOPI
-#     tn = tn.future(dma / meanMotion)
-#
-#     # update state and pVector for the while loop condition, this should be a do-while =(
-#     state = satellite.getState(tn)
-#     pVector = _getPVector(geo, *state, tn)
-#     while vang(state[0], pVector) > 4.85e-6:  # one arc-second
-#         trueAnomaly_n, trueAnomaly_n1, meanAnomaly_n, meanAnomaly_n1 = __maxPassAnomalies(*state, mu, pVector, ecc)
-#         dma = meanAnomaly_n1 - meanAnomaly_n
-#         if trueAnomaly_n1 <= trueAnomaly_n:
-#             if (trueAnomaly_n - trueAnomaly_n1) >= pi:
-#                 dma += TWOPI
-#         else:
-#             if (trueAnomaly_n1 - trueAnomaly_n) > pi:
-#                 dma -= TWOPI
-#         tn = tn.future(dma / meanMotion)
-#         state = satellite.getState(tn)
-#         pVector = _getPVector(geo, *state, tn)
-#
-#     return tn
-
-
-# def _vector_almost_equal(vec1, vec2, epsilon=1e-5):
-#     return dot(vec1, vec2) > (1 - epsilon)
-
-    # for v1, v2 in zip(vec1, vec2):
-    #     if abs(v1 - v2) > epsilon:
-    #         return False
-    #
-    # return True
-
-
-def _nextPassMaxApproxFix(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> JulianDate:
+def _nextPassMaxApprox(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> JulianDate:
     """Approximates the time of the next satellite pass. For circular orbits this usually approximates the point the
     satellite achieves its maximum altitude above the horizon."""
     '''
@@ -699,14 +632,23 @@ def _getAltitudeDerivative(topoPosition: Vector, topoVelocity: Vector) -> float:
     """Computes the derivative of altitude with respect to time from topocentric position and velocity vectors."""
 
     rDotV = dot(topoPosition, topoVelocity)
+    rMag = topoPosition.mag()
+    # preserves round off
     rMag2 = topoPosition.mag2()
+    z2OverRMag2 = topoPosition[2] * topoPosition[2] / rMag2
 
-    rightNumeratorTerm = topoPosition[2] * rDotV / rMag2
-    rightDenominatorTerm = topoPosition[2] * topoPosition[2] / rMag2
-    numerator = topoVelocity[2] - rightNumeratorTerm
-    denominator = sqrt(1 - rightDenominatorTerm)
+    lhs = (1 / sqrt(1 - z2OverRMag2))
+    rhsLeft = topoVelocity[2] / topoPosition.mag()
+    rhsRight = topoPosition[2] * rDotV / (rMag * rMag2)
 
-    return numerator / denominator
+    return lhs * (rhsLeft - rhsRight)
+
+    # rightNumeratorTerm = topoPosition[2] * rDotV / rMag2
+    # rightDenominatorTerm = topoPosition[2] * topoPosition[2] / rMag2
+    # numerator = topoVelocity[2] - rightNumeratorTerm
+    # denominator = sqrt(1 - rightDenominatorTerm)
+
+    # return numerator / denominator
 
 
 def _getAltitude(topoPosition: Vector) -> float:
@@ -798,11 +740,11 @@ def _maxPassRefine(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> 
 def _nextPassMax(satellite: Orbitable, geo: GeoPosition, time: JulianDate, timeout: float) -> JulianDate:
     """Computes the time of maximum altitude of the next satellite pass."""
 
-    nextMax = _nextPassMaxApproxFix(satellite, geo, time)
+    nextMax = _nextPassMaxApprox(satellite, geo, time)
     altitude = _orbitAltitude(satellite, geo, nextMax)
     while altitude < 0:
         if nextMax - time < timeout:
-            nextMax = _nextPassMaxApproxFix(satellite, geo, nextMax.future(0.001))
+            nextMax = _nextPassMaxApprox(satellite, geo, nextMax.future(0.001))
             altitude = _orbitAltitude(satellite, geo, nextMax)
         else:
             # todo: make a more specific exception type for this
@@ -1114,25 +1056,32 @@ def azimuthAngleString(azimuth: float) -> str:
         raise ValueError('azimuth angle must be between 0 and 360 degrees')
     return _azimuthAngleString(azimuth)
 
+
+def toTopocentricPosition(vector: Vector, geo: GeoPosition, time: JulianDate) -> Vector:
+    """Rotates a position like vector to a topocentric reference frame. This method rotates as well as offsets the
+    vector being rotated."""
+
+    if not isinstance(vector, Vector):
+        raise TypeError('vector parameter must be pyevspace.Vector type', type(vector))
+    if not isinstance(geo, GeoPosition):
+        raise TypeError('geo parameter must be GeoPosition type', type(geo))
+    if not isinstance(time, JulianDate):
+        raise TypeError('time parameter must be JulianDate type', type(time))
+
+    return _toTopocentricOffset(vector, geo, time)
+
+
+def toTopocentricVelocity(vector: Vector, geo: GeoPosition, time: JulianDate) -> Vector:
+    """Rotates a velocity like vector to a topocentric reference frame. This method doesn't account for offsetting the
+    rotated vector."""
+
+    if not isinstance(vector, Vector):
+        raise TypeError('vector parameter must be pyevspace.Vector type', type(vector))
+    if not isinstance(geo, GeoPosition):
+        raise TypeError('geo parameter must be GeoPosition type', type(geo))
+    if not isinstance(time, JulianDate):
+        raise TypeError('time parameter must be JulianDate type', type(time))
+
+    return _toTopocentric(vector, geo, time)
+
 # todo: create alt-az type and methods for it
-
-
-def timeToHorizon(sat: Orbitable, geo: GeoPosition, time: JulianDate) -> JulianDate:
-    state = sat.getState(time)
-    topoPosition = _toTopocentricOffset(state[0], geo, time)
-    topoVelocity = _toTopocentric(state[1], geo, time)
-    velExclude = vxcl(topoVelocity, topoPosition)
-
-    a = asin(topoPosition[2] / topoPosition.mag())
-    C = pi / 2
-    # use topoVelocity dot Vector.e3 to get sign of Vector.e3 here
-    B = vang(velExclude, -Vector.e3)
-
-    # using cotangent four part formulae
-    temp = (cos(a) * cos(B) + (1 / tan(C)) * sin(B)) / sin(a)
-    c = atan(1 / temp)
-
-    alpha = velExclude.mag() / topoPosition.mag()
-    dt = c / alpha
-
-    return time.future(dt / 86400)

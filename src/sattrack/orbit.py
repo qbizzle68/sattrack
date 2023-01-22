@@ -8,6 +8,8 @@ from pyevspace import Vector, ZXZ, Z_AXIS, Angles, getMatrixEuler, rotateMatrixF
     ReferenceFrame
 from sattrack.sgp4 import TwoLineElement, getState, elementsFromState
 
+from sattrack._topocentric import _toTopocentricOffset, _toTopocentric
+from sattrack.coordinates import GeoPosition
 from sattrack.sun import getSunPosition
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import siderealTime
@@ -448,6 +450,21 @@ class Orbitable(ABC):
     @abstractmethod
     def getState(self, time: JulianDate) -> (Vector, Vector):
         pass
+
+    @abstractmethod
+    def getTopocentricState(self, geo: GeoPosition, time: JulianDate) -> (Vector, Vector):
+        """Computes the state vectors and rotates them to a topocentric reference frame."""
+
+        if not isinstance(geo, GeoPosition):
+            raise TypeError('geo parameter must be GeoPosition type', type(geo))
+        if not isinstance(time, JulianDate):
+            raise TypeError('time parameter must be JulianDate type', type(time))
+
+        state = self.getState(time)
+        topoPos = _toTopocentricOffset(state[0], geo, time)
+        topoVel = _toTopocentric(state[1], geo, time)
+
+        return topoPos, topoVel
 
     @abstractmethod
     def getElements(self, time: JulianDate) -> Elements:
