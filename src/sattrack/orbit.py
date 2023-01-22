@@ -451,7 +451,6 @@ class Orbitable(ABC):
     def getState(self, time: JulianDate) -> (Vector, Vector):
         pass
 
-    @abstractmethod
     def getTopocentricState(self, geo: GeoPosition, time: JulianDate) -> (Vector, Vector):
         """Computes the state vectors and rotates them to a topocentric reference frame."""
 
