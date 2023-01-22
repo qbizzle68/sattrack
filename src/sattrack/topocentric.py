@@ -528,6 +528,7 @@ def _timeToPlane(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> Ju
 
 
 def __nextPassMaxIteration(pos: Vector, vel: Vector, pVector: Vector, time: JulianDate, mu: float) -> JulianDate:
+    """Handles the iteration logic for approximating the next pass's maximum time."""
 
     elements = Elements.fromState(pos, vel, time)
     # mean motion in radians / day
@@ -551,6 +552,7 @@ def __nextPassMaxIteration(pos: Vector, vel: Vector, pVector: Vector, time: Juli
 
 
 def _nextPassMaxApprox(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> JulianDate:
+    """Computes the approximate time of the maximum altitude for the satellite's next pass."""
 
     if _orbitAltitude(satellite, geo, time) < 0:
         tn = _timeToPlane(satellite, geo, time)
