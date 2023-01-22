@@ -1,8 +1,8 @@
 import json
-from math import radians, asin, cos, acos, sqrt, sin, degrees
+from math import radians, asin, cos, acos, sqrt, sin, degrees, pi, tan, atan
 from operator import index
 
-from pyevspace import Vector, vang, norm, cross, dot, ZYX, getMatrixEuler, Angles, rotateOffsetFrom
+from pyevspace import Vector, vang, norm, cross, dot, ZYX, getMatrixEuler, Angles, rotateOffsetFrom, vxcl
 from sattrack.sgp4 import computeEccentricVector
 
 from sattrack._coordinates import _computePositionVector, _computeZenithVector
@@ -20,7 +20,7 @@ from sattrack.util.constants import TWOPI
 from sattrack.util.conversions import atan3
 
 __all__ = ('PositionInfo', 'SatellitePass', 'SatellitePassConstraints', 'getNextPass', 'getPassList', 'toTopocentric',
-           'fromTopocentric', 'getAltitude', 'getAzimuth', 'azimuthAngleString')
+           'fromTopocentric', 'getAltitude', 'getAzimuth', 'azimuthAngleString', 'timeToHorizon')
 
 
 def _azimuthAngleString(azimuth):
@@ -860,33 +860,39 @@ def _riseSetTimesApprox(satellite: Orbitable, geo: GeoPosition, time: JulianDate
     return jd2, jd1
 
 
-# todo: can we account for earth's rotation here? will that be more accurate?
+def __timeToHorizonIteration(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> JulianDate:
+    state = satellite.getState(time)
+    topoPosition = _toTopocentricOffset(state[0], geo, time)
+
+    vel = geo.getRadius() * TWOPI / satellite.body.period
+    geoVelocity = Vector(0, vel, 0)
+    topoVelocity = _toTopocentric(state[1], geo, time) - geoVelocity
+
+    velExclude = vxcl(topoVelocity, topoPosition)
+
+    a = asin(topoPosition[2] / topoPosition.mag())
+    C = pi / 2
+    # use topoVelocity dot Vector.e3 to get sign of Vector.e3 here
+    B = vang(velExclude, -Vector.e3)
+
+    # using cotangent four part formulae
+    temp = (cos(a) * cos(B) + (1 / tan(C)) * sin(B)) / sin(a)
+    c = atan(1 / temp)
+
+    alpha = velExclude.mag() / topoPosition.mag()
+    dt = c / alpha
+
+    return time.future(dt / 86400)
+
 
 def _horizonTimeRefine(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> JulianDate:
-    """Refines a rise or set time to find the exact time a satellite's altitude is zero."""
+    updatedTime = time
+    alt = getAltitude(satellite, geo, updatedTime)
+    while alt > 4.848e-6:   # 1 arc-second
+        updatedTime = __timeToHorizonIteration(satellite, geo, updatedTime)
+        alt = getAltitude(satellite, geo, updatedTime)
 
-    # needed to add a proportional governor because of cases oscillating around the zero altitude
-    # todo: look into a pid loop for this
-    p = 1.0
-    iterCount = 0
-
-    state = satellite.getState(time)
-    topocentricPosition = _toTopocentricOffset(state[0], geo, time)
-    altitude = asin(topocentricPosition[2] / topocentricPosition.mag())
-    while abs(altitude) > 4.85e-6:  # one arc-second
-        iterCount += 1
-        if iterCount % 10 == 0:
-            p /= 2
-
-        topocentricVelocity = _toTopocentric(state[1], geo, time)
-        dz = topocentricPosition.mag() * altitude
-        dt = (-dz / topocentricVelocity[2]) / 86400
-        time = time.future(dt * p)
-
-        state = satellite.getState(time)
-        topocentricPosition = _toTopocentricOffset(state[0], geo, time)
-        altitude = asin(topocentricPosition[2] / topocentricPosition.mag())
-    return time
+    return updatedTime
 
 
 def _riseSetTimes(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> (JulianDate, JulianDate):
@@ -1109,3 +1115,24 @@ def azimuthAngleString(azimuth: float) -> str:
     return _azimuthAngleString(azimuth)
 
 # todo: create alt-az type and methods for it
+
+
+def timeToHorizon(sat: Orbitable, geo: GeoPosition, time: JulianDate) -> JulianDate:
+    state = sat.getState(time)
+    topoPosition = _toTopocentricOffset(state[0], geo, time)
+    topoVelocity = _toTopocentric(state[1], geo, time)
+    velExclude = vxcl(topoVelocity, topoPosition)
+
+    a = asin(topoPosition[2] / topoPosition.mag())
+    C = pi / 2
+    # use topoVelocity dot Vector.e3 to get sign of Vector.e3 here
+    B = vang(velExclude, -Vector.e3)
+
+    # using cotangent four part formulae
+    temp = (cos(a) * cos(B) + (1 / tan(C)) * sin(B)) / sin(a)
+    c = atan(1 / temp)
+
+    alpha = velExclude.mag() / topoPosition.mag()
+    dt = c / alpha
+
+    return time.future(dt / 86400)
