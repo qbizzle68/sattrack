@@ -619,13 +619,20 @@ def _nextPassMaxApprox(satellite: Orbitable, geo: GeoPosition, time: JulianDate)
     return tn
 
 
-def _computeAltitude(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> float:
+def _computeAltitudePosition(position: Vector):
+    """Computes the satellite's altitude from a topocentric position vector."""
+
+    return asin(position[2] / position.mag())
+
+
+def _computeAltitudeSatellite(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> float:
     """Computes the altitude in radians of the highest point of an orbital path above a geo-position's horizontal
     reference frame."""
 
     position = satellite.getState(time)[0]
     topocentricPosition = _toTopocentricOffset(position, geo, time)
-    return asin(topocentricPosition[2] / topocentricPosition.mag())
+    # return asin(topocentricPosition[2] / topocentricPosition.mag())
+    return _computeAltitudePosition(topocentricPosition)
 
 
 def _getAltitudeDerivative(topoPosition: Vector, topoVelocity: Vector) -> float:
@@ -649,11 +656,6 @@ def _getAltitudeDerivative(topoPosition: Vector, topoVelocity: Vector) -> float:
     # denominator = sqrt(1 - rightDenominatorTerm)
 
     # return numerator / denominator
-
-
-def _getAltitude(topoPosition: Vector) -> float:
-    """Computes the altitude of a topocentric position vector."""
-    return asin(topoPosition[2] / topoPosition.mag())
 
 
 def _maxPassRefine(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> JulianDate:
@@ -715,9 +717,9 @@ def _maxPassRefine(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> 
 
     # todo: utilize the dadt values to future time increase and make this a more analytical guess
     oneSecond = 1 / 86400
-    altitude = _computeAltitude(satellite, geo, time)
-    futureAltitude = _computeAltitude(satellite, geo, time.future(oneSecond))
-    pastAltitude = _computeAltitude(satellite, geo, time.future(-oneSecond))
+    altitude = _computeAltitudeSatellite(satellite, geo, time)
+    futureAltitude = _computeAltitudeSatellite(satellite, geo, time.future(oneSecond))
+    pastAltitude = _computeAltitudeSatellite(satellite, geo, time.future(-oneSecond))
 
     parity = 0  # to please the editor
     if altitude >= futureAltitude and altitude >= pastAltitude:
@@ -728,11 +730,11 @@ def _maxPassRefine(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> 
         parity = -1
 
     jd = time
-    nextAltitude = _computeAltitude(satellite, geo, time.future(parity * oneSecond))
+    nextAltitude = _computeAltitudeSatellite(satellite, geo, time.future(parity * oneSecond))
     while altitude < nextAltitude:
         jd = jd.future(parity * oneSecond)
-        altitude = _computeAltitude(satellite, geo, jd)
-        nextAltitude = _computeAltitude(satellite, geo, jd.future(parity * oneSecond))
+        altitude = _computeAltitudeSatellite(satellite, geo, jd)
+        nextAltitude = _computeAltitudeSatellite(satellite, geo, jd.future(parity * oneSecond))
 
     return jd
 
@@ -1026,10 +1028,11 @@ def getAltitude(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> flo
     if not isinstance(time, JulianDate):
         raise TypeError('time parameter must be JulianDate type')
 
-    position = satellite.getState(time)[0]
-    topocentricPosition = _toTopocentricOffset(position, geo, time)
-    arg = topocentricPosition[2] / topocentricPosition.mag()
-    return degrees(asin(arg))
+    # position = satellite.getState(time)[0]
+    # topocentricPosition = _toTopocentricOffset(position, geo, time)
+    # arg = topocentricPosition[2] / topocentricPosition.mag()
+    # return degrees(asin(arg))
+    return degrees(_computeAltitudeSatellite(satellite, geo, time))
 
 
 def getAzimuth(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> float:
