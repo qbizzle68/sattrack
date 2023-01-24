@@ -8,14 +8,15 @@ from pyevspace import Vector, ZXZ, Z_AXIS, Angles, getMatrixEuler, rotateMatrixF
     ReferenceFrame
 from sattrack.sgp4 import TwoLineElement, getState, elementsFromState
 
-from sattrack._topocentric import _toTopocentricOffset, _toTopocentric
+from sattrack._topocentric import _toTopocentricState
 from sattrack.coordinates import GeoPosition
 from sattrack.sun import getSunPosition
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import siderealTime
 from sattrack._orbit import _trueToMeanAnomaly, _trueToEccentricAnomaly, _eccentricToMeanAnomaly, \
     _smaToMeanMotion, _nearestTrueAnomaly, _nearestMeanAnomaly
-from sattrack.util.constants import TWOPI, EARTH_MU, EARTH_POLAR_RADIUS, EARTH_EQUITORIAL_RADIUS, SUN_MU, SUN_RADIUS
+from sattrack.util.constants import TWOPI, EARTH_MU, EARTH_POLAR_RADIUS, EARTH_EQUITORIAL_RADIUS, SUN_MU, SUN_RADIUS, \
+    EARTH_SIDEREAL_PERIOD
 
 _all__ = ('Elements', 'Body', 'SUN_BODY', 'EARTH_BODY', 'Orbitable', 'Orbit', 'Satellite', 'meanMotionToSma',
           'smaToMeanMotion', 'meanToTrueAnomaly', 'meanToEccentricAnomaly', 'eccentricToTrueAnomaly',
@@ -385,12 +386,18 @@ class Body:
         """Returns the position of the center of the celestial body relative to the Earth's center."""
         return self._positionFunc(time)
 
+    def getAngularMomentum(self):
+        """Returns the angular momentum of the rotation of the body. This assumes that the rotation is about the
+        celestial Z-axis."""
+        w = TWOPI / self._revPeriod
+        return Vector(0, 0, w)
+
 
 """Global Body object representing the Sun."""
 SUN_BODY = Body('Sun', SUN_MU, SUN_RADIUS, 0, lambda time: 0, getSunPosition)
 
 """Global Body object representing the Earth."""
-EARTH_BODY = Body('Earth', EARTH_MU, EARTH_EQUITORIAL_RADIUS, 86164.090531, siderealTime,
+EARTH_BODY = Body('Earth', EARTH_MU, EARTH_EQUITORIAL_RADIUS, EARTH_SIDEREAL_PERIOD, siderealTime,
                   lambda time: Vector((0, 0, 0)), Rp=EARTH_POLAR_RADIUS, parent=SUN_BODY)
 
 
@@ -460,10 +467,7 @@ class Orbitable(ABC):
             raise TypeError('time parameter must be JulianDate type', type(time))
 
         state = self.getState(time)
-        topoPos = _toTopocentricOffset(state[0], geo, time)
-        topoVel = _toTopocentric(state[1], geo, time)
-
-        return topoPos, topoVel
+        return _toTopocentricState(*state, geo, time)
 
     @abstractmethod
     def getElements(self, time: JulianDate) -> Elements:

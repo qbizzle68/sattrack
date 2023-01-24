@@ -8,7 +8,7 @@ from sattrack.sgp4 import computeEccentricVector
 from sattrack._coordinates import _computePositionVector, _computeZenithVector
 from sattrack._orbit import _trueAnomalyFromState, _trueToMeanAnomaly, \
     _smaToMeanMotion, _nearestTrueAnomaly, _vectorAlmostEqual
-from sattrack._topocentric import _toTopocentricOffset, _toTopocentric
+from sattrack._topocentric import _toTopocentricOffset, _toTopocentric, _toTopocentricState
 from sattrack.coordinates import GeoPosition
 from sattrack.eclipse import getShadowTimes, Shadow
 from sattrack.exceptions import PassConstraintException, NoPassException
@@ -582,10 +582,10 @@ def _computeAltitudeSatellite(satellite: Orbitable, geo: GeoPosition, time: Juli
 
     position = satellite.getState(time)[0]
     topocentricPosition = _toTopocentricOffset(position, geo, time)
-    # return asin(topocentricPosition[2] / topocentricPosition.mag())
     return _computeAltitudePosition(topocentricPosition)
 
 
+# todo: find out why this doesn't match empirical values
 def _getAltitudeDerivative(topoPosition: Vector, topoVelocity: Vector) -> float:
     """Computes the derivative of altitude with respect to time from topocentric position and velocity vectors."""
 
@@ -601,23 +601,25 @@ def _getAltitudeDerivative(topoPosition: Vector, topoVelocity: Vector) -> float:
 
     return lhs * (rhsLeft - rhsRight)
 
-    # rightNumeratorTerm = topoPosition[2] * rDotV / rMag2
-    # rightDenominatorTerm = topoPosition[2] * topoPosition[2] / rMag2
-    # numerator = topoVelocity[2] - rightNumeratorTerm
-    # denominator = sqrt(1 - rightDenominatorTerm)
 
-    # return numerator / denominator
+def _getAltitudeDerivativeFix(satellite: Orbitable, geo: GeoPosition, time: JulianDate, dt: float = 0.01) -> float:
+    """Short-term fix for the _getAltitudeDerivative not working as expected."""
+    time1 = time.future(dt / 86400)
+
+    state0 = satellite.getState(time)
+    topocentricPosition0 = _toTopocentricOffset(state0[0], geo, time)
+    state1 = satellite.getState(time1)
+    topocentricPosition1 = _toTopocentricOffset(state1[0], geo, time1)
+    alt0 = asin(topocentricPosition0[2] / topocentricPosition0.mag())
+    alt1 = asin(topocentricPosition1[2] / topocentricPosition1.mag())
+
+    return (alt1 - alt0) / dt
 
 
 def _maxPassRefine(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> JulianDate:
     """Refines the original time approximation of the maximum altitude of a satellite pass."""
 
-    # this works but the times are inaccurate, either the equation implemented in _getAltitudeDerivative is wrong,
-    # or maybe the earth rotation needs to be accounted for.
-    '''state = satellite.getState(time)
-    topoPosition = _toTopocentricOffset(state[0], geo, time)
-    topoVelocity = _toTopocentric(state[1], geo, time)
-    dadt = _getAltitudeDerivative(topoPosition, topoVelocity)
+    dadt = _getAltitudeDerivativeFix(satellite, geo, time)
 
     # move forward or back 1 second and see how what the derivative is
     # todo: can we analytical explain why 1 second should be used here?
@@ -631,15 +633,10 @@ def _maxPassRefine(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> 
 
     dadt2 = direction
     time2 = time
-    topoPosition2 = 0   # to please the IDE
-    topoVelocity2 = 0   # to please the IDE
     # keep moving forward or back until time and time2 are not both increasing or both decreasing
     while dadt * dadt2 > 0:
         time2 = time2.future(direction / 86400)
-        state2 = satellite.getState(time2)
-        topoPosition2 = _toTopocentricOffset(state2[0], geo, time2)
-        topoVelocity2 = _toTopocentric(state2[1], geo, time2)
-        dadt2 = _getAltitudeDerivative(topoPosition2, topoVelocity2)
+        dadt2 = _getAltitudeDerivativeFix(satellite, geo, time2)
 
     # use bisecting logic to find the maximum altitude
     if time < time2:
@@ -648,15 +645,10 @@ def _maxPassRefine(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> 
     else:
         beforeTime = time2
         afterTime = time
-        beforeDadt = _getAltitudeDerivative(topoPosition2, topoVelocity2)
-        afterDadt = _getAltitudeDerivative(topoPosition, topoVelocity)
     while (afterTime - beforeTime) > (0.001 / 86400):     # 1/1000th of a second
         halftime = (afterTime - beforeTime) / 2
         middleTime = beforeTime.future(halftime)
-        state = satellite.getState(middleTime)
-        topoPos = _toTopocentricOffset(state[0], geo, middleTime)
-        topoVel = _toTopocentric(state[1], geo, middleTime)
-        dadt = _getAltitudeDerivative(topoPos, topoVel)
+        dadt = _getAltitudeDerivativeFix(satellite, geo, middleTime)
         if dadt < 0:
             afterTime = middleTime
         elif dadt > 0:
@@ -664,30 +656,7 @@ def _maxPassRefine(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> 
         else:
             return middleTime
 
-    return beforeTime'''
-
-    # todo: utilize the dadt values to future time increase and make this a more analytical guess
-    oneSecond = 1 / 86400
-    altitude = _computeAltitudeSatellite(satellite, geo, time)
-    futureAltitude = _computeAltitudeSatellite(satellite, geo, time.future(oneSecond))
-    pastAltitude = _computeAltitudeSatellite(satellite, geo, time.future(-oneSecond))
-
-    parity = 0  # to please the editor
-    if altitude >= futureAltitude and altitude >= pastAltitude:
-        return time
-    elif altitude < futureAltitude:
-        parity = 1
-    elif altitude < pastAltitude:
-        parity = -1
-
-    jd = time
-    nextAltitude = _computeAltitudeSatellite(satellite, geo, time.future(parity * oneSecond))
-    while altitude < nextAltitude:
-        jd = jd.future(parity * oneSecond)
-        altitude = _computeAltitudeSatellite(satellite, geo, jd)
-        nextAltitude = _computeAltitudeSatellite(satellite, geo, jd.future(parity * oneSecond))
-
-    return jd
+    return beforeTime
 
 
 def _nextPassMax(satellite: Orbitable, geo: GeoPosition, time: JulianDate, timeout: float) -> JulianDate:
@@ -756,12 +725,13 @@ def _riseSetTimesApprox(satellite: Orbitable, geo: GeoPosition, time: JulianDate
 
 
 def __timeToHorizonIteration(satellite: Orbitable, geo: GeoPosition, time: JulianDate) -> JulianDate:
-    state = satellite.getState(time)
-    topoPosition = _toTopocentricOffset(state[0], geo, time)
+    topoPosition, topoVelocity = satellite.getTopocentricState(geo, time)
+    # state = satellite.getState(time)
+    # topoPosition = _toTopocentricOffset(state[0], geo, time)
 
-    vel = geo.getRadius() * TWOPI / satellite.body.period
-    geoVelocity = Vector(0, vel, 0)
-    topoVelocity = _toTopocentric(state[1], geo, time) - geoVelocity
+    # vel = geo.getRadius() * TWOPI / satellite.body.period
+    # geoVelocity = Vector(0, vel, 0)
+    # topoVelocity = _toTopocentric(state[1], geo, time) - geoVelocity
 
     velExclude = vxcl(topoVelocity, topoPosition)
 
@@ -957,14 +927,8 @@ def fromTopocentric(vector: Vector, geo: GeoPosition, time: JulianDate) -> Vecto
         raise TypeError('time parameter must be JulianDate type')
 
     geoVector = geo.getPositionVector(time)
-    matrix = getMatrixEuler(
-        ZYX,
-        Angles(
-            radians(geo.longitude) + earthOffsetAngle(time),
-            radians(90 - geo.latitude),
-            0.0
-        )
-    )
+    angs = Angles(radians(geo.longitude) + earthOffsetAngle(time), radians(90 - geo.latitude), 0.0)
+    matrix = getMatrixEuler(ZYX, angs)
 
     return rotateOffsetFrom(matrix, geoVector, vector)
 
@@ -1037,5 +1001,18 @@ def toTopocentricVelocity(vector: Vector, geo: GeoPosition, time: JulianDate) ->
         raise TypeError('time parameter must be JulianDate type', type(time))
 
     return _toTopocentric(vector, geo, time)
+
+
+def toTopocentricState(position: Vector, velocity: Vector, geo: GeoPosition, time: JulianDate) -> (Vector, Vector):
+    if not isinstance(position, Vector):
+        raise TypeError('position parameter must be pyevspace.Vector type', type(position))
+    if not isinstance(velocity, Vector):
+        raise TypeError('velocity parameter must be pyevspace.Vector type', type(velocity))
+    if not isinstance(geo, GeoPosition):
+        raise TypeError('geo parameter must be GeoPosition type', type(geo))
+    if not isinstance(time, JulianDate):
+        raise TypeError('time parameter must be JulianDate type', type(time))
+
+    return _toTopocentricState(position, velocity, geo, time)
 
 # todo: create alt-az type and methods for it
