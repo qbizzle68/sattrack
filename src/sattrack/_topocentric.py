@@ -1,6 +1,6 @@
 from math import radians, pi
 
-from pyevspace import getMatrixEuler, ZYX, Angles, rotateEulerTo, cross, Vector, rotateMatrixTo
+from pyevspace import getMatrixEuler, ZYX, Angles, rotateEulerTo, cross, Vector, rotateOffsetTo
 
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack._coordinates import _computePositionVector
@@ -26,9 +26,7 @@ def _toTopocentricOffset(position, geo, time):
     angs = __getTopocentricAngles(geo, time)
     matrix = getMatrixEuler(ZYX, angs)
 
-    # this is overkill, need to fix this in pyevspace
-    # return rotateOffsetTo(matrix, geoVector, position)
-    return rotateMatrixTo(matrix, position - geoVector)
+    return rotateOffsetTo(matrix, geoVector, position)
 
 
 def _toTopocentric(vector, geo, time):
