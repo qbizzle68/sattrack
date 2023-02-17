@@ -561,6 +561,23 @@ def _nextPassMaxApprox(satellite: Orbitable, geo: GeoPosition, time: JulianDate)
 
     mu = satellite.body.mu
     state = satellite.getState(tn)
+
+    # todo: this is a short-cut, short term fix
+    # if we assume circular orbit with close to constant motion
+    topoPos = _toTopocentricOffset(state[0], geo, time)
+    alt = _computeAltitudePosition(topoPos)
+    if (alt > 0):
+        # this is horribly inefficient, but it's guaranteed to work
+        tmpTime = time
+        while alt >= 0:
+            tmpTime = tmpTime.future(-1 / 1440)
+            tmpState = satellite.getState(tmpTime)
+            topoPos = _toTopocentricOffset(tmpState[0], geo, tmpTime)
+            alt = _computeAltitudePosition(topoPos)
+
+        tn = tmpTime
+        state = satellite.getState(tn)
+
     pVector = _getPVector(geo, *state, tn)
     while vang(state[0], pVector) > 4.58e-6:    # 1 arc-second
         tn = __nextPassMaxIteration(*state, pVector, tn, mu)
@@ -823,7 +840,7 @@ def getNextPass(satellite: Orbitable, geo: GeoPosition, timeOrPass: JulianDate |
     if isinstance(timeOrPass, JulianDate):
         time = timeOrPass
     elif isinstance(timeOrPass, SatellitePass):
-        time = timeOrPass.maxInfo.time.future(0.001)
+        time = timeOrPass.setInfo.time.future(0.001)
     else:
         raise TypeError('timeOrPass parameter must be JulianDate or SatellitePass type')
     nextPassTime = _nextPassMax(satellite, geo, time, timeout)
