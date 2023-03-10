@@ -916,7 +916,7 @@ def getPassList(satellite: Orbitable, geo: GeoPosition, start: JulianDate, durat
         except NoPassException:
             break
         passList.append(nextPass)
-        nextTime = nextPass.maxInfo.time
+        nextTime = nextPass.setInfo.time
         remainingTime = duration - (nextTime - start)
     return tuple(passList)
 
