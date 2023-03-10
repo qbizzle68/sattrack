@@ -647,12 +647,12 @@ static PyMemberDef tle_member[] = {
 
 static PyType_Slot tle_slots[] = {
     {Py_tp_getset,  tle_getset},
-    {Py_tp_init,    (initproc)tle_init},
-    {Py_tp_new,     PyType_GenericNew},
-    {Py_tp_members, tle_member},
-    {Py_tp_free,    (freefunc)tle_free},
-    {Py_tp_str,     (reprfunc)tle_str},
-    {Py_tp_repr,    (reprfunc)tle_repr},
+    {Py_tp_init,    (void*)tle_init},
+    {Py_tp_new,     (void*)PyType_GenericNew},
+    {Py_tp_members, (void*)tle_member},
+    {Py_tp_free,    (void*)tle_free},
+    {Py_tp_str,     (void*)tle_str},
+    {Py_tp_repr,    (void*)tle_repr},
     {0, NULL}
 };
 
@@ -747,7 +747,7 @@ static void sgp4_free(void* self)
 }
 
 static PyModuleDef_Slot sgp4_slots[]{
-    {Py_mod_exec, sgp4_exec},
+    {Py_mod_exec, (void*)sgp4_exec},
     {0, NULL}
 };
 
