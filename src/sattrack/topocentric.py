@@ -1,6 +1,8 @@
 import json
 from math import radians, asin, cos, acos, sqrt, sin, degrees, pi, tan, atan
 from operator import index
+from threading import Thread
+from time import time as _time
 
 from pyevspace import Vector, vang, norm, cross, dot, ZYX, getMatrixEuler, Angles, rotateOffsetFrom, vxcl
 from sattrack.sgp4 import computeEccentricVector
@@ -566,7 +568,7 @@ def _nextPassMaxApprox(satellite: Orbitable, geo: GeoPosition, time: JulianDate)
     # if we assume circular orbit with close to constant motion
     topoPos = _toTopocentricOffset(state[0], geo, time)
     alt = _computeAltitudePosition(topoPos)
-    if (alt > 0):
+    if alt > 0:
         # this is horribly inefficient, but it's guaranteed to work
         tmpTime = time
         while alt >= 0:
@@ -827,8 +829,33 @@ def _deriveBasicInfo(satellite: Orbitable, geo: GeoPosition, time: JulianDate, i
     return PositionInfo(altitude, azimuth, time, isIlluminated, isUnobscured)
 
 
+# SatellitePass value to be set inside the getNextPass thread when (if) a pass is found
+nextPassValue = None
+
+
 def getNextPass(satellite: Orbitable, geo: GeoPosition, timeOrPass: JulianDate | SatellitePass,
                 timeout: float = 7) -> SatellitePass:
+    global nextPassValue
+
+    computeThread = Thread(target=_getNextPass, args=(satellite, geo, timeOrPass, timeout), daemon=True)
+
+    # time to limit in seconds
+    limit = 5
+    computeThread.start()
+    startTime = _time()
+    while _time() < startTime + limit:
+        if nextPassValue:
+            break
+
+    if not nextPassValue:
+        raise NoPassException(f'no pass was found in time (limit {limit} seconds)')
+    np = nextPassValue
+    nextPassValue = None
+    return np
+
+
+def _getNextPass(satellite: Orbitable, geo: GeoPosition, timeOrPass: JulianDate | SatellitePass,
+                 timeout: float = 7) -> SatellitePass:
     """Computes the next satellite pass after a given time or another SatellitePass object. In the case of the latter
     the pass times in the SatellitePass are used to find the next pass. For multiple passes over a specific duration
     see getPassList()."""
@@ -889,11 +916,38 @@ def getNextPass(satellite: Orbitable, geo: GeoPosition, timeOrPass: JulianDate |
                        lastIlluminatedInfo=lastIlluminatedInfo)
 
     # todo: filter the pass
+    # return np
+    global nextPassValue
+    nextPassValue = np
+    return
+
+
+# SatellitePass value to be set inside the getNextPass thread when (if) a pass is found
+passListValues = None
+
+
+def getPassList(satellite: Orbitable, geo: GeoPosition, start: JulianDate, duration: float) -> tuple[SatellitePass]:
+    global passListValues
+
+    computeThread = Thread(target=_getPassList, args=(satellite, geo, start, duration))
+
+    # time to limit in seconds
+    limit = 10
+    computeThread.start()
+    startTime = _time()
+    while _time() < startTime + limit:
+        if passListValues:
+            break
+
+    if not passListValues:
+        raise NoPassException(f'no pass was found in time (limit {limit} seconds)')
+    np = passListValues
+    passListValues = None
     return np
 
 
 # todo: pass a PassConstraints into this?
-def getPassList(satellite: Orbitable, geo: GeoPosition, start: JulianDate, duration: float) -> tuple[SatellitePass]:
+def _getPassList(satellite: Orbitable, geo: GeoPosition, start: JulianDate, duration: float) -> tuple[SatellitePass]:
     """Generate a list of SatellitePass objects over a duration of time in solar days."""
 
     if not isinstance(satellite, Orbitable):
@@ -918,7 +972,9 @@ def getPassList(satellite: Orbitable, geo: GeoPosition, start: JulianDate, durat
         passList.append(nextPass)
         nextTime = nextPass.setInfo.time
         remainingTime = duration - (nextTime - start)
-    return tuple(passList)
+    # return tuple(passList)
+    global passListValues
+    passListValues = tuple(passList)
 
 
 def toTopocentric(vector: Vector, geo: GeoPosition, time: JulianDate) -> Vector:
