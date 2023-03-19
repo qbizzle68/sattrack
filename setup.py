@@ -18,7 +18,7 @@ ext_modules = [Extension(
 
 setup(
     name='sattrack',
-    version='0.1.0',
+    version='0.1.1',
     author="Quinton Barnes",
     author_email="devqbizzle68@gmail.com",
     description=description,
