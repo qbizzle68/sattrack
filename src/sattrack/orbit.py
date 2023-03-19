@@ -1,7 +1,8 @@
+import json
 from abc import abstractmethod, ABC
 from copy import deepcopy
 from inspect import Parameter, signature
-from math import radians, cos, sin, pi, sqrt, atan2, floor, degrees
+from math import radians, cos, sin, pi, sqrt, atan2, floor, degrees, asin
 from typing import Callable
 
 from pyevspace import Vector, ZXZ, Z_AXIS, Angles, getMatrixEuler, rotateMatrixFrom, getMatrixAxis, \
@@ -9,7 +10,7 @@ from pyevspace import Vector, ZXZ, Z_AXIS, Angles, getMatrixEuler, rotateMatrixF
 from sattrack.sgp4 import TwoLineElement, getState, elementsFromState
 
 from sattrack._topocentric import _toTopocentricState
-from sattrack.coordinates import GeoPosition
+from sattrack.coordinates import GeoPosition, getSubPoint
 from sattrack.sun import getSunPosition
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import siderealTime
@@ -17,6 +18,7 @@ from sattrack._orbit import _trueToMeanAnomaly, _trueToEccentricAnomaly, _eccent
     _smaToMeanMotion, _nearestTrueAnomaly, _nearestMeanAnomaly
 from sattrack.util.constants import TWOPI, EARTH_MU, EARTH_POLAR_RADIUS, EARTH_EQUITORIAL_RADIUS, SUN_MU, SUN_RADIUS, \
     EARTH_SIDEREAL_PERIOD
+from sattrack.util.conversions import atan3
 
 _all__ = ('Elements', 'Body', 'SUN_BODY', 'EARTH_BODY', 'Orbitable', 'Orbit', 'Satellite', 'meanMotionToSma',
           'smaToMeanMotion', 'meanToTrueAnomaly', 'meanToEccentricAnomaly', 'eccentricToTrueAnomaly',
@@ -484,6 +486,31 @@ class Orbitable(ABC):
     @abstractmethod
     def getApoapsis(self, time: JulianDate = None) -> float:
         pass
+
+    def getDetails(self, time: JulianDate, geo: GeoPosition = None):
+        """Computes satellite details at a given time and geo-position."""
+        state = self.getState(time)
+        subPoint = getSubPoint(state[0], time)
+        height = state[0].mag() - subPoint.getRadius()
+        pos = [i for i in state[0]]
+        vel = [i for i in state[1]]
+
+        if geo:
+            topoStateRaw = self.getTopocentricState(geo, time)
+            distance = topoStateRaw[0].mag()
+            alt = degrees(asin(topoStateRaw[0][2] / topoStateRaw[0].mag()))
+            az = degrees(atan3(topoStateRaw[0][1], -topoStateRaw[0][0]))
+            topoPosition = [i for i in topoStateRaw[0]]
+            topoVelocity = [i for i in topoStateRaw[1]]
+        else:
+            distance, alt, az = None, None, None, None
+            topoPosition, topoVelocity = None, None
+
+        details = {'state': {'position': pos, 'velocity': vel}, 'subpoint': {'latitude': subPoint.latitude,
+                                                                             'longitude': subPoint.longitude},
+                   'height': height, 'topoState': {'position': topoPosition, 'velocity': topoVelocity},
+                   'distance': distance, 'altitude': alt, 'azimuth': az}
+        return json.dumps(details)
 
 
 def _radiusAtPeriapsis(semiMajorAxis: float, eccentricity: float) -> float:
