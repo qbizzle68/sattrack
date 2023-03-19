@@ -1,4 +1,3 @@
-import json
 from abc import abstractmethod, ABC
 from copy import deepcopy
 from inspect import Parameter, signature
@@ -510,7 +509,7 @@ class Orbitable(ABC):
                                                                              'longitude': subPoint.longitude},
                    'height': height, 'topoState': {'position': topoPosition, 'velocity': topoVelocity},
                    'distance': distance, 'altitude': alt, 'azimuth': az}
-        return json.dumps(details)
+        return details
 
 
 def _radiusAtPeriapsis(semiMajorAxis: float, eccentricity: float) -> float:
