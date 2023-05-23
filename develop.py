@@ -264,13 +264,18 @@ def computeExtremaValues(sat, geo, jd, plus=1, start=True):
     return zi1, getZi(zi1, zk, rho, k, plus), getZiPP(zi1, zj, zk, k)
 
 
-class Extrema:
-    __slots__ = '_zi', '_value', '_ziPP'
+EXTREMA_TAIL = 0
+EXTREMA_MINMAX = 1
 
-    def __init__(self, zi, value, ziPP):
+
+class Extrema:
+    __slots__ = '_zi', '_value', '_ziPP', '_type'
+
+    def __init__(self, zi, value, ziPP, type):
         self._zi = zi
         self._value = value
         self._ziPP = ziPP
+        self._type = type
 
     def __str__(self):
         return str((self._zi, self._value, self._ziPP))
@@ -293,6 +298,10 @@ class Extrema:
     @property
     def value(self):
         return self._value
+
+    @property
+    def type(self):
+        return self._type
 
     def __eq__(self, other):
         return abs(self._zi - other.zi) <= 1e-5
@@ -424,8 +433,10 @@ class ZeroFunction:
     def _getTails(self):
         ziRight = self._rho * 0.99999
         ziLeft = -self._rho * 0.99999
-        rightTail = Extrema(ziRight, self.getValue(ziRight), self.getPPrime(ziRight))
-        leftTail = Extrema(ziLeft, self.getValue(ziLeft), self.getPPrime(ziLeft))
+        rightType = abs(self.getPrime(ziRight)) < 0.1
+        leftType = abs(self.getPrime(ziLeft)) < 0.1
+        rightTail = Extrema(ziRight, self.getValue(ziRight), self.getPPrime(ziRight), rightType)
+        leftTail = Extrema(ziLeft, self.getValue(ziLeft), self.getPPrime(ziLeft), leftType)
 
         return rightTail, leftTail
 
@@ -501,29 +512,71 @@ class ZeroFunction:
 
         plt.show()
 
+    # def _getZero(self, lBound, rBound):
+    #     zi0 = -2
+    #     if self.getPrime(lBound) > 1e3:
+    #         zi1 = lBound
+    #     elif self.getPrime(rBound) > 1e3:
+    #         zi1 = rBound
+    #     else:
+    #         zi1 = (lBound + rBound) / 2
+    #
+    #     while abs(zi0 - zi1) > 1e-7:
+    #
+    #         zi0 = zi1
+    #         zi1 = zi0 - self.getValue(zi0) / self.getPrime(zi0)
+    #
+    #     return zi1
+
     def computeGeneralZeros(self):
         rightTail, leftTail = self._getTails()
 
         xArgs = [self._computeExtremaValues(s) for s in (True, 0, False)]
-        xt = [Extrema(*args) for args in xArgs if args != (None, None, None)]
-        extrema = set(xt)
+        xt = [Extrema(*args, EXTREMA_MINMAX) for args in xArgs if args != (None, None, None)]
+        # we don't need to eliminate duplicates because we only care about when a zero occurs between two values
+        # extrema = set(xt)
 
-        sortedExtrema = sorted([rightTail, leftTail] + list(extrema), key=lambda o: o.zi)
+        sortedExtrema = sorted([rightTail, leftTail] + xt, key=lambda o: o.zi)
         zeros = []
         for i, x in enumerate(sortedExtrema[:-1]):
             if x.value * sortedExtrema[i+1].value < 0:
-                z = x.zi, sortedExtrema[i+1].zi
+                z = x.zi, sortedExtrema[i+1].zi, x.type, sortedExtrema[i+1].type
                 zeros.append(z)
 
         intersections = []
         for z in zeros:
             zi0 = -2
-            if self.getPrime(z[0]) > 1e3:
+            if z[2] == EXTREMA_TAIL:
                 zi1 = z[0]
-            elif self.getPrime(z[1]) > 1e3:
+            elif z[3] == EXTREMA_TAIL:
                 zi1 = z[1]
             else:
-                zi1 = (z[0] + z[1]) / 2
+                # todo: this doesn't guarantee we won't push a guess out of bounds, maybe bisect until value
+                #   is close to zero
+                if self.getValue(z[0]) > 0:
+                    upper = z[0]
+                    lower = z[1]
+                else:
+                    upper = z[1]
+                    lower = z[0]
+                epsilon = min(abs(self.getValue(z[0])), abs(self.getValue(z[1]))) * 0.001
+                mid = (z[0] + z[1]) / 2
+                val = self.getValue(mid)
+                while abs(val) > epsilon:
+                    if val > 0:
+                        upper = mid
+                    else:
+                        lower = mid
+                    mid = (upper + lower) / 2
+                    val = self.getValue(mid)
+                zi1 = mid
+            # # todo: shouldn't these epsilon's err on the larger side? like 0.1 ???
+            # if abs(self.getPrime(z[0])) > 1e3:
+            #     zi1 = z[0]
+            # elif abs(self.getPrime(z[1])) > 1e3:
+            #     zi1 = z[1]
+            # else:
+            #     zi1 = (z[0] + z[1]) / 2
             while abs(zi0 - zi1) > 1e-7:
                 zi0 = zi1
                 zi1 = zi0 - self.getValue(zi0) / self.getPrime(zi0)
@@ -801,10 +854,10 @@ class OrbitPath2:
 
     def _getConstants(self, a, b, c, jd):
         # a, b, c = getEllipseVectors(self._sat, jd)
-        gamma = geo.getPositionVector(jd)
-        phiPrime = geo.getGeocentricLatitude()
+        gamma = self._geo.getPositionVector(jd)
+        phiPrime = self._geo.getGeocentricLatitude()
 
-        d = gamma.mag() * cos(radians(geo.latitude) - phiPrime)
+        d = gamma.mag() * cos(radians(self._geo.latitude) - phiPrime)
         k1 = a[0] * a[0] + b[0] * b[0] - c[0] * c[0]
         k2 = a[1] * a[1] + b[1] * b[1] - c[1] * c[1]
         k3 = a[2] * a[2] + b[2] * b[2] - c[2] * c[2]
@@ -846,7 +899,7 @@ class OrbitPath2:
 
     def _getTimeTo(self, zi, zj, jd, next):
         lng = atan2(zj, zi) - earthOffsetAngle(jd)
-        dl = self._angleDifference(lng - radians(geo.longitude))
+        dl = self._angleDifference(lng - radians(self._geo.longitude))
         if next and dl < 0:
             dl += TWOPI
         elif not next and dl > 0:
@@ -865,24 +918,63 @@ class OrbitPath2:
 
         return num / den
 
+    def _signOf(self, val):
+        if val >= 0:
+            return 1
+        return -1
+
     def _refineZero(self, zi, jd, plus, next):
         assert plus == 1 or plus == -1
-        # zj = plus * sqrt(self._rho*self._rho - zi*zi)
-        eVecs = self._getEllipseVectors(jd)
-        k = self._getConstants(*eVecs, jd)
+        zj = plus * sqrt(self._rho*self._rho - zi*zi)
+        eVectors = self._getEllipseVectors(jd)
+        k = self._getConstants(*eVectors, jd)
         func = ZeroFunction(self._zk, self._rho, k, plus)
 
         check = 2
         time = jd
+        small = 1e-7
+        # thought here: if value at zi is positive, the acos term is just greater than 1. We can use the
+        # derivative to figure out which way to 'nudge' the zi to make it approach 1 from the 0.99999 side.
         while not (0.9999999 < check <= 1):
-            eVecs = self._getEllipseVectors(time)
-            k = self._getConstants(*eVecs, time)
-            zi = func.computeSpecificZero(zi, k)
+            if 1 < check < 1 + small:
+                sign = self._signOf(func.getPrime(zi, zj))
+                zi += sign * small
+            else:
+                eVectors = self._getEllipseVectors(time)
+                k = self._getConstants(*eVectors, time)
+                zi = func.computeSpecificZero(zi, k)
             zj = plus * sqrt(self._rho*self._rho - zi*zi)
             time = self._getTimeTo(zi, zj, jd, next)
             check = self._checkTime(time)
 
         return time
+
+    def _orderZeros(self, zeroSorted, dlSorted, length, up):
+        assert length == 2 or length == 4
+        positiveIndices = [i for i, dl in enumerate(dlSorted) if dl > 0]
+        if positiveIndices:
+            firstPositive = positiveIndices[0]
+        else:
+            firstPositive = 0
+
+        # in high latitudes of inclined orbits, both intersection angles can be close together,
+        #   which means the dls can be both negative, both positive, or one of each. Need to
+        #   accommodate all cases
+        if up:
+            zeroSorted = zeroSorted[firstPositive-1:length] + zeroSorted[0:firstPositive-1]
+            direction = [False] + [True] * (length - 1)
+        else:
+            zeroSorted = zeroSorted[firstPositive:length] + zeroSorted[0:firstPositive]
+            direction = [True] * length
+
+        return zeroSorted, direction
+
+    def _getZeroInstructions(self, zeros, dls, length, jd):
+        zeroSorted = [z for _, z in sorted(zip(dls, zeros))]
+        dlSorted = sorted(dls)
+
+        up = -1 < self._checkTime(jd) < 1
+        return self._orderZeros(zeroSorted, dlSorted, length, up)
 
     def computeIntersectionTimes(self, jd):
         zeros = self._getGeneralZeros(jd)
@@ -896,277 +988,14 @@ class OrbitPath2:
         geoLng = radians(self._geo.longitude)
         dls = [self._angleDifference(lng - geoLng) for lng in lngs]
 
-        zeroSorted = [z for _, z in sorted(zip(dls, zeros))]
-        # dlSorted = sorted(dls)
-
-        altTerm = self._checkTime(jd)
-        if -1 < altTerm < 1:
-            if lenZeros == 2:
-                direction = [False, True]
-            else:
-                # dlSorted = dlSorted[1:] + [dlSorted[0] + TWOPI]
-                zeroSorted = zeroSorted[1:] + [zeroSorted[0]]
-                direction = [False, True, True, True]
-        else:
-            halfLen = lenZeros >> 1
-            # dlSorted = dlSorted[halfLen:] + [i + TWOPI for i in dlSorted[:halfLen]]
-            zeroSorted = zeroSorted[halfLen:] + zeroSorted[:halfLen]
-            direction = [True] * lenZeros
+        zeroSorted, direction = self._getZeroInstructions(zeros, dls, lenZeros, jd)
 
         times = [self._refineZero(zi, jd, p, d) for (zi, _, p), d in zip(zeroSorted, direction)]
 
         return times
 
 
-INTERSECTION_EXISTS = 0b001  # 1 yes, 0 no
-INTERSECTION_COUNT = 0b010  # 1 - 4, 0 - 2
-UNDER_ORBIT = 0b100  # 1 - yes, 0 no
-TWO_INTERSECTIONS = INTERSECTION_EXISTS & ~INTERSECTION_COUNT
-FOUR_INTERSECTIONS = INTERSECTION_EXISTS | INTERSECTION_COUNT
-
-
-class OrbitPath:
-
-    def __init__(self, sat, geo, jd):
-        self._sat = sat
-        self._geo = geo
-        self._jd = jd
-
-        a, b, c, k = self._getConstants(jd)
-        zeta = geo.getZenithVector(jd)
-        self._rho = cos(geo.getGeocentricLatitude())
-
-        self._posFunction = Function(zeta[2], self._rho, a, b, c, k, 1)
-        self._negFunction = Function(zeta[2], self._rho, a, b, c, k, -1)
-
-        # posIntersections = [Intersection(zi, zeta[2], 1) for zi in self._posFunction.intersections]
-        # negIntersections = [Intersection(zi, zeta[2], -1) for zi in self._negFunction.intersections]
-        # self._intersections = posIntersections + negIntersections
-
-        self.computeTimes(jd)
-
-    # @staticmethod
-    # def _orderIntersections(intersections, lng):
-    #     pass
-
-    def _getConstants(self, jd):
-        a, b, c = getEllipseVectors(self._sat, jd)
-        gamma = geo.getPositionVector(jd)
-        phiPrime = geo.getGeocentricLatitude()
-
-        d = gamma.mag() * cos(radians(geo.latitude) - phiPrime)
-        k1 = a[0] * a[0] + b[0] * b[0] - c[0] * c[0]
-        k2 = a[1] * a[1] + b[1] * b[1] - c[1] * c[1]
-        k3 = a[2] * a[2] + b[2] * b[2] - c[2] * c[2]
-        k4 = 2 * (a[0] * a[1] + b[0] * b[1] - c[0] * c[1])
-        k5 = 2 * (a[0] * a[2] + b[0] * b[2] - c[0] * c[2])
-        k6 = 2 * (a[1] * a[2] + b[1] * b[2] - c[1] * c[2])
-        k7 = 2 * d * c[0]
-        k8 = 2 * d * c[1]
-        k9 = 2 * d * c[2]
-        k10 = d * d
-
-        return a, b, c, [k1, k2, k3, k4, k5, k6, k7, k8, k9, k10]
-
-    def _getEllipseVectors(self):
-        elements = self._sat.getElements(self._jd)
-        mat = getMatrixEuler(ZXZ, Angles(elements.raan, elements.inc, elements.aop))
-        amag = elements.sma
-        e = elements.ecc
-        cmag = amag * e
-        bmag = amag * sqrt(1 - e * e)
-        a = rotateMatrixFrom(mat, Vector(amag, 0, 0))
-        b = rotateMatrixFrom(mat, Vector(0, bmag, 0))
-        c = rotateMatrixFrom(mat, Vector(-cmag, 0, 0))
-
-        return a, b, c
-
-    @property
-    def intersections(self):
-        return self._posFunction.intersections + self._negFunction.intersections
-
-    @property
-    def positive(self):
-        return self._posFunction
-
-    @property
-    def negative(self):
-        return self._negFunction
-
-    @staticmethod
-    def _orderIntersections(lngs, ints):
-        intsSorted = [x for _, x in zip(lngs, ints)]
-        lngsSorted = sorted(lngs)
-        return lngsSorted, intsSorted
-
-    @staticmethod
-    def _angleDifference(diff):
-        if diff > pi:
-            return diff - TWOPI
-        elif diff < -pi:
-            return diff + TWOPI
-        return diff
-
-    def _timeTo(self, dLng, jd0):
-        dt = dLng / TWOPI
-        # convert solar day to sidereal day
-        return jd0.future(dt * SIDEREAL_PER_SOLAR)
-
-    def computeTimes(self, jd):
-        mask = 0
-        rawZis = self._posFunction.intersections + self._negFunction.intersections
-        if len(rawZis) == 0:
-            return []
-        elif len(rawZis) == 2:
-            mask = TWO_INTERSECTIONS
-        elif len(rawZis) == 4:
-            mask = FOUR_INTERSECTIONS
-        else:
-            raise ValueError('expected to find 0, 2 or 4 intersections, found %i' % len(rawZis))
-        zjSigns = [1 for i in range(len(self._posFunction.intersections))] + [-1 for i in range(len(self._negFunction.intersections))]
-        zjs = [zjSign * sqrt(self._rho*self._rho - zi*zi) for zi, zjSign in zip(rawZis, zjSigns)]
-
-        # zjs = []
-        # for i, zi in enumerate(rawZis):
-        #     zj = zjSigns[i] * sqrt(self._rho*self._rho - zi*zi)
-        #     zjs.append(zj)
-
-        geoLng = radians(self._geo.longitude)
-        lngs = [atan2(zj, zi) for zi, zj in zip(rawZis, zjs)]
-        dls = [self._angleDifference(lng - geoLng) for lng in lngs]
-
-        dlSorted, ziSorted = self._orderIntersections(dls, rawZis)
-
-        # correctly 'order' the sorted dl's, based on wanting future or past time(s).
-        # if orbit path is above, find most recent negative dl, else find next 2 positive
-
-        a, b, c, k = self._getConstants(jd)
-        zeta = geo.getZenithVector(jd)
-        gamma = geo.getPositionVector(jd)
-        altTerm = dot(zeta, gamma - c) / sqrt(dot(zeta, a)**2 + dot(zeta, b)**2)
-        if -1 < altTerm < 1:
-            mask |= UNDER_ORBIT
-            # find previous most recent negative dl, next for the rest
-            if mask & FOUR_INTERSECTIONS:
-            # if len(dlSorted) == 4:
-                dlSorted = dlSorted[1:] + [dlSorted[0] + TWOPI]
-                ziSorted = ziSorted[1:] + [ziSorted[0]]
-            # if two intersections, should be ordered how we want it
-        else:
-            halfLen = int(len(dlSorted) / 2)
-            dlSorted = dlSorted[halfLen:] + [i + TWOPI for i in dlSorted[:halfLen]]
-            ziSorted = ziSorted[halfLen:] + ziSorted[:halfLen]
-
-        times = [self._timeTo(dl, jd) for dl in dlSorted]
-
-        stopRecurse = []
-        for i, dl, zi, jd in enumerate(zip(dlSorted, ziSorted, times)):
-            if i in stopRecurse:
-                continue
-
-            a, b, c, k = self._getConstants(jd)
-
-
-class Plot:
-
-    def __init__(self, sat, geo, jd):
-        self._sat = sat
-        self._geo = geo
-        self._jd = jd
-
-        a, b, c, k = self._getConstants()
-        zeta = geo.getZenithVector(jd)
-        rho = cos(geo.getGeocentricLatitude())
-
-        self._posFunction = Function(zeta[2], rho, a, b, c, k, 1)
-        self._negFunction = Function(zeta[2], rho, a, b, c, k, -1)
-
-    def _getConstants(self):
-        a, b, c = getEllipseVectors(self._sat, self._jd)
-        gamma = geo.getPositionVector(jd)
-        phiPrime = geo.getGeocentricLatitude()
-
-        d = gamma.mag() * cos(radians(geo.latitude) - phiPrime)
-        k1 = a[0] * a[0] + b[0] * b[0] - c[0] * c[0]
-        k2 = a[1] * a[1] + b[1] * b[1] - c[1] * c[1]
-        k3 = a[2] * a[2] + b[2] * b[2] - c[2] * c[2]
-        k4 = 2 * (a[0] * a[1] + b[0] * b[1] - c[0] * c[1])
-        k5 = 2 * (a[0] * a[2] + b[0] * b[2] - c[0] * c[2])
-        k6 = 2 * (a[1] * a[2] + b[1] * b[2] - c[1] * c[2])
-        k7 = 2 * d * c[0]
-        k8 = 2 * d * c[1]
-        k9 = 2 * d * c[2]
-        k10 = d * d
-
-        return a, b, c, [k1, k2, k3, k4, k5, k6, k7, k8, k9, k10]
-
-    def _getEllipseVectors(self):
-        elements = self._sat.getElements(self._jd)
-        mat = getMatrixEuler(ZXZ, Angles(elements.raan, elements.inc, elements.aop))
-        amag = elements.sma
-        e = elements.ecc
-        cmag = amag * e
-        bmag = amag * sqrt(1 - e * e)
-        a = rotateMatrixFrom(mat, Vector(amag, 0, 0))
-        b = rotateMatrixFrom(mat, Vector(0, bmag, 0))
-        c = rotateMatrixFrom(mat, Vector(-cmag, 0, 0))
-
-        return a, b, c
-
-    @property
-    def intersections(self):
-        return self._posFunction.intersections + self._negFunction.intersections
-
-    @property
-    def positive(self):
-        return self._posFunction
-
-    @property
-    def negative(self):
-        return self._negFunction
-
-
 SIDEREAL_PER_SOLAR = EARTH_SIDEREAL_PERIOD / 86400
-
-
-class Intersection:
-
-    def __init__(self, zi, plus):
-        self._zi = zi
-        # self._rho = sqrt(1 - zk*zk)
-        assert plus == 1 or plus == -1
-        self._plus = plus
-
-    @property
-    def zi(self):
-        return self._zi
-
-    @property
-    def plus(self):
-        return self._plus
-
-    # def update(self, zero):
-    #     self._zi = zero
-
-    # def computeTimeTo(self, zi, geoLng, jd, next=True):
-    #     '''next is True to find time to next lng pass, False is previous'''
-    #     zj = self._plus * sqrt(self._rho*self._rho - zi*zi)
-    #
-    #     lng = (atan2(zj, zi) - earthOffsetAngle(jd)) % TWOPI
-    #     if lng > pi:
-    #         lng -= TWOPI
-    #
-    #     dLng = lng - geoLng
-    #     if dLng > pi:
-    #         dLng -= TWOPI
-    #     elif dLng < -pi:
-    #         dLng += TWOPI
-    #
-    #     if next is True and dLng < 0:
-    #         dLng += TWOPI
-    #     dt = SIDEREAL_PER_SOLAR * dLng / 360
-    #
-    #     return jd.future(dt)
 
 
 def makeZetaPlot(sat, geo, jd, plus=True, ylim=None, filename=None):
