@@ -19,9 +19,18 @@ from sattrack.util.constants import TWOPI, EARTH_MU, EARTH_POLAR_RADIUS, EARTH_E
     EARTH_SIDEREAL_PERIOD
 from sattrack.util.conversions import atan3
 
-_all__ = ('Elements', 'Body', 'SUN_BODY', 'EARTH_BODY', 'Orbitable', 'Orbit', 'Satellite', 'meanMotionToSma',
-          'smaToMeanMotion', 'meanToTrueAnomaly', 'meanToEccentricAnomaly', 'eccentricToTrueAnomaly',
-          'trueToMeanAnomaly', 'trueToEccentricAnomaly', 'eccentricToMeanAnomaly')
+if __debug__ is True:
+    debug__all__ = ['_elementsFromTle', '_radiusAtPeriapsis', '_radiusAtApoapsis', '_meanToEccentricAnomaly',
+                    '_eccentricToTrueAnomaly', '_meanToTrueAnomalyNewton', '_meanToTrueAnomalyFast',
+                    '_meanToTrueAnomaly', '_radiusAtAnomaly', '_flightAngleAtAnomaly', '_velocityAtAnomaly',
+                    '_nextMeanAnomaly', '_previousMeanAnomaly', '_nextTrueAnomaly', '_previousTrueAnomaly',
+                    '_meanAnomalyAt', '_trueAnomalyAt', '_meanMotionToSma']
+else:
+    debug__all__ = []
+
+__all__ = ['Elements', 'Body', 'SUN_BODY', 'EARTH_BODY', 'Orbitable', 'Orbit', 'Satellite', 'meanMotionToSma',
+           'smaToMeanMotion', 'meanToTrueAnomaly', 'meanToEccentricAnomaly', 'eccentricToTrueAnomaly',
+           'trueToMeanAnomaly', 'trueToEccentricAnomaly', 'eccentricToMeanAnomaly'] + debug__all__
 
 
 def _elementsFromTle(tle: TwoLineElement, time: JulianDate) -> (float, float, float, float, float, float):

@@ -2,6 +2,8 @@ from pyevspace import Vector
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.coordinates import CelestialCoordinates
 
+__all__ = []
+
 
 def getMoonPosition(jd: JulianDate) -> Vector:
     pass
