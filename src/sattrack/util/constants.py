@@ -25,5 +25,6 @@ AU = 1.495978707e8  # km
 TWOPI = 2.0 * pi
 
 #   Time constants
+SIDEREAL_PER_SOLAR = EARTH_SIDEREAL_PERIOD / 86400
 # as of 10/2022
 DELTAT = 72.6
