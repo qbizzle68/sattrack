@@ -207,6 +207,50 @@ def getZiPP(zi, zj, zk, k):
     return (2 * k[0]) + (2 * k[1] * (zj * zjPP + zjP * zjP)) + (k[3] * (zi * zjPP + 2 * zjP)) + (k[5] * zk * zjPP) + (k[7] * zjPP)
 
 
+def getZiPPP(zi, zj, zk, k):
+    zjP = -zi / zj
+    zjPP = (zjP * zi - zj) / (zj*zj)
+    zjPPP = ((zj*zj) * (zjP + zjPP * zi - zjP) - 2 * zj * zjP * (zjP * zi - zj)) / (zj*zj*zj*zj)
+    return (2 * k[1]) * (zj * zjPPP + zjP * zjPP + 2 * zjP * zjPP) + k[3] * (zi * zjPPP + 3 * zjPP) + k[5] * zk * zjPPP + k[7] * zjPPP
+
+
+def checkPPPrime(sat, geo, jd):
+    a, b, c, k = getConstants(sat, geo, jd)
+    zk = sin(radians(geo.latitude))
+    rho = cos(radians(geo.latitude))
+
+    m = int(rho * 1000)
+    x = [i / 1000 for i in range(-m, m)]
+    f, fPP, fPPP = [], [], []
+
+    for zi in x:
+        zj = sqrt(rho*rho - zi*zi)
+
+        f.append(getZi(zi, zk, rho, k, 1))
+        fPP.append(getZiPP(zi, zj, zk, k))
+        fPPP.append(getZiPPP(zi, zj, zk, k))
+
+    trueFPPP = [0]
+    dt = 0.001
+    for i in range(len(fPP)-1):
+        df = fPP[i+1] - fPP[i]
+        trueFPPP.append(df / dt)
+
+    figure = plt.figure()
+    ax = figure.add_subplot(111)
+    ax.plot(x, f, '-', c='blue')
+    ax.plot(x, fPP, '-', c='dodgerblue')
+    ax.plot(x, fPPP, '-', c='powderblue')
+    ax.plot(x, trueFPPP, '-', c='red')
+
+    maxVal = max(f) * 1.2
+    minVal = min(f) * 1.2
+    ax.set_ylim((minVal, maxVal))
+    ax.grid()
+
+    plt.show()
+
+
 tle = TwoLineElement('''NOAA 1 [-]
 1 04793U 70106A   23134.16528281 -.00000029  00000+0  91342-4 0  9997
 2 04793 101.5043 194.0017 0031725  39.1298  23.1377 12.54015040399041''')
@@ -620,212 +664,212 @@ def checkZi(zi, sat, geo, jd, plus=1):
     return num, den, num / den
 
 
-class Function:
-    __slots__ = '_zk', '_rho', '_a', '_b', '_c', '_k', '_plus', '_rightTail', '_leftTail', '_extrema', \
-                '_zeros', '_zeroCount', '_intersections'
-
-    def __init__(self, zk, rho, a, b, c, k, plus):
-        self._zk = zk
-        self._rho = rho
-        self._a = a
-        self._b = b
-        self._c = c
-        self._k = k
-        self._plus = plus
-
-        ziRight = rho * 0.99999
-        ziLeft = -rho * 0.99999
-        self._rightTail = Extrema(ziRight, self.getValue(ziRight), self.getPPrime(ziRight))
-        self._leftTail = Extrema(ziLeft, self.getValue(ziLeft), self.getPPrime(ziLeft))
-
-        self._updateExtrema()
-        self._updateZeros()
-        self._updateIntersections()
-
-    def _getZj(self, zi):
-        return self._plus * sqrt(self._rho*self._rho - zi*zi)
-
-    def getValue(self, zi, zj=None):
-        if zj is None:
-            zj = self._getZj(zi)
-
-        term1 = self._k[0] * zi * zi
-        term2 = self._k[1] * zj * zj
-        term3 = self._k[2] * self._zk * self._zk
-        term4 = self._k[3] * zi * zj
-        term5 = self._k[4] * zi * self._zk
-        term6 = self._k[5] * zj * self._zk
-        term7 = self._k[6] * zi
-        term8 = self._k[7] * zj
-        term9 = self._k[8] * self._zk
-
-        return term1 + term2 + term3 + term4 + term5 + term6 + term7 + term8 + term9 - self._k[9]
-
-    def getPrime(self, zi, zj=None):
-        if zj is None:
-            zj = self._getZj(zi)
-        zjP = -zi / zj
-        return (2 * self._k[0] * zi) + (2 * self._k[1] * zj * zjP) + (self._k[3] * (zi * zjP + zj)) + (self._k[4]
-                                        * self._zk) + (self._k[5] * self._zk * zjP) + (self._k[6]) + self._k[7] * zjP
-
-    def getPPrime(self, zi, zj=None):
-        if zj is None:
-            zj = self._getZj(zi)
-        zjP = -zi / zj
-        zjPP = (zjP * zi - zj) / (zj * zj)
-        return (2 * self._k[0]) + (2 * self._k[1] * (zj * zjPP + zjP * zjP)) + (self._k[3] * (zi * zjPP + 2 * zjP)) + (
-                    self._k[5] * self._zk * zjPP) + (self._k[7] * zjPP)
-
-    def plot(self):
-        m = int(self._rho * .99999 * 1000)
-        x = [i / 1000 for i in range(-m, m)]
-        f = []
-        fPrime = []
-        fPPrime = []
-
-        for zi in x:
-            zj = self._getZj(zi)
-
-            f.append(self.getValue(zi, zj))
-            fPrime.append(self.getPrime(zi, zj))
-            fPPrime.append(self.getPPrime(zi, zj))
-
-        figure = plt.figure()
-        ax = figure.add_subplot(111)
-        ax.plot(x, f, '-', c='blue')
-        ax.plot(x, fPrime, '-', c='dodgerblue')
-        ax.plot(x, fPPrime, '-', c='powderblue')
-
-        maxVal = max(f) * 1.2
-        minVal = min(f) * 1.2
-        ax.set_ylim((minVal, maxVal))
-        ax.grid()
-
-        plt.show()
-
-    def _computeExtremaValues(self, start):
-        assert start is True or start is False or start == 0
-
-        if start is True:
-            zi1 = self._rho * 0.99999
-            zj = self._plus * sqrt(self._rho * self._rho - zi1 * zi1)
-            ziP = getZiP(zi1, zj, self._zk, self._k)
-            ziPP = getZiPP(zi1, zj, self._zk, self._k)
-            # reduce initial guess until it is either positive and increasing or negative and decreasing
-            while ziP > 0 and ziPP < 0 or ziP < 0 and ziPP > 0:
-                zi1 *= 0.99
-                ziP = getZiP(zi1, zj, self._zk, self._k)
-                ziPP = getZiPP(zi1, zj, self._zk, self._k)
-        elif start is False:
-            zi1 = -self._rho * 0.99999
-            zj = self._plus * sqrt(self._rho * self._rho - zi1 * zi1)
-            ziP = getZiP(zi1, zj, self._zk, self._k)
-            ziPP = getZiPP(zi1, zj, self._zk, self._k)
-            # reduce initial guess until it is either positive and decreasing or negative and increasing
-            while ziP > 0 and ziPP > 0 or ziP < 0 and ziPP < 0:
-                zi1 *= 0.99
-                ziP = getZiP(zi1, zj, self._zk, self._k)
-                ziPP = getZiPP(zi1, zj, self._zk, self._k)
-        else:
-            zi1 = 0
-        zi0 = -2
-
-        while abs(zi0 - zi1) > 1e-7:
-            zi0 = zi1
-            try:
-                zj = self._plus * sqrt(self._rho * self._rho - zi1 * zi1)
-            except ValueError:
-                return None, None, None
-            zi1 = zi0 - getZiP(zi0, zj, self._zk, self._k) / getZiPP(zi0, zj, self._zk, self._k)
-
-        return zi1, getZi(zi1, self._zk, self._rho, self._k, self._plus), getZiPP(zi1, zj, self._zk, self._k)
-
-    def _updateTails(self):
-        ziRight = self._rho * 0.99999
-        ziLeft = -self._rho * 0.99999
-        self._rightTail = Extrema(ziRight, self.getValue(ziRight), self.getPPrime(ziRight))
-        self._leftTail = Extrema(ziLeft, self.getValue(ziLeft), self.getPPrime(ziLeft))
-
-    def _updateExtrema(self):
-        self._updateTails()
-        rightArgs = self._computeExtremaValues(True)
-        right = Extrema(*rightArgs) if rightArgs[0] is not None else None
-        zeroArgs = self._computeExtremaValues(0)
-        zero = Extrema(*zeroArgs) if zeroArgs[0] is not None else None
-        leftArgs = self._computeExtremaValues(False)
-        left = Extrema(*leftArgs) if leftArgs[0] is not None else None
-
-        xt = []
-        for i in (right, zero, left):
-            if i is not None:
-                if all([i != x for x in xt]):
-                    xt.append(i)
-
-        self._extrema = xt
-
-    def _updateZeros(self):
-        sortedExtrema = sorted([self._rightTail, self._leftTail] + self._extrema, key=lambda o: o.zi)
-        zeros = []
-        for i, x in enumerate(sortedExtrema[:-1]):
-            if x.value * sortedExtrema[i+1].value < 0:
-                z = x.zi, sortedExtrema[i+1].zi
-                zeros.append(z)
-        self._zeros = zeros
-        self._zeroCount = len(zeros)
-
-    def _updateIntersections(self):
-        intersections = []
-        for z in self._zeros:
-            zi0 = -2
-            if self.getPrime(z[0]) > 1e-3:
-                zi1 = z[0]
-            elif self.getPrime(z[1]) > 1e-3:
-                zi1 = z[1]
-            else:
-                zi1 = (z[0] + z[1]) / 2
-            while abs(zi0 - zi1) > 1e-7:
-                zi0 = zi1
-                zi1 = zi0 - self.getValue(zi0) / self.getPrime(zi0)
-            intersections.append(zi1)
-
-        self._intersections = intersections
-
-    @property
-    def extrema(self):
-        return self._extrema
-
-    def updateSatValues(self, a, b, c, k):
-        self._a = a
-        self._b = b
-        self._c = c
-        self._k = k
-
-    def updateGeoValues(self, zk, rho):
-        self._zk = zk
-        self._rho = rho
-
-    def update(self):
-        self._updateExtrema()
-        self._updateZeros()
-        self._updateIntersections()
-
-    @property
-    def zeroCount(self):
-        return self._zeroCount
-
-    @property
-    def zeros(self):
-        return self._zeros
-
-    @property
-    def intersections(self):
-        return self._intersections
-
-    def updateSpecific(self, a, b, c, k, zi):
-        self._a = a
-        self._b = b
-        self._c = c
-        self._k = k
+# class Function:
+#     __slots__ = '_zk', '_rho', '_a', '_b', '_c', '_k', '_plus', '_rightTail', '_leftTail', '_extrema', \
+#                 '_zeros', '_zeroCount', '_intersections'
+#
+#     def __init__(self, zk, rho, a, b, c, k, plus):
+#         self._zk = zk
+#         self._rho = rho
+#         self._a = a
+#         self._b = b
+#         self._c = c
+#         self._k = k
+#         self._plus = plus
+#
+#         ziRight = rho * 0.99999
+#         ziLeft = -rho * 0.99999
+#         self._rightTail = Extrema(ziRight, self.getValue(ziRight), self.getPPrime(ziRight))
+#         self._leftTail = Extrema(ziLeft, self.getValue(ziLeft), self.getPPrime(ziLeft))
+#
+#         self._updateExtrema()
+#         self._updateZeros()
+#         self._updateIntersections()
+#
+#     def _getZj(self, zi):
+#         return self._plus * sqrt(self._rho*self._rho - zi*zi)
+#
+#     def getValue(self, zi, zj=None):
+#         if zj is None:
+#             zj = self._getZj(zi)
+#
+#         term1 = self._k[0] * zi * zi
+#         term2 = self._k[1] * zj * zj
+#         term3 = self._k[2] * self._zk * self._zk
+#         term4 = self._k[3] * zi * zj
+#         term5 = self._k[4] * zi * self._zk
+#         term6 = self._k[5] * zj * self._zk
+#         term7 = self._k[6] * zi
+#         term8 = self._k[7] * zj
+#         term9 = self._k[8] * self._zk
+#
+#         return term1 + term2 + term3 + term4 + term5 + term6 + term7 + term8 + term9 - self._k[9]
+#
+#     def getPrime(self, zi, zj=None):
+#         if zj is None:
+#             zj = self._getZj(zi)
+#         zjP = -zi / zj
+#         return (2 * self._k[0] * zi) + (2 * self._k[1] * zj * zjP) + (self._k[3] * (zi * zjP + zj)) + (self._k[4]
+#                                         * self._zk) + (self._k[5] * self._zk * zjP) + (self._k[6]) + self._k[7] * zjP
+#
+#     def getPPrime(self, zi, zj=None):
+#         if zj is None:
+#             zj = self._getZj(zi)
+#         zjP = -zi / zj
+#         zjPP = (zjP * zi - zj) / (zj * zj)
+#         return (2 * self._k[0]) + (2 * self._k[1] * (zj * zjPP + zjP * zjP)) + (self._k[3] * (zi * zjPP + 2 * zjP)) + (
+#                     self._k[5] * self._zk * zjPP) + (self._k[7] * zjPP)
+#
+#     def plot(self):
+#         m = int(self._rho * .99999 * 1000)
+#         x = [i / 1000 for i in range(-m, m)]
+#         f = []
+#         fPrime = []
+#         fPPrime = []
+#
+#         for zi in x:
+#             zj = self._getZj(zi)
+#
+#             f.append(self.getValue(zi, zj))
+#             fPrime.append(self.getPrime(zi, zj))
+#             fPPrime.append(self.getPPrime(zi, zj))
+#
+#         figure = plt.figure()
+#         ax = figure.add_subplot(111)
+#         ax.plot(x, f, '-', c='blue')
+#         ax.plot(x, fPrime, '-', c='dodgerblue')
+#         ax.plot(x, fPPrime, '-', c='powderblue')
+#
+#         maxVal = max(f) * 1.2
+#         minVal = min(f) * 1.2
+#         ax.set_ylim((minVal, maxVal))
+#         ax.grid()
+#
+#         plt.show()
+#
+#     def _computeExtremaValues(self, start):
+#         assert start is True or start is False or start == 0
+#
+#         if start is True:
+#             zi1 = self._rho * 0.99999
+#             zj = self._plus * sqrt(self._rho * self._rho - zi1 * zi1)
+#             ziP = getZiP(zi1, zj, self._zk, self._k)
+#             ziPP = getZiPP(zi1, zj, self._zk, self._k)
+#             # reduce initial guess until it is either positive and increasing or negative and decreasing
+#             while ziP > 0 and ziPP < 0 or ziP < 0 and ziPP > 0:
+#                 zi1 *= 0.99
+#                 ziP = getZiP(zi1, zj, self._zk, self._k)
+#                 ziPP = getZiPP(zi1, zj, self._zk, self._k)
+#         elif start is False:
+#             zi1 = -self._rho * 0.99999
+#             zj = self._plus * sqrt(self._rho * self._rho - zi1 * zi1)
+#             ziP = getZiP(zi1, zj, self._zk, self._k)
+#             ziPP = getZiPP(zi1, zj, self._zk, self._k)
+#             # reduce initial guess until it is either positive and decreasing or negative and increasing
+#             while ziP > 0 and ziPP > 0 or ziP < 0 and ziPP < 0:
+#                 zi1 *= 0.99
+#                 ziP = getZiP(zi1, zj, self._zk, self._k)
+#                 ziPP = getZiPP(zi1, zj, self._zk, self._k)
+#         else:
+#             zi1 = 0
+#         zi0 = -2
+#
+#         while abs(zi0 - zi1) > 1e-7:
+#             zi0 = zi1
+#             try:
+#                 zj = self._plus * sqrt(self._rho * self._rho - zi1 * zi1)
+#             except ValueError:
+#                 return None, None, None
+#             zi1 = zi0 - getZiP(zi0, zj, self._zk, self._k) / getZiPP(zi0, zj, self._zk, self._k)
+#
+#         return zi1, getZi(zi1, self._zk, self._rho, self._k, self._plus), getZiPP(zi1, zj, self._zk, self._k)
+#
+#     def _updateTails(self):
+#         ziRight = self._rho * 0.99999
+#         ziLeft = -self._rho * 0.99999
+#         self._rightTail = Extrema(ziRight, self.getValue(ziRight), self.getPPrime(ziRight))
+#         self._leftTail = Extrema(ziLeft, self.getValue(ziLeft), self.getPPrime(ziLeft))
+#
+#     def _updateExtrema(self):
+#         self._updateTails()
+#         rightArgs = self._computeExtremaValues(True)
+#         right = Extrema(*rightArgs) if rightArgs[0] is not None else None
+#         zeroArgs = self._computeExtremaValues(0)
+#         zero = Extrema(*zeroArgs) if zeroArgs[0] is not None else None
+#         leftArgs = self._computeExtremaValues(False)
+#         left = Extrema(*leftArgs) if leftArgs[0] is not None else None
+#
+#         xt = []
+#         for i in (right, zero, left):
+#             if i is not None:
+#                 if all([i != x for x in xt]):
+#                     xt.append(i)
+#
+#         self._extrema = xt
+#
+#     def _updateZeros(self):
+#         sortedExtrema = sorted([self._rightTail, self._leftTail] + self._extrema, key=lambda o: o.zi)
+#         zeros = []
+#         for i, x in enumerate(sortedExtrema[:-1]):
+#             if x.value * sortedExtrema[i+1].value < 0:
+#                 z = x.zi, sortedExtrema[i+1].zi
+#                 zeros.append(z)
+#         self._zeros = zeros
+#         self._zeroCount = len(zeros)
+#
+#     def _updateIntersections(self):
+#         intersections = []
+#         for z in self._zeros:
+#             zi0 = -2
+#             if self.getPrime(z[0]) > 1e-3:
+#                 zi1 = z[0]
+#             elif self.getPrime(z[1]) > 1e-3:
+#                 zi1 = z[1]
+#             else:
+#                 zi1 = (z[0] + z[1]) / 2
+#             while abs(zi0 - zi1) > 1e-7:
+#                 zi0 = zi1
+#                 zi1 = zi0 - self.getValue(zi0) / self.getPrime(zi0)
+#             intersections.append(zi1)
+#
+#         self._intersections = intersections
+#
+#     @property
+#     def extrema(self):
+#         return self._extrema
+#
+#     def updateSatValues(self, a, b, c, k):
+#         self._a = a
+#         self._b = b
+#         self._c = c
+#         self._k = k
+#
+#     def updateGeoValues(self, zk, rho):
+#         self._zk = zk
+#         self._rho = rho
+#
+#     def update(self):
+#         self._updateExtrema()
+#         self._updateZeros()
+#         self._updateIntersections()
+#
+#     @property
+#     def zeroCount(self):
+#         return self._zeroCount
+#
+#     @property
+#     def zeros(self):
+#         return self._zeros
+#
+#     @property
+#     def intersections(self):
+#         return self._intersections
+#
+#     def updateSpecific(self, a, b, c, k, zi):
+#         self._a = a
+#         self._b = b
+#         self._c = c
+#         self._k = k
 
 
 class OrbitPath2:
