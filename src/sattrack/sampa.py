@@ -16,6 +16,13 @@ from ._sampa import _mpaMoonMeanLongitude, _mpaMoonMeanElongation, _mpaSunMeanAn
     _atmosphericRefractionCorrection, _topocentricElevationAngle, _topocentricZenithAngle, \
     _topocentricAstronomersAzimuthAngle, _topocentricAzimuthAngle, _spaIncidenceAngle
 
+if __debug__ is True:
+    debug__all__ = ['_generate_times']
+else:
+    debug__all__ = []
+
+__all__ = ['Variable', 'Constant', 'Register', 'RegisterTopocentric'] + debug__all__
+
 
 # todo: put useful values here like true obliquity etc.
 

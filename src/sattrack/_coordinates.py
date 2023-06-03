@@ -4,6 +4,9 @@ import pyevspace as evs
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.util.constants import EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS, EARTH_FLATTENING
 
+__all__ = ['_computeZenithVector', '_computePositionVector', '_radiusAtLat', '_computeNormalVector',
+           '_geodeticToGeocentric']
+
 
 def _computeZenithVector(latitude: float, longitude: float, elevation: float, time) -> evs.Vector:
     """Compute a normal vector to earth surface (latitude is geodetic in radians). The magnitude of the zenith vector

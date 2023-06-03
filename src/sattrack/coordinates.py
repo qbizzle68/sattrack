@@ -10,8 +10,13 @@ from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.util.conversions import atan3
 
+if __debug__ is True:
+    debug__all__ = ['_RAD_TO_HOURS', '_DEG_TO_HOURS', '_geocentricToGeodetic']
+else:
+    debug__all__ = []
+
 __all__ = ['Coordinates', 'GeoPosition', 'CelestialCoordinates', 'radiusAtLatitude', 'geocentricToGeodetic',
-           'geodeticToGeocentric', 'getSubPoint']
+           'geodeticToGeocentric', 'getSubPoint'] + debug__all__
 
 _RAD_TO_HOURS = 12 / _math.pi
 _DEG_TO_HOURS = 15

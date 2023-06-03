@@ -1,3 +1,42 @@
+__all__ = []
+
+# import subpackages
+from .spacetime import *
+__all__ += spacetime.__all__
+from .util import *
+__all__ += util.__all__
+
+# import modules
+from .coordinates import *
+__all__ += coordinates.__all__
+from .eclipse import *
+__all__ += eclipse.__all__
+from .exceptions import *
+__all__ += exceptions.__all__
+from .moon import *
+__all__ += moon.__all__
+from .orbit import *
+__all__ += orbit.__all__
+from .sampa import *
+__all__ += sampa.__all__
+from .sun import *
+__all__ += sun.__all__
+from .tle import *
+__all__ += tle.__all__
+from .topocentric import *
+__all__ += topocentric.__all__
+
+# if in debug mode, import internal modules as well
+if __debug__ is True:
+    from ._coordinates import *
+    __all__ += _coordinates.__all__
+    from ._orbit import *
+    __all__ += _orbit.__all__
+    from ._sampa import *
+    __all__ += _sampa.__all__
+    from ._topocentric import *
+    __all__ += _topocentric.__all__
+
 """Compute positioning and angle data for satellites in earth orbit.
 
 This package can create raw position and velocity data for earth satellites, and interpret the results depending on what

@@ -21,9 +21,18 @@ from sattrack.sun import getSunTimes
 from sattrack.util.constants import TWOPI
 from sattrack.util.conversions import atan3
 
-__all__ = ('PositionInfo', 'SatellitePass', 'SatellitePassConstraints', 'getNextPass', 'getPassList', 'toTopocentric',
+if __debug__ is True:
+    debug__all__ = ['_azimuthAngleString', '_getPVector', '_orbitAltitude', '_timeToPlane', '__nextPassMaxIteration',
+                    '_nextPassMaxApprox', '_computeAltitudePosition', '_computeAltitudeSatellite',
+                    '_getAltitudeDerivative', '_getAltitudeDerivativeFix', '_maxPassRefine', '_nextPassMax',
+                    '_riseSetTimesApprox', '__timeToHorizonIteration', '_horizonTimeRefine', '_riseSetTimes',
+                    '_getSpecialTimes', '_deriveBasicInfo', '_getNextPass', '_getPassList']
+else:
+    debug__all__ = []
+
+__all__ = ['PositionInfo', 'SatellitePass', 'SatellitePassConstraints', 'getNextPass', 'getPassList', 'toTopocentric',
            'fromTopocentric', 'getAltitude', 'getAzimuth', 'azimuthAngleString', 'toTopocentricPosition',
-           'toTopocentricVelocity')
+           'toTopocentricVelocity'] + debug__all__
 
 
 def _azimuthAngleString(azimuth):
