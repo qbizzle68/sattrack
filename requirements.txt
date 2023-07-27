@@ -12,7 +12,7 @@ packaging==23.0
 pyevspace==0.0.12.4
 Pygments==2.14.0
 pytz==2022.7.1
-requests==2.28.2
+requests==2.31.0
 -e git+https://github.com/qbizzle68/sattrack.git@233e44700bf8ca725290386c231ec2d9eb20a917#egg=sattrack
 snowballstemmer==2.2.0
 Sphinx==6.1.3
