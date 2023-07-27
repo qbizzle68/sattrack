@@ -1,4 +1,5 @@
-from math import sqrt, radians, cos, sin
+from copy import copy
+from math import sqrt, radians, cos, sin, pi, atan2
 
 from _pyevspace import Vector, getMatrixEuler, ZXZ, Angles, rotateMatrixFrom, dot
 
@@ -6,18 +7,22 @@ from sattrack.coordinates import GeoPosition
 from sattrack.orbit import Orbitable
 from sattrack.spacetime.juliandate import JulianDate
 
-__all__ = ['getGeoValues', 'getEllipseVectors', 'getConstants', 'Point', 'Extrema', 'Boundary', 'ALMOST_ONE',\
-    'DOMAIN_ONE', 'Domain', 'DUPLICATE_ZERO_EPSILON', 'ZeroIntersection', 'ZeroDisappeared', 'EPSILON',\
-    'INITIAL_REDUCTION_COUNT', 'NEWTON_EPSILON', 'NEWTON_GAP', 'ZeroFunction', 'PREVIOUS_OCCURRENCE',\
-    'NEXT_OCCURRENCE', 'SMALL', 'CHECK_MINIMUM', 'TIME_DIFFERENCE', 'OrbitPath']
-    
 if __debug__ is True:
-    debug__all__ = '_getZj', '_getZjPrime', '_getZjPPrime', '_getZjPPPrime', '_getZiValue', '_getZiPrime',\
-        '_getZiPPrime', '_getZiPPPrime', '_getEllipseVectors', '_getConstants', '_angleDifference', '_signOf'
-    __all__ += debug__all__
+    debug__all__ = ['_getZj', '_getZjPrime', '_getZjPPrime', '_getZjPPPrime', '_getZiValue', '_getZiPrime',
+                    '_getZiPPrime', '_getZiPPPrime', '_getEllipseVectors', '_getConstants', '_angleDifference',
+                    '_signOf']
+else:
+    debug__all__ = []
+
+__all__ = ['getGeoValues', 'getEllipseVectors', 'getConstants', 'Point', 'Extrema', 'Boundary', 'ALMOST_ONE',
+           'DOMAIN_ONE', 'Domain', 'DUPLICATE_ZERO_EPSILON', 'ZeroIntersection', 'ZeroDisappeared', 'EPSILON',
+           'INITIAL_REDUCTION_COUNT', 'NEWTON_EPSILON', 'NEWTON_GAP', 'ZeroFunction', 'PREVIOUS_OCCURRENCE',
+           'NEXT_OCCURRENCE', 'SMALL', 'CHECK_MINIMUM', 'TIME_DIFFERENCE', 'OrbitPath'] + debug__all__
+
+from sattrack.util.constants import SIDEREAL_PER_SOLAR
 
 # for developing
-from sattrack.api import *
+from sattrack import *
 
 tle = TwoLineElement('''ISS (ZARYA)             
 1 25544U 98067A   23147.70061491  .00011858  00000+0  21377-3 0  9990
@@ -25,7 +30,7 @@ tle = TwoLineElement('''ISS (ZARYA)
 iss = Satellite(tle)
 jd = now()
 geo = GeoPosition(38, -98)
-__all__ += [iss, jd, geo]
+__all__ += ['iss', 'jd', 'geo']
 
 
 # disappearing zero happens with !!!!!!!!!!!!!!!!!!!!1
@@ -314,15 +319,23 @@ class Domain(Boundary):
 
 
 DUPLICATE_ZERO_EPSILON = 1e-3
+ZERO_ASCENDING = 1
+ZERO_DESCENDING = -1
 
 
 class ZeroIntersection:
-    __slots__ = '_zi', '_sign'
+    __slots__ = '_zi', '_sign', '_direction'
 
-    def __init__(self, zi: float, sign: int):
+    def __init__(self, zi: float, sign: int, ziP: float):
         assert sign == 1 or sign == -1, f'plus expected to be +/- 1, was {sign}'
 
         _checkFloat(zi, 'zi')
+        _checkFloat(ziP, 'ziP')
+
+        if ziP > 0:
+            self._direction = ZERO_ASCENDING
+        else:
+            self._direction = ZERO_DESCENDING
 
         self._zi = zi
         self._sign = sign
@@ -361,6 +374,17 @@ class ZeroIntersection:
 
         self._sign = value
 
+    @property
+    def direction(self):
+        # so this attribute can be used instantiating another intersection
+        return float(self._direction)
+
+    @direction.setter
+    def direction(self, value: int):
+        assert value == ZERO_ASCENDING or value == ZERO_DESCENDING, f'value must be ZERO_ASCENDING or ' \
+                                                                    f'ZERO_DESCENDING, not {value} '
+        self._direction = value
+
 
 class ZeroDisappeared(Exception):
     def __init__(self, message):
@@ -376,40 +400,47 @@ NEWTON_GAP = 1e-7
 class ZeroFunction:
     __slots__ = '_zk', '_rho', '_geo', '_zeros'
 
-    def __new__(cls, geo: GeoPosition, jd: JulianDate):
-        if not isinstance(geo, GeoPosition):
-            raise TypeError(f'geo must be a GeoPosition type, not {type(geo)}')
-        if not isinstance(jd, JulianDate):
-            raise TypeError(f'jd must be a JulianDate type, not {type(jd)}')
+    # def __new__(cls, geo: GeoPosition, jd: JulianDate):
+    #     if not isinstance(geo, GeoPosition):
+    #         raise TypeError(f'geo must be a GeoPosition type, not {type(geo)}')
+    #     if not isinstance(jd, JulianDate):
+    #         raise TypeError(f'jd must be a JulianDate type, not {type(jd)}')
+    #
+    #     rtn = object.__new__(cls)
+    #     lat = radians(geo.latitude)
+    #     rtn._zk = sin(lat)
+    #     rtn._rho = cos(lat)
+    #     rtn._geo = geo
+    #     rtn._zeros = []
+    #
+    # def __init__(self, geo: GeoPosition, jd: JulianDate):
+    #     if not isinstance(geo, GeoPosition):
+    #         raise TypeError(f'geo must be a GeoPosition type, not {type(geo)}')
+    #
+    #     lat = radians(geo.latitude)
+    #     self._zk = sin(lat)
+    #     self._rho = cos(lat)
+    #     self._geo = geo
+    #     self._zeros = []
 
-        rtn = object.__new__(cls)
-        lat = radians(geo.latitude)
-        rtn._zk = sin(lat)
-        rtn._rho = cos(lat)
-        rtn._geo = geo
-        rtn._zeros = []
-
-    def __init__(self, geo: GeoPosition, jd: JulianDate):
+    def __init__(self, geo: GeoPosition):
         if not isinstance(geo, GeoPosition):
             raise TypeError(f'geo must be a GeoPosition type, not {type(geo)}')
 
         lat = radians(geo.latitude)
         self._zk = sin(lat)
         self._rho = cos(lat)
-        self._geo = geo
-        self._zeros = []
 
     @classmethod
-    # def fromValues(cls, zk: float, rho: float):
-    def forPlotting(cls, zk: float, rho: float):
+    def fromValues(cls, zk: float, rho: float):
         _checkFloat(zk, 'zk')
         _checkFloat(rho, 'rho')
 
         rtn = object.__new__(cls)
         rtn._zk = zk
         rtn._rho = rho
-        rtn._geo = None
-        rtn._zeros = []
+        # rtn._geo = None
+        # rtn._zeros = []
 
         return rtn
 
@@ -551,7 +582,8 @@ class ZeroFunction:
 
         # find and return the zeros
         zeros = [self._reduceBoundary(bound, sign, k, _getZiValue, _getZiPrime) for bound in existingZeros]
-        return [ZeroIntersection(zi, sign) for zi in zeros]
+        aux = [_getZiPrime(z, _getZj(z, self._rho, sign), self._zk, k) for z in zeros]
+        return [ZeroIntersection(zi, sign, ziP) for zi, ziP in zip(zeros, aux)]
 
     def computeGeneralZeros(self, k: list[float]) -> list[ZeroIntersection]:
         # Zeros that occur in both positive and negative functions refer to different geo-positions
@@ -715,7 +747,7 @@ class OrbitPath:
         #   not significant outside this method, as the direction array specifies which direction to
         #   move in time while searching for intersecting times.
         # todo: should this be in [0, 1] or -[1, 1] ?
-        up = -1 , self._checkTime(jd) < 1
+        up = -1 < self._checkTime(jd) < 1
         # Find the first positive dl then determine which indices to append to the positive values.
         positiveIndices = [i for i, dl, in enumerate(dlSorted) if dl > 0]
         if positiveIndices:
@@ -812,7 +844,6 @@ class OrbitPath:
                 #   recognized in the computeSpecificZero method. This could cause issues in the future.
                 z = func.computeSpecificZero(z, k)
 
-
         while _getZiValue(zi, zj, self._zk, k) < 0:
             tmpZi = min(max(zi + derivativeSign * nudgeFactor, -limit), limit)
             zj = _getZj(tmpZi, self._rho, z.sign)
@@ -820,7 +851,6 @@ class OrbitPath:
                 if _signOf(_getZiPrime(tmpZi, zj, self._zk, k)) != derivativeSign:
                     # We've sandwiched the positive portion of the function, bisect from here.
                     pass
-
 
                 temperZi = tmpZi
                 tmpZj = _getZj(temperZi, self._rho, z.sign)
@@ -932,7 +962,7 @@ class OrbitPath:
                                                                                  f'NEXT_OCCURRENCE or ' \
                                                                                  f'PREVIOUS_OCCURRENCE, not{direction}'
         time = jd
-        z = ZeroIntersection(zero.zi, zero.sign)
+        z = ZeroIntersection(zero.zi, zero.sign, zero.direction)
         func = ZeroFunction.fromValues(self._zk, self._rho)
         previousTime = time.future(-1)
 
@@ -1042,7 +1072,207 @@ class OrbitPath:
         dls = [_angleDifference(lng - geoLng) for lng in lngs]
 
         # Sort the order and which occurrence of the zeros to find.
-        breakpoint()
+        zeroSorted, direction = self._orderZero(zeros, dls, zCount, jd)
+        times = [self._refineZero(z, jd, d) for z, d in zip(zeroSorted, direction)]
+        return times
+
+
+class OrbitPath2:
+    __slots__ = '_sat', '_geo', '_jd', '_zk', '_rho'
+
+    def __init__(self, sat: Orbitable, geo: GeoPosition, jd: JulianDate):
+        if not isinstance(sat, Orbitable):
+            raise TypeError(f'sat must be an Orbitable type, not {type(sat)}')
+        if not isinstance(geo, GeoPosition):
+            raise TypeError(f'geo must be a GeoPosition type, not {type(geo)}')
+        if not isinstance(jd, JulianDate):
+            raise TypeError(f'jd must be a JulianDate type, not {type(geo)}')
+
+        self._sat = sat
+        self._geo = geo
+        self._jd = jd
+
+        angle = radians(geo.latitude)
+        self._zk = sin(angle)
+        self._rho = cos(angle)
+
+    def _getGeneralZeros(self, jd: JulianDate) -> list[ZeroIntersection]:
+        ellipseVectors = _getEllipseVectors(self._sat, jd)
+        k = _getConstants(*ellipseVectors, self._geo, jd)
+
+        func = ZeroFunction.fromValues(self._zk, self._rho)
+
+        # return [ZeroIntersection(zi, 1) for zi in func.computeGeneralZeros(k)]
+        return func.computeGeneralZeros(k)
+
+    def _checkTime(self, jd: JulianDate) -> float:
+        a, b, c = _getEllipseVectors(self._sat, jd)
+        zeta = self._geo.getZenithVector(jd)
+        gamma = self._geo.getPositionVector(jd)
+
+        numerator = dot(zeta, gamma - c)
+        aDotZ = dot(zeta, a)
+        bDotZ = dot(zeta, b)
+        denominator = sqrt(aDotZ * aDotZ + bDotZ * bDotZ)
+
+        return numerator / denominator
+
+    def _orderZero(self, zeros: list[ZeroIntersection], dls: list[float], zCount: int, jd: JulianDate) -> (
+            list[ZeroIntersection], list[bool]):
+        assert zCount == 2 or zCount == 4, f'expected zCount of 2 or 4, not {zCount}'
+
+        # Sort zeros and angle differences based on the angle differences
+        zeroSorted = [z for _, z in sorted(zip(dls, zeros))]
+        dlSorted = sorted(dls)
+
+        # We want to order the zeros to find the next time to the intersecting geo-positions, with
+        #   the exception being we want to find the previous zero time if the orbit path is currently
+        #   above the geo-position. We only need to sort the zeros accordingly, the sign of the dl is
+        #   not significant outside this method, as the direction array specifies which direction to
+        #   move in time while searching for intersecting times.
+        # todo: should this be in [0, 1] or -[1, 1] ?
+        up = -1 < self._checkTime(jd) < 1
+        # Find the first positive dl then determine which indices to append to the positive values.
+        positiveIndices = [i for i, dl, in enumerate(dlSorted) if dl > 0]
+        if positiveIndices:
+            firstPositive = positiveIndices[0]
+        else:
+            # The cases with no positive dls and all positive dls are treated the same, so set firstPositive
+            #   to 0 if positiveIndices is empty (see explanation below).
+            firstPositive = 0
+
+        # Here is the breakdown for creating the updated zeroSorted arrays, note: fp = firstPositive,
+        #   zs = zeroSorted and dls = dlSorted for brevity
+        #
+        #   dls: [1, 2, 3, 4] [-1, 2, 3, 4] [-1,-2, 3, 4] [-1,-2,-3, 4] [-1,-2,-3,-4]
+        #   zs:  [a, b, c, d] [ a, b, c, d] [ a, b, c, d] [ a, b, c, d] [ a, b, c, d]
+        #
+        #   zs should become the following when up is true
+        #   zs:  [d, a, b, c] [ a, b, c, d] [ b, c, d, a] [ c, d, a, b] [ d, a, b, c]
+        #   and zs should become the following when up is false
+        #   zs:  [a, b, c, d] [ b, c, d, a] [ c, d, a, b] [ d, a, b, c] [ a, b, c, d]
+        #
+        #   Therefore the correct ordering of zs should be zs[fp-1:length] + zs[0:fp-1] when up is True
+        #   and zs[fp:length] + zs[0:fp] when up is False. Notice that the first and last dls values in
+        #   the above outline result in the same output, hence why firstPositive is 0 if positiveIndices
+        #   is empty. The same index pattern is valid when the length of the zero array is 2.
+        #   The direction for each zero should always be the next occurrence, except when up is True, then
+        #   the first zero's previous occurrence should be found.
+        if up:
+            updatedZeros = zeroSorted[firstPositive - 1:zCount] + zeroSorted[0:firstPositive - 1]
+            direction = [PREVIOUS_OCCURRENCE] + [NEXT_OCCURRENCE] * (zCount - 1)
+        else:
+            updatedZeros = zeroSorted[firstPositive:zCount] + zeroSorted[0:firstPositive]
+            direction = [NEXT_OCCURRENCE] * zCount
+
+        return updatedZeros, direction
+
+    def _getTimeTo(self, zi: float, zj: float, jd: JulianDate, direction: int):
+        assert direction == NEXT_OCCURRENCE or direction == PREVIOUS_OCCURRENCE, f'direction expected to be ' \
+                                                                                 f'NEXT_OCCURRENCE or ' \
+                                                                                 f'PREVIOUS_OCCURRENCE, not{direction}'
+        lng = atan2(zj, zi) - earthOffsetAngle(jd)
+        dl = _angleDifference(lng - radians(self._geo.longitude))
+        if direction == NEXT_OCCURRENCE and dl < 0:
+            dl += TWOPI
+        elif direction == PREVIOUS_OCCURRENCE and dl > 0:
+            dl -= TWOPI
+
+        # We need to use sidereal day length as one revolution, not solar day length.
+        dt = SIDEREAL_PER_SOLAR * dl / TWOPI
+        return jd.future(dt)
+
+    def _switchSides(self, z: ZeroIntersection, direction: int, time: JulianDate, k) -> float:
+        assert direction == NEXT_OCCURRENCE or direction == PREVIOUS_OCCURRENCE, f'direction expected to be ' \
+                                                                                 f'NEXT_OCCURRENCE or ' \
+                                                                                 f'PREVIOUS_OCCURRENCE, not{direction}'
+        DT = 1. / 86400.
+        zj = _getZj(z.zi, self._rho, z.sign)
+        moveDirection = z.sign * _signOf(_getZiPrime(z.zi, zj, self._zk, k)) * -1
+
+        while self._checkTime(time) > 1:
+            # fixme:
+            #   it's possible this moves too far past both zeros. If this happens we don't really need to
+            #   care about this section, but functionally we need to worry about it to avoid infinite loops.
+            time = time.future(moveDirection * DT)
+
+        return time
+
+    def _refineZero(self, zero: ZeroIntersection, jd: JulianDate, direction: int):
+        assert direction == NEXT_OCCURRENCE or direction == PREVIOUS_OCCURRENCE, f'direction expected to be ' \
+                                                                                 f'NEXT_OCCURRENCE or ' \
+                                                                                 f'PREVIOUS_OCCURRENCE, not{direction}'
+        time = jd
+        z = copy(zero)
+        func = ZeroFunction.fromValues(self._zk, self._rho)
+        previousTime = time.future(-1)
+
+        CHECK_EPSILON = 1 - CHECK_MINIMUM
+        while abs((check := self._checkTime(time)) - 1) > CHECK_EPSILON or abs(time - previousTime) > TIME_DIFFERENCE:
+            ellipseVectors = _getEllipseVectors(self._sat, time)
+            k = _getConstants(*ellipseVectors, self._geo, time)
+
+            # get the specified zero
+
+    def _refineZero(self, zero: ZeroIntersection, jd: JulianDate, direction: int):
+        assert direction == NEXT_OCCURRENCE or direction == PREVIOUS_OCCURRENCE, f'direction expected to be ' \
+                                                                                 f'NEXT_OCCURRENCE or ' \
+                                                                                 f'PREVIOUS_OCCURRENCE, not{direction}'
+        time = jd
+        z = ZeroIntersection(zero.zi, zero.sign, zero.direction)
+        func = ZeroFunction.fromValues(self._zk, self._rho)
+        previousTime = time.future(-1)
+
+        # Check must be close to 1 but also less than to avoid domain errors on inverse trig functions.
+        #   To avoid being too strict on the check value and inducing an infinite loop, we also check the
+        #   difference in successive times computed. The more liberal CHECK_MINIMUM value is backed up by
+        #   ensuring the change in time is necessarily small.
+        CHECK_EPSILON = 1 - CHECK_MINIMUM
+        while abs((check := self._checkTime(time)) - 1) > CHECK_EPSILON or abs(time - previousTime) > TIME_DIFFERENCE:
+            # while abs((check := self._checkTime(time))) > 1 or abs(time - previousTime) > TIME_DIFFERENCE:
+            ellipseVectors = _getEllipseVectors(self._sat, time)
+            k = _getConstants(*ellipseVectors, self._geo, time)
+            # Update zi to the computed zero for the ZeroFunction with updated k values, which the
+            #   previous zi as out initial guess for the zero finding procedure.
+            # It is possible a zero may move from the positive to the negative function or vise versa.
+            #   This is signaled by a ZeroDisappeared exception and should be handled here.
+            try:
+                z = func.computeSpecificZero(z, k)
+            except ZeroDisappeared:
+                z.sign = -z.sign
+                # Known issue: moving too far forwards/backwards moves the zero so much it's not
+                #   recognized in the computeSpecificZero method. This could cause issues in the future.
+                z = func.computeSpecificZero(z, k)
+
+            # Update the geo-position whose zenith vector corresponds to zi, and update the time to that point.
+            zj = _getZj(z.zi, self._rho, z.sign)
+            previousTime = time
+            time = self._getTimeTo(z.zi, zj, jd, direction)
+
+        if check > 1:
+            return self._switchSides(z, direction, time, k)
+        else:
+            return time
+
+    def computeIntersectionTimes(self, jd: JulianDate):
+        if not isinstance(jd, JulianDate):
+            raise TypeError(f'jd must be a JulianDate type, not {type(geo)}')
+
+        # Get zeros and determine if any intersections occur.
+        zeros = self._getGeneralZeros(jd)
+        zCount = len(zeros)
+        if zCount == 0:
+            # The path is either always or never visible, so no intersection times exist.
+            return []
+        assert zCount == 2 or zCount == 4, f'expected to find 0, 2 or 4 intersections, not {zCount}'
+
+        # Find the difference in longitude from each intersection geo-position relative to the current geo-position.
+        # todo: need to add a property to GeoPosition class that returns the values in radians
+        geoLng = radians(self._geo.longitude)
+        lngs = [atan2(_getZj(z.zi, self._rho, z.sign), z.zi) - earthOffsetAngle(jd) for z in zeros]
+        dls = [_angleDifference(lng - geoLng) for lng in lngs]
+
+        # Sort the order and which occurrence of the zeros to find.
         zeroSorted, direction = self._orderZero(zeros, dls, zCount, jd)
         times = [self._refineZero(z, jd, d) for z, d in zip(zeroSorted, direction)]
         return times
