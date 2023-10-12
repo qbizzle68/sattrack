@@ -183,57 +183,77 @@ class SatellitePass:
     and shouldn't be used when another PositionInfo shares the same information, e.g. the last visible PositionInfo
     shouldn't be set if it's the same as setInfo."""
 
-    __slots__ = '_riseInfo', '_setInfo', '_maxInfo', '_firstUnobscured', '_lastUnobscured', '_firstIlluminated', \
-                '_lastIlluminated', '_illuminated', '_unobscured', '_visible', '_name'
+    __slots__ = '_name', '_infos', '_illuminated', '_unobscured', '_visible'
 
-    def __init__(self, riseInfo: PositionInfo, setInfo: PositionInfo, maxInfo: PositionInfo, *,
-                 firstUnobscuredInfo: PositionInfo = None, lastUnobscuredInfo: PositionInfo = None,
-                 firstIlluminatedInfo: PositionInfo = None, lastIlluminatedInfo: PositionInfo = None, name: str = ''):
-        """Initialize a SatellitePass with the respective PositionInfos. All non-required infos are keyword only and
-        default to None."""
-
-        self._riseInfo = _checkInfoType(riseInfo, 'riseInfo')
-        self._setInfo = _checkInfoType(setInfo, 'setInfo')
-        self._maxInfo = _checkInfoType(maxInfo, 'maxInfo')
-        self._firstUnobscured = _checkInfoTypeNone(firstUnobscuredInfo, 'firstUnobscuredInfo')
-        self._lastUnobscured = _checkInfoTypeNone(lastUnobscuredInfo, 'lastUnobscuredInfo')
-        self._firstIlluminated = _checkInfoTypeNone(firstIlluminatedInfo, 'firstIlluminatedInfo')
-        self._lastIlluminated = _checkInfoTypeNone(lastIlluminatedInfo, 'lastIlluminatedInfo')
-        if firstIlluminatedInfo is not None or riseInfo.illuminated:
-            self._illuminated = True
-        else:
-            self._illuminated = False
-        if firstUnobscuredInfo is not None or riseInfo.unobscured:
-            self._unobscured = True
-        else:
-            self._unobscured = False
-        if self._riseInfo.visible \
-                or (self._firstIlluminated is not None and self._firstIlluminated.visible) \
-                or (self._firstUnobscured is not None and self._firstUnobscured.visible):
-            self._visible = True
-        else:
-            self._visible = False
+    def __init__(self, infos: list[PositionInfo], name: str = ''):
         self._name = name
+        self._infos = {
+            'rise': min(infos, key=lambda o: o.time),
+            'set': max(infos, key=lambda o: o.time),
+            'max': max(infos, key=lambda o: o.altitude),
+        }
+
+        illuminated = [info for info in infos if info.illuminated]
+        unobscured = [info for info in infos if info.unobscured]
+        visible = [info for info in infos if info.visible]
+        self._illuminated = bool(illuminated)
+        self._unobscured = bool(unobscured)
+        self._visible = bool(visible)
+
+        if visible:
+            self._infos['maxVisible'] = max(visible, key=lambda o: o.altitude)
+            self._infos['firstVisible'] = min(visible, key=lambda o: o.time)
+            self._infos['lastVisible'] = max(visible, key=lambda o: o.time)
+        else:
+            self._infos['maxVisible'] = None
+            self._infos['firstVisible'] = None
+            self._infos['lastVisible'] = None
+
+        if illuminated:
+            self._infos['maxIlluminated'] = max(illuminated, key=lambda o: o.altitude)
+            self._infos['firstIlluminated'] = min(illuminated, key=lambda o: o.time)
+            self._infos['lastIlluminated'] = max(illuminated, key=lambda o: o.time)
+        else:
+            self._infos['maxIlluminated'] = None
+            self._infos['firstIlluminated'] = None
+            self._infos['lastIlluminated'] = None
+
+        if unobscured:
+            self._infos['maxUnobscured'] = max(unobscured, key=lambda o: o.altitude)
+            self._infos['firstUnobscured'] = min(unobscured, key=lambda o: o.time)
+            self._infos['lastUnobscured'] = max(unobscured, key=lambda o: o.time)
+        else:
+            self._infos['maxUnobscured'] = None
+            self._infos['firstUnobscured'] = None
+            self._infos['lastUnobscured'] = None
 
     def _getInfos(self):
         """Returns the PositionInfos as a list of tuples with their names and values."""
-        return [
-            ('rise', self._riseInfo),
-            ('set', self._setInfo),
-            ('max', self._maxInfo),
-            ('first unobscured', self._firstUnobscured),
-            ('last unobscured', self._lastUnobscured),
-            ('first illuminated', self._firstIlluminated),
-            ('last illuminated', self._lastIlluminated)
+        rtn = [
+            ('rise', self._infos['rise']),
+            ('set', self._infos['set']),
+            ('max', self._infos['max']),
         ]
+
+        basicInfos = [j for _, j in rtn]
+        if self._infos['firstUnobscured'] not in basicInfos:
+            rtn.append(('first unobscured', self._infos['firstUnobscured']))
+        if self._infos['lastUnobscured'] not in basicInfos:
+            rtn.append(('last unobscured', self._infos['lastUnobscured']))
+        if self._infos['firstIlluminated'] not in basicInfos:
+            rtn.append(('first illuminated', self._infos['firstIlluminated']))
+        if self._infos['lastIlluminated'] not in basicInfos:
+            rtn.append(('last illuminated', self._infos['lastIlluminated']))
+
+        return rtn
 
     def __str__(self):
         """Returns a human readably text table with the pass information."""
         width = 97
         if self._name == '':
-            title = '{:^{w}}'.format('Pass details at {}'.format(self._maxInfo.time.date()), w=width)
+            title = '{:^{w}}'.format('Pass details at {}'.format(self._infos['max'].time.date()), w=width)
         else:
-            title = '{:^{w}}'.format('Pass details for {}, at {}'.format(self._name, self._maxInfo.time.date()),
+            title = '{:^{w}}'.format('Pass details for {}, at {}'.format(self._name, self._infos['max'].time.date()),
                                      w=width)
         heading = ' {:^17} | {:^12} | altitude | {:^12} | illuminated | unobscured | visible ' \
             .format('instance', 'time', 'azimuth')
@@ -241,7 +261,7 @@ class SatellitePass:
         string = title + '\n' + heading + '\n'
 
         infos = [i for i in self._getInfos() if i[1] is not None]
-        infos.sort(key=lambda o: o[1].time.value)
+        infos.sort(key=lambda o: o[1].time)
 
         for name, info in infos:
             string += '{}\n{}\n'.format(lineBreak, str(info).format(name))
@@ -256,46 +276,66 @@ class SatellitePass:
         return json.dumps(self, default=lambda o: o.toDict())
 
     def toDict(self):
-        """Returns a dictionary of the pass to create json formats of other types containing a GeoPosition."""
-        return {"name": self._name, "riseInfo": self._riseInfo, "setInfo": self._setInfo, "maxInfo": self._maxInfo,
-                "firstUnobscured": self._firstUnobscured, "lastUnobscured": self._lastUnobscured,
-                "firstIlluminated": self._firstIlluminated, "lastIlluminated": self._lastIlluminated,
-                "illuminated": self._illuminated, "unobscured": self._unobscured, "visible": self._visible}
+        return {"name": self._name, "riseInfo": self._infos['rise'], "setInfo": self._infos['set'],
+                "maxInfo": self._infos['max'], "firstUnobscured": self._infos['firstUnobscured'],
+                "lastUnobscured": self._infos['lastUnobscured'], "firstIlluminated": self._infos['firstIlluminated'],
+                "lastIlluminated": self._infos['lastIlluminated'], "illuminated": self._illuminated,
+                "unobscured": self._unobscured, "visible": self._visible}
 
     @property
     def riseInfo(self):
         """Returns the PositionInfo for the rise time of the pass."""
-        return self._riseInfo
+        return self._infos['rise']
 
     @property
     def setInfo(self):
         """Returns the PositionInfo for the set time of the pass."""
-        return self._setInfo
+        return self._infos['set']
 
     @property
     def maxInfo(self):
         """Returns the PositionInfo for the time the pass reaches maximum altitude."""
-        return self._maxInfo
+        return self._infos['max']
+
+    @property
+    def firstVisibleInfo(self):
+        return self._infos['firstVisible']
+
+    @property
+    def lastVisibleInfo(self):
+        return self._infos['lastVisible']
+
+    @property
+    def maxVisibleInfo(self):
+        return self._infos['maxVisible']
 
     @property
     def firstUnobscuredInfo(self):
         """Returns the PositionInfo for the first unobscured time of the pass."""
-        return self._firstUnobscured
+        return self._infos['firstUnobscured']
 
     @property
     def lastUnobscuredInfo(self):
         """Returns the PositionInfo for the last unobscured time of the pass."""
-        return self._lastUnobscured
+        return self._infos['lastUnobscured']
+
+    @property
+    def maxUnobscuredInfo(self):
+        return self._infos['maxUnobscured']
 
     @property
     def firstIlluminatedInfo(self):
         """Returns the PositionInfo for the first illuminated time of the pass."""
-        return self._firstIlluminated
+        return self._infos['firstIlluminated']
 
     @property
     def lastIlluminatedInfo(self):
         """Returns the PositionInfo for the last illuminated time of the pass."""
-        return self._lastIlluminated
+        return self._infos['lastIlluminated']
+
+    @property
+    def maxIlluminatedInfo(self):
+        return self._infos['maxIlluminated']
 
     @property
     def unobscured(self):
@@ -889,6 +929,58 @@ def _getNextPass(satellite: Orbitable, geo: GeoPosition, timeOrPass: JulianDate 
     #   then the above issue shouldn't exist
     sunRiseTime, sunSetTime = getSunTimes(riseTime, geo)
 
+    # riseInfo = _deriveBasicInfo(satellite, geo, riseTime, riseTime < enterTime, sunRiseTime < riseTime < sunSetTime) #  riseIlluminated, riseUnobscured)
+    # setInfo = _deriveBasicInfo(satellite, geo, setTime, setTime < enterTime, sunRiseTime < setTime < sunSetTime) #   setIlluminated, setUnobscured)
+    # maxInfo = _deriveBasicInfo(satellite, geo, nextPassTime, nextPassTime < enterTime, sunRiseTime < nextPassTime < sunSetTime) #    maxIlluminated, maxUnobscured)
+
+    # times = {}
+    # if riseTime < enterTime < setTime:
+    #     times['lastIlluminated'] = enterTime
+    # else:
+    #     times['lastIlluminated'] = setTime
+    # if riseTime < exitTime < setTime:
+    #     times['firstIlluminated'] = exitTime
+    # else:
+    #     times['firstIlluminated'] = riseTime
+    #
+    # if sunRiseTime < riseTime < sunSetTime:
+    #     times['firstUnobscured'] = None
+    # elif sunSetTime < riseTime:
+    #     times['firstUnobscured'] = riseTime
+    # elif riseTime < sunSetTime < setTime:
+    #     times['firstUnobscured'] = sunSetTime
+    # if riseTime < sunSetTime <
+
+
+    """               illuminated                           first       last
+        riseTime    enterTime   setTime     exitTime        riseTime    enterTime
+        riseTime    setTime     enterTime   exitTime        riseTime    setTime
+        riseTime    enterTime   exitTime    setTime         riseTime    enterTime
+        enterTime   riseTime    setTime     exitTime        None        None
+        enterTime   riseTime    exitTime    setTime         exitTime    setTime
+        enterTime   exitTime    riseTime    setTime         riseTime    setTime     (doesn't exist, because of shadow time rules)
+        
+                      unobscured                            first       last
+        riseTime    sunRise     setTime     sunSet          riseTime    sunRise
+        riseTime    setTime     sunRise     sunSet          riseTime    setTime
+        riseTime    sunRise     sunSet      setTime         ambiguous               (plan on this not being possible, we can do this if a pass takes longer than the length of the day)
+        sunRise     riseTime    setTime     sunSet          None        None
+        sunRise     riseTime    sunSet      setTime         sunSet      setTime
+        sunRise     sunSet      riseTime    setTime         riseTime    setTime
+    """
+
+    # times = {}
+    # if riseTime < setTime <= enterTime < exitTime:
+    #     times['firstIlluminated'] = riseTime
+    #     times['lastIlluminated'] = setTime
+    # elif riseTime <= enterTime <= setTime <= exitTime or riseTime <= enterTime < exitTime <= setTime:
+    #     times['firstIlluminated'] = riseTime
+    #     times['lastIlluminated'] = enterTime
+    # elif enterTime <=
+
+
+
+
     firstIlluminatedTime, lastIlluminatedTime, riseIlluminated, setIlluminated \
         = _getSpecialTimes(riseTime, setTime, enterTime, exitTime)
     firstUnobscuredTime, lastUnobscuredTime, riseUnobscured, setUnobscured \
@@ -918,11 +1010,10 @@ def _getNextPass(satellite: Orbitable, geo: GeoPosition, timeOrPass: JulianDate 
                                               lastUnobscuredTime < enterTime
                                               or lastUnobscuredTime >= exitTime, True)
 
-    np = SatellitePass(riseInfo, setInfo, maxInfo,
-                       firstUnobscuredInfo=firstUnobscuredInfo,
-                       lastUnobscuredInfo=lastUnobscuredInfo,
-                       firstIlluminatedInfo=firstIlluminatedInfo,
-                       lastIlluminatedInfo=lastIlluminatedInfo)
+    infos = [info for info in [riseInfo, setInfo, maxInfo, firstUnobscuredInfo, lastUnobscuredInfo,
+                               firstIlluminatedInfo, lastIlluminatedInfo] if info is not None]
+
+    np = SatellitePass(infos)
 
     # todo: filter the pass
     # return np
