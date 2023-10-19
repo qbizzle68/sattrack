@@ -10,13 +10,13 @@ from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.util.conversions import atan3
 
-if __debug__ is True:
-    debug__all__ = ['_RAD_TO_HOURS', '_DEG_TO_HOURS', '_geocentricToGeodetic']
-else:
-    debug__all__ = []
-
-__all__ = ['Coordinates', 'GeoPosition', 'CelestialCoordinates', 'radiusAtLatitude', 'geocentricToGeodetic',
-           'geodeticToGeocentric', 'getSubPoint'] + debug__all__
+# if __debug__ is True:
+#     debug__all__ = ['_RAD_TO_HOURS', '_DEG_TO_HOURS', '_geocentricToGeodetic']
+# else:
+#     debug__all__ = []
+#
+# __all__ = ['Coordinates', 'GeoPosition', 'CelestialCoordinates', 'radiusAtLatitude', 'geocentricToGeodetic',
+#            'geodeticToGeocentric', 'getSubPoint'] + debug__all__
 
 _RAD_TO_HOURS = 12 / _math.pi
 _DEG_TO_HOURS = 15
@@ -266,6 +266,86 @@ class CelestialCoordinates(Coordinates):
     def _fmtLongitude(self):
         """Formats the right-ascension to degrees for printing."""
         return self._lng * _RAD_TO_HOURS
+
+# fixme: Clean this up later
+class AltAz:
+    __slots__ = '_altitude', '_azimuth', '_direction'
+
+    def __init__(self, altitude: float, azimuth: float):
+        # Args in degrees, will be modded to valid ranges
+
+        if not -90 <= altitude <= 90:
+            raise ValueError(f'altitude must be in (-90, 90), was {altitude}')
+
+        self._altitude = altitude
+        self._azimuth = azimuth % 360.0
+        self._direction = self.azimuthAngleString(self._azimuth)
+
+    @staticmethod
+    def azimuthAngleString(azimuth):
+        """Converts an azimuth angle in degrees to a compass direction string."""
+        if azimuth > 348.25 or azimuth <= 11.25:
+            return 'N'
+        elif azimuth <= 33.75:
+            return 'NNE'
+        elif azimuth <= 56.25:
+            return 'NE'
+        elif azimuth <= 78.75:
+            return 'ENE'
+        elif azimuth <= 101.25:
+            return 'E'
+        elif azimuth <= 123.75:
+            return 'ESE'
+        elif azimuth <= 146.25:
+            return 'SE'
+        elif azimuth <= 168.75:
+            return 'SSE'
+        elif azimuth <= 191.25:
+            return 'S'
+        elif azimuth <= 213.75:
+            return 'SSW'
+        elif azimuth <= 236.25:
+            return 'SW'
+        elif azimuth <= 258.75:
+            return 'WSW'
+        elif azimuth <= 281.25:
+            return 'W'
+        elif azimuth <= 303.75:
+            return 'WNW'
+        elif azimuth <= 326.25:
+            return 'NW'
+        else:
+            return 'NNW'
+
+    def toDict(self):
+        return {'az': self._azimuth, 'alt': self._altitude, 'direction': self._direction}
+
+    def __str__(self):
+        return str(self.toDict())
+
+    def __repr__(self):
+        return f'AltAz({self._altitude}, {self._azimuth})'
+
+    @property
+    def altitude(self):
+        return self._altitude
+
+    @altitude.setter
+    def altitude(self, value):
+        self._altitude = value
+
+    @property
+    def azimuth(self):
+        return self._azimuth
+
+    @azimuth.setter
+    def azimuth(self, value):
+        self._azimuth = value % 360.0
+        self._direction = self.azimuthAngleString(self._azimuth)
+
+    @property
+    def direction(self):
+        return self._direction
 
 
 def getSubPoint(position: Vector, jd: JulianDate) -> GeoPosition:

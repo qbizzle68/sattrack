@@ -8,31 +8,31 @@ from pyevspace import Vector, vang, norm, cross, dot, ZYX, getMatrixEuler, Angle
 from sattrack.sgp4 import computeEccentricVector
 
 from sattrack._coordinates import _computePositionVector, _computeZenithVector
-from sattrack._orbit import _trueAnomalyFromState, _trueToMeanAnomaly, \
+from sattrack.orbit._satellite import _trueAnomalyFromState, _trueToMeanAnomaly, \
     _smaToMeanMotion, _nearestTrueAnomaly, _vectorAlmostEqual
 from sattrack._topocentric import _toTopocentricOffset, _toTopocentric, _toTopocentricState
 from sattrack.coordinates import GeoPosition
 from sattrack.eclipse import getShadowTimes, Shadow
 from sattrack.exceptions import PassConstraintException, NoPassException
-from sattrack.orbit import Orbitable, Elements
+from sattrack.orbit.satellite import Orbitable, Elements
 from sattrack.spacetime.juliandate import JulianDate
 from sattrack.spacetime.sidereal import earthOffsetAngle
 from sattrack.sun import getSunTimes
 from sattrack.util.constants import TWOPI
 from sattrack.util.conversions import atan3
 
-if __debug__ is True:
-    debug__all__ = ['_azimuthAngleString', '_getPVector', '_orbitAltitude', '_timeToPlane', '__nextPassMaxIteration',
-                    '_nextPassMaxApprox', '_computeAltitudePosition', '_computeAltitudeSatellite',
-                    '_getAltitudeDerivative', '_getAltitudeDerivativeFix', '_maxPassRefine', '_nextPassMax',
-                    '_riseSetTimesApprox', '__timeToHorizonIteration', '_horizonTimeRefine', '_riseSetTimes',
-                    '_getSpecialTimes', '_deriveBasicInfo', '_getNextPass', '_getPassList']
-else:
-    debug__all__ = []
-
-__all__ = ['PositionInfo', 'SatellitePass', 'SatellitePassConstraints', 'getNextPass', 'getPassList', 'toTopocentric',
-           'fromTopocentric', 'getAltitude', 'getAzimuth', 'azimuthAngleString', 'toTopocentricPosition',
-           'toTopocentricVelocity'] + debug__all__
+# if __debug__ is True:
+#     debug__all__ = ['_azimuthAngleString', '_getPVector', '_orbitAltitude', '_timeToPlane', '__nextPassMaxIteration',
+#                     '_nextPassMaxApprox', '_computeAltitudePosition', '_computeAltitudeSatellite',
+#                     '_getAltitudeDerivative', '_getAltitudeDerivativeFix', '_maxPassRefine', '_nextPassMax',
+#                     '_riseSetTimesApprox', '__timeToHorizonIteration', '_horizonTimeRefine', '_riseSetTimes',
+#                     '_getSpecialTimes', '_deriveBasicInfo', '_getNextPass', '_getPassList']
+# else:
+#     debug__all__ = []
+#
+# __all__ = ['PositionInfo', 'SatellitePass', 'SatellitePassConstraints', 'getNextPass', 'getPassList', 'toTopocentric',
+#            'fromTopocentric', 'getAltitude', 'getAzimuth', 'azimuthAngleString', 'toTopocentricPosition',
+#            'toTopocentricVelocity'] + debug__all__
 
 
 def _azimuthAngleString(azimuth):

@@ -2,30 +2,31 @@ from enum import Enum
 from math import atan2, cos, sin, pi, sqrt, acos, asin
 from operator import index
 
+from _pyevspace import cross, dot
 from pyevspace import Vector, norm, vang, ZXZ, Angles, rotateEulerTo
 # from sattrack.rotation.order import ZXZ
 # from sattrack.rotation.rotation import EulerAngles, rotateOrderTo
-
+from sattrack.exceptions import NoSatelliteEclipseException
 from sattrack.sun import getSunPosition
 from sattrack.spacetime.juliandate import JulianDate
-from sattrack.orbit import Orbitable
+from sattrack.orbit.satellite import Orbitable
 from sattrack.util.constants import TWOPI, EARTH_EQUITORIAL_RADIUS, SUN_RADIUS
 
 # References:
 # [1] Shadow Times Of Earth Satellites - Alessandro de Iaco Veris
 # [2] Visually Observing Earth Satellites - Dr. T. S. Kelso - https://celestrak.org/columns/v03n01/
 
-if __debug__ is True:
-    debug__all__ = ['__compute_s_vector', '__compute_gamma', '__escobal_method', '__escobal_method_derivative',
-                    '__find_zero_newton', '__find_certain_zeros', '__check_zero', '__check_range', '_get_zero',
-                    '__get_radius_z_comp', '__get_latitude_term', '__get_radius_from_latitude', '__get_aperture_angle',
-                    '__get_refraction_angle', '__get_corrected_refraction_angle', '_get_shadow_positions',
-                    '__compute_anomaly_loop', '_get_perspective_radius']
-else:
-    debug__all__ = []
-
-__all__ = ['Shadow', 'Eclipse', 'getShadowPositions', 'getShadowAnomalies', 'getShadowTimes', 'isEclipsed'] \
-          + debug__all__
+# if __debug__ is True:
+#     debug__all__ = ['__compute_s_vector', '__compute_gamma', '__escobal_method', '__escobal_method_derivative',
+#                     '__find_zero_newton', '__find_certain_zeros', '__check_zero', '__check_range', '_get_zero',
+#                     '__get_radius_z_comp', '__get_latitude_term', '__get_radius_from_latitude', '__get_aperture_angle',
+#                     '__get_refraction_angle', '__get_corrected_refraction_angle', '_get_shadow_positions',
+#                     '__compute_anomaly_loop', '_get_perspective_radius']
+# else:
+#     debug__all__ = []
+#
+# __all__ = ['Shadow', 'Eclipse', 'getShadowPositions', 'getShadowAnomalies', 'getShadowTimes', 'isEclipsed'] \
+#           + debug__all__
 
 
 class Shadow(Enum):
@@ -331,17 +332,23 @@ def _check_args(sat, time, shadow):
 def getShadowPositions(satellite: Orbitable, time: JulianDate,
                        shadowType: Shadow) -> ((float, JulianDate), (float, JulianDate)):
     _check_args(satellite, time, shadowType)
+    if checkEclipse(satellite, time) is False:
+        raise NoSatelliteEclipseException(f"{satellite.name} is not eclipsed by Earth's shadow")
     return _get_shadow_positions(time, satellite, shadowType)
 
 
 def getShadowAnomalies(satellite: Orbitable, time: JulianDate, shadowType: Shadow) -> (float, float):
     _check_args(satellite, time, shadowType)
+    if checkEclipse(satellite, time) is False:
+        raise NoSatelliteEclipseException(f"{satellite.name} is not eclipsed by Earth's shadow")
     (enterPhi, enterTime), (exitPhi, exitTime) = _get_shadow_positions(time, satellite, shadowType)
     return enterPhi, exitPhi
 
 
 def getShadowTimes(satellite: Orbitable, time: JulianDate, shadowType: Shadow) -> (JulianDate, JulianDate):
     _check_args(satellite, time, shadowType)
+    if checkEclipse(satellite, time) is False:
+        raise NoSatelliteEclipseException(f"{satellite.name} is not eclipsed by Earth's shadow")
     (enterPhi, enterTime), (exitPhi, exitTime) = _get_shadow_positions(time, satellite, shadowType)
     return enterTime, exitTime
 
@@ -385,3 +392,26 @@ def isEclipsed(satellite: Orbitable, time: JulianDate, shadowType: Shadow = _PEN
         return abs(thetaE - thetaS) < theta < (thetaE + thetaS) or (thetaE > thetaS) and (theta < (thetaE - thetaS))
     elif index(shadowType) is _ANNULAR:
         return (thetaS > thetaE) and (theta < (thetaS - thetaE))
+
+
+def checkEclipse(sat, time):
+    # compute delta
+    state = sat.getState(time)
+    h = cross(*state)
+    uz = norm(h)
+    sunPosition = getSunPosition(time)
+    s = norm(sunPosition)
+    tmp = acos(dot(uz, s))
+    if tmp > pi / 2:
+        tmp = pi - tmp
+    delta = pi / 2 - tmp
+
+    # compute delta'
+    elements = sat.getElements(time)
+    sVector = __compute_s_vector(sunPosition, elements.raan, elements.inc, elements.aop)
+    gamma = __compute_gamma(sVector)
+    rhs = EARTH_EQUITORIAL_RADIUS * (1 + elements.ecc * cos(pi - gamma))
+    lhs = elements.sma * (1 - elements.ecc * elements.ecc)
+    deltaP = asin(rhs / lhs)
+
+    return delta < deltaP

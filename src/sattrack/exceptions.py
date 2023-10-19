@@ -1,6 +1,6 @@
-__all__ = ('TLEException', 'LineNumberException', 'ChecksumException', 'TokenNumberException', 'TokenLengthException',
-           'NoPassException', 'ShadowException', 'PositiveZeroException', 'PassConstraintException',
-           'SunRiseSetException')
+# __all__ = ('TLEException', 'LineNumberException', 'ChecksumException', 'TokenNumberException', 'TokenLengthException',
+#            'NoPassException', 'ShadowException', 'PositiveZeroException', 'PassConstraintException',
+#            'SunRiseSetException')
 
 class TLEException(Exception):
     """
@@ -130,3 +130,18 @@ class SunRiseSetException(Exception):
     def __init__(self, message):
         self.message = message
         super().__init__(self.message)
+
+
+class NoSatelliteEclipseException(Exception):
+    """
+    Exception raised when a satellite is always in sunlight, and does not enter Earth's shadow.
+    """
+    pass
+
+
+class OrbitPathAlwaysUp(Exception):
+    pass
+
+
+class SatelliteAlwaysAbove(Exception):
+    pass

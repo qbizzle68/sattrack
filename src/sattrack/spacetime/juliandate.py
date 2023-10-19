@@ -3,13 +3,13 @@ import time as _time
 import datetime as _datetime
 from operator import index as _index
 
-if __debug__ is True:
-    debug__all__ = ['_DAY_IN_MONTH', '_isLeap', '_getMonthDays', '_checkArgs', '_checkTimezone',
-                    '_jdToGregorian']
-else:
-    debug__all__ = []
-
-__all__ = ["JulianDate", "now", "J2000"] + debug__all__
+# if __debug__ is True:
+#     debug__all__ = ['_DAY_IN_MONTH', '_isLeap', '_getMonthDays', '_checkArgs', '_checkTimezone',
+#                     '_jdToGregorian']
+# else:
+#     debug__all__ = []
+#
+# __all__ = ["JulianDate", "now", "J2000"] + debug__all__
 
 # if __debug__ is True:
 #     debug__all__ = ['_DAY_IN_MONTH', '_isLeap', '_getMonthDays', '_checkArgs', '_checkTimezone',

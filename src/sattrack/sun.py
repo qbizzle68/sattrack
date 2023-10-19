@@ -17,16 +17,16 @@ from sattrack.spacetime.juliandate import JulianDate
 from sattrack.coordinates import GeoPosition, CelestialCoordinates
 from sattrack.util.constants import AU, TWOPI, DELTAT
 
-if __debug__ is True:
-    debug__all__ = ['_generateTimes', '_computeJme', '__sunPrimaryBundle', '__sunPrimaryBundleRightAscension',
-                    '__sunPrimaryBundleDeclination', '__sunSecondaryBundle', '__sunSecondaryBundleRightAscension',
-                    '__sunSecondaryBundleDeclination', '_sunCelestialCoordinates', '_sunPositionVector', '_sunAngles',
-                    '__sunPrimaryBundleHourAngle', '__sunSecondaryBundleHourAngle', '_sunHourAngle']
-else:
-    debug__all__ = []
-
-__all__ = ['Twilight', 'getTwilight', 'getSunTimes', 'getSunPosition', 'getSunCelestialCoordinates', 'getSunHourAngle']\
-          + debug__all__
+# if __debug__ is True:
+#     debug__all__ = ['_generateTimes', '_computeJme', '__sunPrimaryBundle', '__sunPrimaryBundleRightAscension',
+#                     '__sunPrimaryBundleDeclination', '__sunSecondaryBundle', '__sunSecondaryBundleRightAscension',
+#                     '__sunSecondaryBundleDeclination', '_sunCelestialCoordinates', '_sunPositionVector', '_sunAngles',
+#                     '__sunPrimaryBundleHourAngle', '__sunSecondaryBundleHourAngle', '_sunHourAngle']
+# else:
+#     debug__all__ = []
+#
+# __all__ = ['Twilight', 'getTwilight', 'getSunTimes', 'getSunPosition', 'getSunCelestialCoordinates', 'getSunHourAngle']\
+#           + debug__all__
 
 @total_ordering
 class Twilight(Enum):

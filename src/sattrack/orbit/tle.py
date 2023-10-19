@@ -2,7 +2,7 @@ from sattrack.sgp4 import TwoLineElement
 
 import requests
 
-__all__ = ('TwoLineElement', "getTle")
+# __all__ = ('TwoLineElement', "getTle")
 
 
 _CELESTRAK_URL = "https://celestrak.com/NORAD/elements/gp.php?{}={}&FORMAT=TLE"

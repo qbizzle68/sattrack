@@ -8,11 +8,163 @@ GeoPosition(-62.23136355180276, -105.76181776155057, 0)
 JulianDate(5, 29, 2023, 21, 18, 19.243000000002212, -5.0)
 
 
+CORNER CASE #1
+
 Case where zero's completely disappear.
 
 EROS C3
 1 54880U 22179A   23147.44232990  .00006430  00000+0  20916-3 0  9999
 2 54880 139.3581   8.5149 0012925 260.5407  99.3945 15.29442116 22656
 
+#1-a
+This is first case.
 GeoPosition(62.5818464830717, 119.94391125013482, 0)
 JulianDate(5, 31, 2023, 22, 20, 13.789000000004307, -5.0)
+
+(sign is -1 here)
+Disappear time: JulianDate(5, 31, 2023, 22, 34, 45.8859999999986, -5.0)
+Disappear zero: Extrema(0.2714214194033358, 0.0008524134755134583, <FunctionSpec.ZERO_FUNCTION: 0>)
+Disappear geo: GeoPosition(62.5818464830717, 3.0543140675080167, 0)
+
+#1-b
+This is second case where path is already up.
+GeoPosition(62.5818464830717, 3.0543140675080167, 0)
+JulianDate(5, 31, 2023, 22, 34, 44.8859999999986, -5.0)
+
+#1-c
+This is second case where path hasn't risen yet.
+GeoPosition(62.5818464830717, 3.0543140675080167, 0)
+JulianDate(5, 31, 2023, 22, 34, 35.8859999999986, -5.0)
+
+I cannot find an example for the third case right now. We'll have to rely on a failed test to eventually give us
+an instance of the case. Note, there is no guarantee the third case exists, but theoretically it should absolutely be
+possible.
+
+
+
+CORNER CASE #2
+
+This is a weird one, we start checking almost immediately after an intersection, so the next time we try
+and find it, it's been more than a day and weird things happen (the enumerations seem to not be working, and
+we don't actually return the specific zero we want, so we end up bouncing around roots and get in an infinite
+loop.
+NOTE:   The real issue here is the last ordered root is right before the initial position. As time progresses
+the root moves 'ahead' of the initial position, so when comparing against the initial zeta vector, it becomes
+the first enumerated root, instead of the second as it should.
+
+EROS C3
+1 54880U 22179A   23277.90060342  .00025934  00000+0  77686-3 0  9990
+2 54880 139.3547  57.2287 0010278 128.8396 231.3337 15.33076291 42651
+
+GeoPosition(24.398227134243953, -6.974285244256678, 0)
+JulianDate(10, 4, 2023, 23, 9, 7.3840000000054715, -5.0)
+
+
+CORNER CASE #3
+
+Similar to case #2, but the last root to find is a previous occurrence.
+
+EROS C3
+1 54880U 22179A   23277.90060342  .00025934  00000+0  77686-3 0  9990
+2 54880 139.3547  57.2287 0010278 128.8396 231.3337 15.33076291 42651
+
+GeoPosition(-9.446130666073614, 12.911490208536591, 0)
+JulianDate(10, 5, 2023, 0, 23, 45.31400000000008, -5.0)
+
+CORNER CASE #4
+
+Similar to #2 and #3, the order of zeros keeps getting screwed up because our initial zeta vector is very
+close to a root. Need to seriously correct ordering the roots in order to properly solve these cases.
+
+EROS C3
+1 54880U 22179A   23278.81257602  .00025839  00000+0  77285-3 0  9997
+2 54880 139.3543  62.6197 0010306 135.8883 224.2754 15.33122369 42795
+
+GeoPosition(15.357004864903063, -14.06174376034106, 0)
+JulianDate(10, 5, 2023, 19, 16, 15.285000000003492, -5.0)
+
+
+CASE # 4
+
+In a situation with four roots, two roots can be very close to one another, where the OrbitPathDirection is the same
+but the signs are different. There as it stands these two become ambiguous because we don't check the sign, only look
+for the minimum distance. We need to check for sign, but not create issues for when the root moves from one sign to
+another.
+
+ISS (ZARYA)
+1 25544U 98067A   23272.65422324  .00028381  00000+0  51107-3 0  9992
+2 25544  51.6412 171.0935 0006002  52.3064  31.3687 15.49560192417995
+
+GeoPosition(-27.080047954447423, -10.187580831104158, 0)
+JulianDate(10, 8, 2023, 19, 31, 40.56500000000233, -5.0)
+
+
+
+
+Cases for finding satellite passes
+
+All cases use this time unless noted
+JulianDate(10, 17, 2023, 19, 0, 0, -5)
+
+- No orbit pass times:
+    - Orbit path is up
+        - Sat is geosynchronous
+            - Sat is up (should get a SatelliteAlwaysAbove exception)
+
+TwoLineElement('''SPACEWAY 2
+1 28903U 05046B   23289.61779785  .00000119  00000+0  00000+0 0  9990
+2 28903   3.0252  83.0468 0000855 140.0482 245.3432  1.00271510 41579''')
+GeoPosition(38, -97, 0)
+
+            - Sat is not up (should get a NoPassException)
+
+TwoLineElement('''SPACEWAY 2
+1 28903U 05046B   23289.61779785  .00000119  00000+0  00000+0 0  9990
+2 28903   3.0252  83.0468 0000855 140.0482 245.3432  1.00271510 41579''')
+GeoPosition(38.0, 83.0, 0)
+
+        - Sat is not geosynchronous (should get a SatellitePass value)
+
+TwoLineElement('''SPACEWAY 2
+1 28903U 05046B   23289.61779785  .00000119  00000+0  00000+0 0  9990
+2 28903   3.0252  83.0468 0000855 140.0482 245.3432  1.10271510 41570''')
+GeoPosition(38.0, -97.0, 0)
+
+    - Path is down (should get a NoPassException)
+
+TwoLineElement('''IXPE
+1 49954U 21121A   23289.01703978  .00006881  00000+0  53942-3 0  9995
+2 49954   0.2310  48.2272 0010151 248.4626  63.2067 14.95117562101124''')
+GeoPosition(38.0, -97.0, 0)
+
+TwoLineElement('''ISS (ZARYA)
+1 25544U 98067A   23290.70730211  .00020227  00000+0  35718-3 0  9996
+2 25544  51.6416  81.6490 0004772 114.5122 328.6540 15.50333434420790''')
+GeoPosition(75.0, -97.0, 0)
+GeoPosition(-75.0, -97.0, 0)
+
+- Orbit pass times exist
+
+    - Sat is geosynchronous
+
+        - Sat is up (should get a SatellitePass value)
+
+TwoLineElement('''BEIDOU-2 IGSO-1
+1 36828U 10036A   23290.60952736 -.00000076  00000+0  00000+0 0  9993
+2 36828  54.2324 171.7763 0037688 191.9314 346.6367  1.00298034 48443''')
+GeoPosition(38.0, 83.0, 0)
+
+        - Sat is not up (should get a NoPassException)
+
+TwoLineElement('''BEIDOU-2 IGSO-1
+1 36828U 10036A   23290.60952736 -.00000076  00000+0  00000+0 0  9993
+2 36828  54.2324 171.7763 0037688 191.9314 346.6367  1.00298034 48443''')
+GeoPosition(38.0, -97.0, 0)
+
+    - Sat is not geosynchronous (should get a SatellitePass value)
+    - note: this is probably the most common branch, especially for low-mid latitude leo satellites
+
+TwoLineElement('''ISS (ZARYA)
+1 25544U 98067A   23290.70730211  .00020227  00000+0  35718-3 0  9996
+2 25544  51.6416  81.6490 0004772 114.5122 328.6540 15.50333434420790''')
+GeoPosition(38.0, -97.0, 0)
