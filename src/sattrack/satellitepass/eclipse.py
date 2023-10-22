@@ -1,32 +1,12 @@
 from enum import Enum
 from math import atan2, cos, sin, pi, sqrt, acos, asin
-from operator import index
 
-from _pyevspace import cross, dot
-from pyevspace import Vector, norm, vang, ZXZ, Angles, rotateEulerTo
-# from sattrack.rotation.order import ZXZ
-# from sattrack.rotation.rotation import EulerAngles, rotateOrderTo
-from sattrack.exceptions import NoSatelliteEclipseException
-from sattrack.sun import getSunPosition
-from sattrack.spacetime.juliandate import JulianDate
+from pyevspace import Vector, norm, vang, ZXZ, Angles, rotateEulerTo, cross, dot
+from sattrack.satellitepass.exceptions import NoSatelliteEclipseException, NoFunctionRootFound
+from sattrack.bodies.sun import getSunPosition
+from sattrack.core.juliandate import JulianDate
 from sattrack.orbit.satellite import Orbitable
 from sattrack.util.constants import TWOPI, EARTH_EQUITORIAL_RADIUS, SUN_RADIUS
-
-# References:
-# [1] Shadow Times Of Earth Satellites - Alessandro de Iaco Veris
-# [2] Visually Observing Earth Satellites - Dr. T. S. Kelso - https://celestrak.org/columns/v03n01/
-
-# if __debug__ is True:
-#     debug__all__ = ['__compute_s_vector', '__compute_gamma', '__escobal_method', '__escobal_method_derivative',
-#                     '__find_zero_newton', '__find_certain_zeros', '__check_zero', '__check_range', '_get_zero',
-#                     '__get_radius_z_comp', '__get_latitude_term', '__get_radius_from_latitude', '__get_aperture_angle',
-#                     '__get_refraction_angle', '__get_corrected_refraction_angle', '_get_shadow_positions',
-#                     '__compute_anomaly_loop', '_get_perspective_radius']
-# else:
-#     debug__all__ = []
-#
-# __all__ = ['Shadow', 'Eclipse', 'getShadowPositions', 'getShadowAnomalies', 'getShadowTimes', 'isEclipsed'] \
-#           + debug__all__
 
 
 class Shadow(Enum):
@@ -40,26 +20,9 @@ class Eclipse(Enum):
     EXIT = 1
 
 
-_UMBRA = Shadow.UMBRA
-_PENUMBRA = Shadow.PENUMBRA
-_ANNULAR = Shadow.ANNULAR
-
-_ENTER = Eclipse.ENTER
-_EXIT = Eclipse.EXIT
-
-# Shadow = Union[int]
-# EnterExit = Union[int]
-#
-# UMBRA = Shadow(0)
-# PENUMBRA = Shadow(1)
-# ANNULAR = Shadow(2)  # for checking eclipses
-# ENTER = EnterExit(0)
-# EXIT = EnterExit(1)
-
-
 def __compute_s_vector(sunPosition: Vector, raan: float, inclination: float, aop: float) -> Vector:
     S = -norm(sunPosition)
-    # return rotateOrderTo(ZXZ, EulerAngles(raan, inclination, aop), S)
+
     return rotateEulerTo(ZXZ, Angles(raan, inclination, aop), S)
 
 
@@ -82,7 +45,7 @@ def __escobal_method(R: float, sVector: Vector, phi: float, zeta: float, sma: fl
     term4 = 2 * aTerm * R * sTerm * eTerm * sin(zeta)
 
     # subtract term4 for penumbra
-    if shadow is _PENUMBRA:
+    if shadow is Shadow.PENUMBRA:
         term4 *= -1
 
     return term1 + term2 - term3 + term4
@@ -103,7 +66,7 @@ def __escobal_method_derivative(R: float, sVector: Vector, phi: float, zeta: flo
     term2 = 2 * aTerm * aTerm * sTerm * sTermPrime
     term4 = 2 * R * aTerm * sin(zeta) * (sTerm * eTermPrime + sTermPrime * eTerm)
 
-    if shadow is _PENUMBRA:
+    if shadow is Shadow.PENUMBRA:
         term4 *= -1
 
     return term1 + term2 + term4
@@ -124,9 +87,9 @@ def __find_zero_newton(R: float, sVector: Vector, guess: float, zeta: float, sma
 
 def __find_fast_zero(R: float, sVector: Vector, gamma: float, zeta: float, sma: float, ecc: float, shadow: Shadow,
                      enterOrExit: Eclipse, epsilon: float = 1e-5):
-    if enterOrExit is _ENTER:
+    if enterOrExit is Eclipse.ENTER:
         return __find_zero_newton(R, sVector, 3*pi/4 - gamma, zeta, sma, ecc, shadow, epsilon)
-    elif enterOrExit is _EXIT:
+    elif enterOrExit is Eclipse.EXIT:
         return __find_zero_newton(R, sVector, 5*pi/4 - gamma, zeta, sma, ecc, shadow, epsilon)
     else:
         raise ValueError('enterOrExit parameter value must be ENTER or EXIT')
@@ -156,7 +119,9 @@ def __check_zero(phi: float, sVector: Vector):
 
 
 def __check_range(psi: float, enterOrExit: Eclipse) -> bool:
-    return (enterOrExit is _ENTER and pi / 2 <= psi <= pi) or (enterOrExit is _EXIT and pi <= psi <= 3 * pi / 2)
+    cmp1 = (enterOrExit is Eclipse.ENTER and pi / 2 <= psi <= pi)
+    cmp2 = (enterOrExit is Eclipse.EXIT and pi <= psi <= 3 * pi / 2)
+    return cmp1 or cmp2
 
 
 def _get_zero(R: float, sVector: float, zeta: float, sma: float, ecc: float, shadow: Shadow, enterOrExit: Eclipse, *,
@@ -180,8 +145,8 @@ def _get_zero(R: float, sVector: float, zeta: float, sma: float, ecc: float, sha
             psi = (gamma + phi) % TWOPI
             if __check_range(psi, enterOrExit):
                 return phi
-    # todo: make this a custom exception type
-    raise Exception('unable to find a valid zero')
+
+    raise NoFunctionRootFound('unable to find a valid zero')
 
 
 def __get_radius_z_comp(sVector: Vector, sma: float, ecc: float, inc: float, aop: float, phi: float) -> float:
@@ -209,9 +174,9 @@ def __get_radius_from_latitude(latitudeTerm: float) -> float:
 
 
 def __get_aperture_angle(rs: float, Re: float, shadow: Shadow) -> float:
-    if shadow is _UMBRA:
+    if shadow is Shadow.UMBRA:
         cosZeta = sqrt(rs * rs - (SUN_RADIUS - Re) ** 2) / rs
-    elif shadow is _PENUMBRA:
+    elif shadow is Shadow.PENUMBRA:
         cosZeta = sqrt(rs * rs - (SUN_RADIUS + Re) ** 2) / rs
     else:
         raise ValueError('shadow parameter must be either UMBRA or PENUMBRA')
@@ -227,16 +192,15 @@ def __get_refraction_angle(altitudeAngle: float) -> float:
 def __get_corrected_refraction_angle(rs: float, Re: float, shadow: Shadow) -> float:
     semiApertureAngle = __get_aperture_angle(rs, Re, shadow)
     refractionAngle = __get_refraction_angle(semiApertureAngle)
-    if shadow is _UMBRA:
+    if shadow is Shadow.UMBRA:
         correctedAngle = semiApertureAngle + refractionAngle
-    elif shadow is _PENUMBRA:
+    elif shadow is Shadow.PENUMBRA:
         correctedAngle = refractionAngle - semiApertureAngle
     else:
         raise ValueError('shadow parameter must be either UMBRA or PENUMBRA')
     return correctedAngle
 
 
-# todo: make the sat parameter an object that an Elements object can be derived from
 def _get_shadow_positions(jd: JulianDate, sat: Orbitable, shadow: Shadow, zeroEpsilon: float = 1e-5,
                           radiusEpsilon: float = 1e-5) -> ((float, JulianDate), (float, JulianDate)):
     Re = 6371  # start with average radius of the earth
@@ -247,9 +211,11 @@ def _get_shadow_positions(jd: JulianDate, sat: Orbitable, shadow: Shadow, zeroEp
     apertureAngle = __get_corrected_refraction_angle(sunPosition.mag(), Re, shadow)
 
     # phi0 = sat.anomalyAt(jd, Orbitable.TRUE)
-    phi0 = sat.anomalyAt(jd, 'true')
-    approxPhi1 = _get_zero(Re, sVector, apertureAngle, elements.sma, elements.ecc, shadow, _ENTER, epsilon=zeroEpsilon)
-    approxPhi2 = _get_zero(Re, sVector, apertureAngle, elements.sma, elements.ecc, shadow, _EXIT, epsilon=zeroEpsilon)
+    phi0 = sat.anomalyAtTime(jd, 'true')
+    approxPhi1 = _get_zero(Re, sVector, apertureAngle, elements.sma,
+                           elements.ecc, shadow, Eclipse.ENTER, epsilon=zeroEpsilon)
+    approxPhi2 = _get_zero(Re, sVector, apertureAngle, elements.sma, elements.ecc,
+                           shadow, Eclipse.EXIT, epsilon=zeroEpsilon)
 
     # maximum difference between the rages of Re seems to be about 0.015, so take a very conservative value of 0.1 rad
     errorBuffer = 0.1
@@ -267,14 +233,13 @@ def _get_shadow_positions(jd: JulianDate, sat: Orbitable, shadow: Shadow, zeroEp
         dt = (phi2Time - phi1Time) / 2
         referenceTime = phi1Time.future(dt)
 
-    enterPhi, enterTime = __compute_anomaly_loop(jd, referenceTime, sat, shadow, _ENTER, zeroEpsilon, radiusEpsilon)
-    exitPhi, exitTime = __compute_anomaly_loop(jd, referenceTime, sat, shadow, _EXIT, zeroEpsilon, radiusEpsilon)
+    enterPhi, enterTime = __compute_anomaly_loop(jd, referenceTime, sat, shadow,
+                                                 Eclipse.ENTER, zeroEpsilon, radiusEpsilon)
+    exitPhi, exitTime = __compute_anomaly_loop(jd, referenceTime, sat, shadow, Eclipse.EXIT, zeroEpsilon, radiusEpsilon)
 
     # if our approxPhi2 ended up being
     if enterTime < exitTime < jd:
         gamma = __compute_gamma(sVector)
-        # todo: make sure this is at conjunction
-        # updatedJd = sat.timeToAnomaly(gamma, jd, Orbitable.NEXT, Orbitable.TRUE)
         updatedJd = sat.timeToNextAnomaly(gamma, jd, 'true')
         return _get_shadow_positions(updatedJd, sat, shadow, zeroEpsilon)
 
@@ -295,10 +260,10 @@ def __compute_anomaly_loop(startTime: JulianDate, referenceTime: JulianDate, sat
         apertureAngle = __get_corrected_refraction_angle(sunPosition.mag(), Re, shadow)
         phi = _get_zero(Re, sVector, apertureAngle, elements.sma, elements.ecc, shadow, enterOrExit,
                         epsilon=zeroEpsilon)
-        if enterOrExit is _ENTER:
+        if enterOrExit is Eclipse.ENTER:
             # time = sat.timeToAnomaly(phi, referenceTime, Orbitable.PREVIOUS, Orbitable.TRUE)
             time = sat.timeToPreviousAnomaly(phi, referenceTime, 'true')
-        elif enterOrExit is _EXIT:
+        elif enterOrExit is Eclipse.EXIT:
             # time = sat.timeToAnomaly(phi, referenceTime, Orbitable.NEXT, Orbitable.TRUE)
             time = sat.timeToNextAnomaly(phi, referenceTime, 'true')
         elements = sat.getElements(time)
@@ -318,27 +283,14 @@ def _get_perspective_radius(sVector: Vector, sma: float, ecc: float, inc: float,
     return __get_radius_from_latitude(latitudeTerm)
 
 
-def _check_args(sat, time, shadow):
-    if not isinstance(sat, Orbitable):
-        raise TypeError('satellite parameter must be an Orbitable subtype')
-    if not isinstance(time, JulianDate):
-        raise TypeError('time parameter must be JulianDate type')
-    if not isinstance(shadow, Shadow):
-        raise TypeError('shadowType parameter must be Shadow type')
-    elif shadow not in (_PENUMBRA, _UMBRA):
-        raise ValueError('shadowType parameter must be PENUMBRA or UMBRA')
-
-
 def getShadowPositions(satellite: Orbitable, time: JulianDate,
                        shadowType: Shadow) -> ((float, JulianDate), (float, JulianDate)):
-    _check_args(satellite, time, shadowType)
     if checkEclipse(satellite, time) is False:
         raise NoSatelliteEclipseException(f"{satellite.name} is not eclipsed by Earth's shadow")
     return _get_shadow_positions(time, satellite, shadowType)
 
 
 def getShadowAnomalies(satellite: Orbitable, time: JulianDate, shadowType: Shadow) -> (float, float):
-    _check_args(satellite, time, shadowType)
     if checkEclipse(satellite, time) is False:
         raise NoSatelliteEclipseException(f"{satellite.name} is not eclipsed by Earth's shadow")
     (enterPhi, enterTime), (exitPhi, exitTime) = _get_shadow_positions(time, satellite, shadowType)
@@ -346,24 +298,13 @@ def getShadowAnomalies(satellite: Orbitable, time: JulianDate, shadowType: Shado
 
 
 def getShadowTimes(satellite: Orbitable, time: JulianDate, shadowType: Shadow) -> (JulianDate, JulianDate):
-    _check_args(satellite, time, shadowType)
     if checkEclipse(satellite, time) is False:
         raise NoSatelliteEclipseException(f"{satellite.name} is not eclipsed by Earth's shadow")
     (enterPhi, enterTime), (exitPhi, exitTime) = _get_shadow_positions(time, satellite, shadowType)
     return enterTime, exitTime
 
 
-def isEclipsed(satellite: Orbitable, time: JulianDate, shadowType: Shadow = _PENUMBRA) -> bool:
-    if not isinstance(satellite, Orbitable):
-        raise TypeError('satellite parameter must be an Orbitable subtype')
-    if not isinstance(time, JulianDate):
-        raise TypeError('time parameter must be JulianDate type')
-    if not isinstance(shadowType, Shadow):
-        raise TypeError('shadowType parameter must be Shadow type')
-    elif shadowType not in (_PENUMBRA, _UMBRA, _ANNULAR):
-        raise ValueError('shadowType parameter must be PENUMBRA, UMBRA or ANNULAR')
-    # if not 0 <= index(shadowType) <= 2:
-    #     raise ValueError('shadowType parameter must be UMBRA, PENUMBRA or ANNULAR')
+def isEclipsed(satellite: Orbitable, time: JulianDate, shadowType: Shadow = Shadow.PENUMBRA) -> bool:
 
     satPosition = satellite.getState(time)[0]
     sunPosition = getSunPosition(time)
@@ -377,7 +318,7 @@ def isEclipsed(satellite: Orbitable, time: JulianDate, shadowType: Shadow = _PEN
     sVector = __compute_s_vector(sunPosition, elements.raan, elements.inc, elements.aop)
     # phi = elements.trueAnomalyAt(time)
     # phi = satellite.anomalyAt(time, Orbitable.TRUE)
-    phi = satellite.anomalyAt(time, 'true')
+    phi = satellite.anomalyAtTime(time, 'true')
     earthRadius = _get_perspective_radius(sVector, elements.sma, elements.ecc, elements.inc, elements.aop, phi)
 
     # semi-diameters of sun and earth relative to the satellite
@@ -386,11 +327,11 @@ def isEclipsed(satellite: Orbitable, time: JulianDate, shadowType: Shadow = _PEN
     theta = vang(earthPosition, relativeSunPosition)
 
     # logical eclipse values from Ref[2]
-    if index(shadowType) is _UMBRA:
+    if shadowType is Shadow.UMBRA:
         return (thetaE > thetaS) and (theta < (thetaE - thetaS))
-    elif index(shadowType) is _PENUMBRA:
+    elif shadowType is Shadow.PENUMBRA:
         return abs(thetaE - thetaS) < theta < (thetaE + thetaS) or (thetaE > thetaS) and (theta < (thetaE - thetaS))
-    elif index(shadowType) is _ANNULAR:
+    elif shadowType is Shadow.ANNULAR:
         return (thetaS > thetaE) and (theta < (thetaS - thetaE))
 
 

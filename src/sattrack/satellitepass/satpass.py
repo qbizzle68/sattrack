@@ -1,20 +1,22 @@
 import json
 from math import asin, degrees, atan2
 
-from _pyevspace import dot
+from pyevspace import dot
 
-from sattrack.eclipse import getShadowTimes, Shadow
-from sattrack.exceptions import NoSatelliteEclipseException, OrbitPathAlwaysUp, SatelliteAlwaysAbove, NoPassException
-from sattrack.orbit.orbitpath import OrbitPath, TIME_DIFFERENCE, computeEllipseVectors
+from sattrack.satellitepass.eclipse import getShadowTimes, Shadow
+from sattrack.orbit.exceptions import SatelliteAlwaysAbove, NoPassException
+from sattrack.satellitepass.exceptions import NoSatelliteEclipseException
+from sattrack.orbit.orbitpath import OrbitPath, computeEllipseVectors
+from sattrack.config import TIME_DIFFERENCE
 from sattrack.satellitepass.info import PositionInfo, Visibility
-from sattrack.sun import getSunTimes
-from sattrack.util.conversions import atan3
+from sattrack.bodies.sun import getSunTimes
+from sattrack.util.helpers import atan3
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from sattrack.orbit.satellite import Orbitable
-    from sattrack.coordinates import GeoPosition
-    from sattrack.spacetime.juliandate import JulianDate
+    from sattrack.core.coordinates import GeoPosition
+    from sattrack.core.juliandate import JulianDate
 
 
 class SatellitePass:
@@ -205,6 +207,7 @@ class PassController:
         except NoSatelliteEclipseException:
             enterTime = setTime.future(0.0001)
             exitTime = enterTime
+        # fixme: need to consider latitudes where the sun doesn't rise or set
         sunRiseTime, sunSetTime = getSunTimes(riseTime, self._geo)
 
         topoState = self._sat.getTopocentricState(self._geo, riseTime)
@@ -304,7 +307,7 @@ class PassController:
             try:
                 nextPass = self._getNextPass(time.future(0.0001), True)
             # If we get an exception in the middle of getting passes return the list we have up until that point.
-            except (OrbitPathAlwaysUp, SatelliteAlwaysAbove, NoPassException):
+            except (SatelliteAlwaysAbove, NoPassException):
                 return passList
             time = nextPass.riseInfo.time
 

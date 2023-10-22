@@ -1,9 +1,9 @@
 from math import radians
 
-from sattrack.spacetime.juliandate import JulianDate
+from sattrack.core.juliandate import JulianDate
 from sattrack.util.constants import DELTAT
 
-from ._sampa import _mpaMoonMeanLongitude, _mpaMoonMeanElongation, _mpaSunMeanAnomaly, \
+from sattrack.bodies._sampa import _mpaMoonMeanLongitude, _mpaMoonMeanElongation, _mpaSunMeanAnomaly, \
     _mpaMoonMeanAnomaly, _mpaMoonArgumentLatitude, _mpaETerm, _mpaLRTable, _mpaLTerm, _mpaRTerm, \
     _mpaBTerm, _mpaA1Term, _mpaA2Term, _mpaA3Term, _mpaDeltaL, _mpaDeltaB, _mpaMoonLongitude, \
     _mpaMoonLatitude, _mpaMoonDistance, _mpaMoonParallax, _xValues, _xyTable, _nutationLongitude, \
@@ -15,13 +15,6 @@ from ._sampa import _mpaMoonMeanLongitude, _mpaMoonMeanElongation, _mpaSunMeanAn
     _spaEquitorialParallaxSun, _topocentricLocalHourAngle, _topocentricElevationAngleWithout, \
     _atmosphericRefractionCorrection, _topocentricElevationAngle, _topocentricZenithAngle, \
     _topocentricAstronomersAzimuthAngle, _topocentricAzimuthAngle, _spaIncidenceAngle
-
-if __debug__ is True:
-    debug__all__ = ['_generate_times']
-else:
-    debug__all__ = []
-
-__all__ = ['Variable', 'Constant', 'Register', 'RegisterTopocentric'] + debug__all__
 
 
 # todo: put useful values here like true obliquity etc.

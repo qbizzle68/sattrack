@@ -1,25 +1,26 @@
 from copy import deepcopy
 from enum import IntEnum, Enum
-from math import sqrt, radians, cos, sin, pi, atan2, acos, asin, tan, atan
+from math import sqrt, cos, sin, pi, atan2, acos, asin, tan, atan
 
-from _pyevspace import Vector, rotateMatrixFrom, getMatrixEuler, Angles, ZXZ, dot, vxcl, vang
+from pyevspace import Vector, rotateMatrixFrom, getMatrixEuler, Angles, ZXZ, dot, vxcl, vang
 
-from sattrack.exceptions import SatelliteAlwaysAbove, NoPassException
-from sattrack.orbit.exceptions import RootCountChange
-from sattrack.orbit.satellite import trueToMeanAnomaly, smaToMeanMotion
+from sattrack.config import DUPLICATE_ZERO_EPSILON, DOMAIN_ONE, BIFURCATE_EPSILON, SPECIAL_EPSILON, SWITCH_DT, \
+    CHECK_EPSILON, TIME_DIFFERENCE
+from sattrack.orbit.exceptions import RootCountChange, SatelliteAlwaysAbove, NoPassException
+from sattrack.orbit.elements import trueToMeanAnomaly, smaToMeanMotion
 from sattrack.orbit.exceptions import PassedOrbitPathRange
-from sattrack.spacetime.sidereal import earthOffsetAngle
-from sattrack.spacetime.juliandate import now
-from sattrack.topocentric import getAltitude
+from sattrack.core.sidereal import earthOffsetAngle
+from sattrack.bodies.topocentric import getAltitude
 from sattrack.util.constants import TWOPI, SIDEREAL_PER_SOLAR
-from sattrack.util.conversions import atan3
+from sattrack.util.helpers import atan3, signOf, computeAngleDifference, hasSameSign
 
 # Imports solely for type checking
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from sattrack.orbit.satellite import Orbitable
-    from sattrack.spacetime.juliandate import JulianDate
-    from sattrack.coordinates import GeoPosition
+    from sattrack.core.juliandate import JulianDate
+    from sattrack.core.coordinates import GeoPosition
 
 
 def computeZj(zi: float, rho: float, sign: int) -> float:
@@ -108,9 +109,8 @@ def computeValue(zi: float, zj: float, zk: float, k: list[float], spec: 'Functio
     return FUNCTION_ARRAY[spec](zi, zj, zk, k)
 
 
-# todo: move this to the Satellite object ?
-def computeEllipseVectors(sat: 'Orbitable', jd: 'JulianDate') -> (Vector, Vector, Vector):
-    elements = sat.getElements(jd)
+def computeEllipseVectors(sat: 'Orbitable', time: 'JulianDate') -> (Vector, Vector, Vector):
+    elements = sat.getElements(time)
     matrix = getMatrixEuler(ZXZ, Angles(elements.raan, elements.inc, elements.aop))
     aMag = elements.sma
     bMag = aMag * sqrt(1 - elements.ecc * elements.ecc)
@@ -123,9 +123,9 @@ def computeEllipseVectors(sat: 'Orbitable', jd: 'JulianDate') -> (Vector, Vector
     return a, b, c
 
 
-def computeConstants(a: Vector, b: Vector, c: Vector, geo, jd) -> list[float]:
-    gamma = geo.getPositionVector(jd)
-    angle = radians(geo.latitude) - geo.getGeocentricLatitude()
+def computeConstants(a: Vector, b: Vector, c: Vector, geo: 'GeoPosition', time: 'JulianDate') -> list[float]:
+    gamma = geo.getPositionVector(time)
+    angle = geo.latitudeRadians - geo.latitudeGeocentric
     d = gamma.mag() * cos(angle)
     d2 = 2 * d
 
@@ -141,39 +141,6 @@ def computeConstants(a: Vector, b: Vector, c: Vector, geo, jd) -> list[float]:
     k10 = d * d
 
     return [k1, k2, k3, k4, k5, k6, k7, k8, k9, k10]
-
-
-def hasSameSign(a: (float, int), b: (float, int)) -> bool:
-    # Will return NotImplemented if either a or b is zero.
-
-    if a < 0:
-        if b < 0:
-            return True
-        elif b > 0:
-            return False
-    elif a > 0:
-        if b > 0:
-            return True
-        elif b < 0:
-            return False
-    return NotImplemented
-
-
-# todo: this might be useful elsewhere, maybe move to util module
-def computeAngleDifference(angle: float) -> float:
-    validAngle = angle % TWOPI
-    if validAngle > pi:
-        return validAngle - TWOPI
-    return validAngle
-
-
-# todo: this might be useful elsewhere, maybe move to util module
-def signOf(value: float) -> int:
-    # Zero will return True.
-
-    if value >= 0:
-        return 1
-    return -1
 
 
 class FunctionSpec(IntEnum):
@@ -217,17 +184,6 @@ class OccurrenceDirection(Enum):
 # Used to select the function from a FunctionSpec enumeration value.
 # This methodology requires the signature of these methods to be equivalent.
 FUNCTION_ARRAY = [computeZiValue, computeZiPrime, computeZiPPrime, computeZiPPPrime]
-
-# todo: should we put these in a config file?
-# Constants and epsilon values.
-DUPLICATE_ZERO_EPSILON = 1e-3
-DOMAIN_ONE = 0.999999999999999
-BIFURCATE_EPSILON = 1e-10
-SPECIAL_EPSILON = 0.1
-SWITCH_DT = (1 / 864000) / 2
-CHECK_MINIMUM = 0.9999
-CHECK_EPSILON = 1 - CHECK_MINIMUM
-TIME_DIFFERENCE = 1e-5
 
 
 class Point:
@@ -603,7 +559,7 @@ class ZeroFunction:
     def __init__(self, geo: 'GeoPosition'):
         self._geo = geo
 
-        lat = radians(geo.latitude)
+        lat = geo.latitudeRadians
         self._rho = cos(lat)
         self._zk = sin(lat)
         self._limit = DOMAIN_ONE * self._rho
@@ -865,7 +821,7 @@ class OrbitPath:
 
     def _computeTimeTo(self, zi: float, zj: float, jd: 'JulianDate', direction: OccurrenceDirection):
         lng = atan2(zj, zi) - earthOffsetAngle(jd)
-        dl = computeAngleDifference(lng - radians(self._geo.longitude))
+        dl = computeAngleDifference(lng - self._geo.longitudeRadians)
         if direction == OccurrenceDirection.NEXT_OCCURRENCE and dl < 0:
             dl += TWOPI
         elif direction == OccurrenceDirection.PREVIOUS_OCCURRENCE and dl > 0:
@@ -1178,16 +1134,6 @@ class OrbitPath:
                 currentRange = currentRange[2:]
         return currentRange, nextRange
 
-    def isGeosynchronous(self) -> bool:
-        period = 1 / SIDEREAL_PER_SOLAR
-        period = period * TWOPI / 86400
-        delta = period * 0.01
-
-        elements = self._sat.getElements(now())
-        n = smaToMeanMotion(elements.sma, self._sat.body.mu)
-
-        return period - delta <= n <= period + delta
-
     @staticmethod
     def _initRanges(time: 'JulianDate', nextOccurrence: bool, orbitPassTimes: tuple['JulianDate']) \
             -> ('JulianDate', 'tuple[JulianDate] | None', 'tuple[JulianDate] | None'):
@@ -1236,8 +1182,7 @@ class OrbitPath:
             -> bool:
         if not orbitPassTimes:
             if self.isPathAbove(time):
-                # fixme: move this method to the Orbitable class
-                if self.isGeosynchronous():
+                if self._sat.isGeosynchronous():
                     # If satellite is up, assume it's always up
                     if topoState[0][2] > 0:
                         raise SatelliteAlwaysAbove(f'{self._sat.name} is geosynchronous satellite that is '
@@ -1251,7 +1196,7 @@ class OrbitPath:
             else:
                 raise NoPassException(f'{self._sat.name} orbit path is not visible over {self._geo}')
         else:
-            if self.isGeosynchronous():
+            if self._sat.isGeosynchronous():
                 # fixme: this can't be correct 100% of the time
                 if topoState[0][2] > 0:
                     # return orbitPassTimes

@@ -1,7 +1,7 @@
 import json
 
-from sattrack.coordinates import AltAz
-from sattrack.spacetime.juliandate import JulianDate
+from sattrack.bodies.topocentric import AltAz
+from sattrack.core.juliandate import JulianDate
 
 
 class Visibility:

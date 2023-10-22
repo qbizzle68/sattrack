@@ -1,67 +1,10 @@
-from enum import Enum
-from functools import total_ordering
-from math import sin, cos, radians, atan2, tan, asin, atan, pi, acos, sqrt, degrees
+from math import sin, cos, radians, atan2, tan, asin, atan, pi, acos, sqrt
 
 from pyevspace import Vector
 
 from sattrack.util.constants import TWOPI, AU
-from sattrack.util.conversions import atan3
+from sattrack.util.helpers import atan3
 
-__all__ = ['TwilightType', '_mpaMoonMeanLongitude', '_mpaMoonMeanElongation', '_mpaSunMeanAnomaly',
-           '_mpaMoonMeanAnomaly', '_mpaMoonArgumentLatitude', '_mpaETerm', '_mpaLRTable', '_mpaLTerm',
-           '_mpaRTerm', '_mpaBTerm', '_mpaA1Term', '_mpaA2Term', '_mpaA3Term', '_mpaDeltaL', '_mpaDeltaB',
-           '_mpaMoonLongitude', '_mpaMoonLatitude', '_mpaMoonDistance', '_mpaMoonParallax', '_xValues',
-           '_xyTable', '_nutationLongitude', '_nutationObliquity', '_meanObliquity', '_trueObliquity',
-           '_mpaApparentMoonLongitude', '_meanSiderealTime', '_apparentSiderealTime', '_right_ascension',
-           '_declination', '_localHourAngle', '_uTerm', '_xTerm', '_yTerm', '_parallaxRightAscension',
-           '_topocentricRightAscension', '_topocentricDeclination', '_topocentricHourAngle',
-           '_spaExpandTables', '_spaSumExpandedTable', '_spaEarthHeliocentricLongitude',
-           '_spaEarthHeliocentricLatitude', '_spaEarthHeliocentricRadius', '_spaGeocentricLongitude',
-           '_spaGeocentricLatitude', '_spaAberrationCorrection', '_spaApparentSunLongitude',
-           '_spaEquitorialParallaxSun', '_topocentricLocalHourAngle', '_topocentricElevationAngleWithout',
-           '_atmosphericRefractionCorrection', '_topocentricElevationAngle', '_topocentricZenithAngle',
-           '_topocentricAstronomersAzimuthAngle', '_topocentricAzimuthAngle', '_spaIncidenceAngle',
-           '_equationOfTime', '_celestialCoordinatesToPositionVector', '_getTwilightType', '_SPA_L_TABLE',
-           '_SPA_B_TABLE', '_SPA_R_TABLE', '_X_TABLE', '_Y_TABLE', '_NUTATION_TABLE', '_MPA_LR_TERM_TABLE',
-           '_MPA_B_TERM_TABLE']
-
-
-@total_ordering
-class TwilightType(Enum):
-    """Enumerated type for describing specified times of the day defined by the sun's elevation angle."""
-    Day = 0
-    Civil = 1
-    Nautical = 2
-    Astronomical = 3
-    Night = 4
-
-    def __lt__(self, other):
-        if self.__class__ is other.__class__:
-            return self.value < other.value
-        return NotImplemented
-
-    def __eq__(self, other):
-        if self.__class__ is other.__class__:
-            return self.value == other.value
-        return NotImplemented
-
-# def getTwilightType(jd: JulianDate, geo: GeoPosition):
-#     # todo: get sun position in the most efficient way
-#     computer = SampaComputer(jd)
-
-
-# def _generate_times(jd: JulianDate):
-#     JD = Constant(jd.value)
-#     JDE = Constant(JD.value + DELTAT / 86400)
-#     JC = Constant((JD.value - 2451545) / 36525)
-#     JCE = Constant((JDE.value - 2451545) / 36525)
-#     return JD, JDE, JC, JCE, Constant(JCE.value / 10)
-
-
-# def _check_jd(jd):
-#     if not isinstance(jd, JulianDate):
-#         raise TypeError('jd parameter must be JulianDate type')
-#     return True
 
 def _mpaMoonMeanLongitude(JCE):
     """Computes the moon's mean longitude in radians via the MPA."""
@@ -438,22 +381,6 @@ def _celestialCoordinatesToPositionVector(rightAscension, declination, sunDistan
     yComp = abs(yComp) if rightAscension < pi else -abs(yComp)
 
     return Vector((xComp, yComp, zComp)) * sunDistance * AU
-
-
-def _getTwilightType(topocentricPositionVector):
-    """Converts a solar position vector in kilometers to the equivalent twilight type."""
-    sunAngle = degrees(asin(topocentricPositionVector[2] / topocentricPositionVector.mag()))
-
-    if sunAngle < -18:
-        return TwilightType.Night
-    elif sunAngle < -12:
-        return TwilightType.Astronomical
-    elif sunAngle < -6:
-        return TwilightType.Nautical
-    elif sunAngle < -(5.0 / 6.0):
-        return TwilightType.Civil
-    else:
-        return TwilightType.Day
 
 
 _SPA_L_TABLE = [

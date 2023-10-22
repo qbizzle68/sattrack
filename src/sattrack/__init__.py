@@ -13,9 +13,9 @@ _____
 The easiest way to create a satellite is to create a `Satellite` object using a TLE from the `getTle()` method which
 uses [Celestrak](http://www.celestrak.com) via the `requests` module.
 
->>> from sattrack.tle import getTle
->>> from sattrack.spacetime.juliandate import now
->>> from sattrack.orbit import Satellite
+>>> from sattrack.orbit.tle import getTle
+>>> from sattrack.core.juliandate import now
+>>> from sattrack.orbit.satellite import Satellite
 >>>
 >>> tle = getTle('zarya') # get the most recent TLE for the ISS
 >>> jd = now() # get a JulianDate object set to the current time
@@ -30,7 +30,8 @@ uses [Celestrak](http://www.celestrak.com) via the `requests` module.
 An orbit can also be created from raw orbital elements. The fromDegrees class method is used here for simplicity because
 the default constructor takes values in radians.
 
->>> from sattrack.orbit import Elements, Orbit
+>>> from sattrack.orbit.elements import Elements
+>>> from sattrack.orbit.satellite import  Orbit
 >>>
 >>> elements = Elements.fromDegrees(329.765, 51.6438, 59.0052, 0.000677, 6795.067, 184.78, jd)
 >>> iss = Orbit(elements)
@@ -80,42 +81,35 @@ example if a satellite rises illuminated, there will not be a first-illuminated 
 satellite is unobscured when it rises and sets, there will not be a last-unobscured `PositionInfo` set. Only alternate
 events that occur **during** the pass will be considered.
 """
+# todo: put the above in the README.md
+# from sattrack.core.sidereal import earthOffsetAngle
 
-# __all__ = []
-#
-# # import subpackages
-# from .spacetime import *
-# __all__ += spacetime.__all__
-# from .util import *
-# __all__ += util.__all__
-#
-# # import modules
-# from .coordinates import *
-# __all__ += coordinates.__all__
-# from .eclipse import *
-# __all__ += eclipse.__all__
-# from .exceptions import *
-# __all__ += exceptions.__all__
-# from .moon import *
-# __all__ += moon.__all__
-# from .orbit import *
-# __all__ += orbit.__all__
-# from .sampa import *
-# __all__ += sampa.__all__
-# from .sun import *
-# __all__ += sun.__all__
-# from .tle import *
-# __all__ += tle.__all__
-# from .topocentric import *
-# __all__ += topocentric.__all__
-#
-# # if in debug mode, import internal modules as well
-# if __debug__ is True:
-#     from ._coordinates import *
-#     __all__ += _coordinates.__all__
-#     from ._orbit import *
-#     __all__ += _orbit.__all__
-#     from ._sampa import *
-#     __all__ += _sampa.__all__
-#     from ._topocentric import *
-#     __all__ += _topocentric.__all__
+from importlib import import_module as _import_module
+
+try:
+    _import_module('pyevspace')
+except ImportError:
+    raise ImportError('Unable to import required dependency pyevspace.')
+
+# todo: we shouldn't need this if we migrate to urllib
+try:
+    _import_module('requests')
+except ImportError:
+    raise ImportError('Unable to import required dependency: requests.')
+
+__all__ = []
+
+from .bodies import *
+__all__ += bodies.__all__
+
+from .core import *
+__all__ += core.__all__
+
+from .orbit import *
+__all__ += orbit.__all__
+
+from .satellitepass import *
+__all__ += satellitepass.__all__
+
+from .util import *
+__all__ += util.__all__

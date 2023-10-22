@@ -5,17 +5,6 @@
 #include <SGP4.h>
 #include <stdio.h>  // sscanf
 
-/**
- * tle.py
- *  - replace TwoLineElement
- * _orbit.py
- *  - replace _compute_eccentric_vector(position, velocity, MU)
- *  - replace _elements_from_state(position, velocity, MU)
- * _topocentric.py
- *  - replace _elements_from_tle(tle, jd)   (compute state at jd and call _elements_from_state)
- *  - Satellite.anomalyAt(jd, anomalyType)  to use _elements_from_tle
- */
-
 #define TLE_Check(o)    PyObject_TypeCheck(o, &tle_type)
 #define TLE_JDNUMBER(o)     o->satrec.jdsatepoch
 #define TLE_JDFRACTION(o)   o->satrec.jdsatepochF
@@ -306,8 +295,8 @@ tle_str(const tle_t* self)
 static PyObject*
 tle_repr(const tle_t* self)
 {
-    const char* format = "TwoLineElement('"
-                         TLE_STR_FORMAT"')";
+    const char* format = "TwoLineElement('''"
+                         TLE_STR_FORMAT"''')";
     return _get_tle_repr(self, format);
 }
 
@@ -488,25 +477,25 @@ compute_ecc_vector(PyObject* self, PyObject* args)
 
 static PyMethodDef sgp4_methods[] = {
     {"getState", (PyCFunction)get_state, METH_FASTCALL,
-     PyDoc_STR("_getState(tle, jd) -> (position, velocity)\n\nReturns a "
+     PyDoc_STR("getState(tle: 'TwoLineElement', time: 'JulianDate') -> (Vector, Vector)\n\nReturns a "
      "tuple of state vectors at the given time.")},
 
     {"elementsFromState", (PyCFunction)elements_from_state, METH_VARARGS,
-     PyDoc_STR("elementsFromState(position, velocity, mu=EARTH_MU) -> (sma, ecc, "
-     "inc, raan, aop, m, nu)\n\nReturns a tuple of orbital elements from a "
+     PyDoc_STR("elementsFromState(position: 'Vector', velocity: 'Vector, mu: float = EARTH_MU) -> (float, float, "
+     "float, float, float, float, float)\n\nReturns a tuple of orbital elements from a "
      "known state. Tuple returned contains the values (raan, inc, aop, ecc, "
      "sma, meanAnomaly, trueAnomaly).")},
 
     {"elementsFromTle", (PyCFunction)elements_from_tle, METH_FASTCALL,
-     PyDoc_STR("elementsFromTle(tle, jd, mu) -> (sma, ecc, inc, raan, "
-     "aop, m, nu)\n\nReturns a tuple of elements from a TLE at a given time "
+     PyDoc_STR("elementsFromTle(tle: 'TwoLineElement', time: 'JulianDate', mu: float) -> (float, float, float, float, "
+     "float, float, float)\n\nReturns a tuple of elements from a TLE at a given time "
      "(state is implicitly computed). If you have a known state, use "
      "sgp4.elementsFromState() instead. Tuple returned contains the values "
      "(raan, inc, aop, ecc, sma, meanAnomaly, trueAnomaly).")},
 
     {"computeEccentricVector", (PyCFunction)compute_ecc_vector,
-     METH_VARARGS, PyDoc_STR("computeEccentricVector(position, velocity, mu=EARTH_MU) "
-     "-> eccentricVector\n\nReturns the eccentric vector of a satellite from "
+     METH_VARARGS, PyDoc_STR("computeEccentricVector(position: Vector, velocity: Vector, mu: float = EARTH_MU) "
+     "-> Vector\n\nReturns the eccentric vector of a satellite from "
      "a known state.")},
 
     {NULL, NULL}
@@ -657,7 +646,7 @@ static PyType_Slot tle_slots[] = {
 };
 
 static PyType_Spec tle_spec = {
-    "tle.TwoLineElement",
+    "TwoLineElement",
     sizeof(tle_t),
     0,
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HEAPTYPE,
@@ -671,11 +660,21 @@ sgp4_exec(PyObject* module)
     if (!state) {
         return -1;
     }
-
+    
+    // fixme: why do we not decrement this before returning an error?
     PyObject* type = PyType_FromModuleAndSpec(module, &tle_spec, NULL);
     if (!type) {
         return -1;
     }
+
+    // The documentation doesn't mention any error being returned by PyUnicode_FromString.
+    PyObject* moduleName = PyUnicode_FromString("sattrack.orbit.tle");
+    if (PyObject_SetAttrString(type, "__module__", moduleName) < 0) {
+        Py_DECREF(moduleName);
+        return -1;
+    }
+    Py_DECREF(moduleName);
+    
     if (PyModule_AddObjectRef(module, "TwoLineElement", type) < 0) {
         Py_DECREF(type);
         return -1;
@@ -696,7 +695,7 @@ sgp4_exec(PyObject* module)
     state->Vector = type;
     type = NULL;
 
-    module_import = PyImport_ImportModule("sattrack.spacetime.juliandate");
+    module_import = PyImport_ImportModule("sattrack.core.juliandate");
     if (!module_import) {
         Py_DECREF(state->TwoLineElement);
         Py_DECREF(state->Vector);

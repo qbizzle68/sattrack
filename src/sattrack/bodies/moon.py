@@ -1,6 +1,6 @@
 from pyevspace import Vector
-from sattrack.spacetime.juliandate import JulianDate
-from sattrack.coordinates import CelestialCoordinates
+from sattrack.core.juliandate import JulianDate
+from sattrack.core.coordinates import CelestialCoordinates
 
 __all__ = []
 

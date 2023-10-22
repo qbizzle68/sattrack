@@ -1,9 +1,7 @@
-from sattrack.sgp4 import TwoLineElement
-
 import requests
 
-# __all__ = ('TwoLineElement', "getTle")
-
+from sattrack.orbit.sgp4 import TwoLineElement
+from sattrack.orbit.exceptions import NoTLEFound
 
 _CELESTRAK_URL = "https://celestrak.com/NORAD/elements/gp.php?{}={}&FORMAT=TLE"
 
@@ -29,7 +27,7 @@ def getTle(value: str, query: str = 'name') -> TwoLineElement | None:
     lines = response.text.splitlines()
 
     if response.text == 'No GP data found':
-        raise Exception("No GP data found")
+        raise NoTLEFound("No GP data found")
     elif len(lines) == 3:
         return TwoLineElement(response.text.strip())
     else:
