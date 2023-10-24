@@ -3,9 +3,10 @@ from math import sqrt, cos, sin
 from abc import ABC, abstractmethod
 from math import tan, pi, asin, radians, atan, degrees
 
+from _pyevspace import ReferenceFrame, Angles, ZYX
 from pyevspace import Vector, norm
 
-from sattrack.util.constants import EARTH_FLATTENING, TWOPI, EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS,\
+from sattrack.util.constants import EARTH_FLATTENING, TWOPI, EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS, \
     HOURS_TO_RAD, EARTH_SIDEREAL_PERIOD
 from sattrack.core.juliandate import JulianDate
 from sattrack.core.sidereal import earthOffsetAngle
@@ -62,6 +63,27 @@ class Coordinates(ABC):
     @property
     def longitudeRadians(self):
         return self._lng
+
+    # @staticmethod
+    # def _toParts(value: float) -> (float, float, float):
+    #     wholePart = int(value)
+    #     frac = value - wholePart
+    #     if frac < 0:
+    #         frac *= -1
+    #
+    #     tmp = frac * 60
+    #     minutesWhole = int(tmp)
+    #     frac = tmp - minutesWhole
+    #     seconds = frac * 60
+    #
+    #     return wholePart, minutesWhole, seconds
+
+    @property
+    def parts(self):
+        latParts = computeAngleParts(self._latOther)
+        lngParts = computeAngleParts(self._lngOther)
+
+        return latParts, lngParts
 
 
 # todo: make a base class for body like coordinates that implement the vector computations
@@ -141,13 +163,27 @@ class GeoPosition(Coordinates):
         normalVector = _computeNormalVector(self._lat, self._lng, self._radius, time)
         return norm(normalVector)
 
+    def getReferenceFrame(self, time: JulianDate) -> ReferenceFrame:
+        lng = self._lng + earthOffsetAngle(time)
+        lat = pi / 2 - self._lat
+        angles = Angles(lng, lat, 0.0)
+
+        return ReferenceFrame(ZYX, angles)
+
 
 class CelestialCoordinates(Coordinates):
+    # rightAscension (longitude) in hours, declination (latitude) degrees
     def __init__(self, rightAscension: float, declination: float):
-        super().__init__(rightAscension, declination)
+        super().__init__(declination, 0.0)
+
+        self._lng = rightAscension * HOURS_TO_RAD
+        self._lngOther = rightAscension
 
     def __str__(self) -> str:
         return f'right-ascension: {self._lngOther}, declination: {self._latOther}'
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}({self._lngOther}, {self._latOther})'
 
     def toDict(self) -> dict:
         return {"right-ascension": self._lngOther, "declination": self._latOther}
@@ -180,6 +216,13 @@ class CelestialCoordinates(Coordinates):
     def declinationRadians(self):
         return self._lat
 
+    @property
+    def parts(self):
+        raParts = computeAngleParts(self._lngOther)
+        decParts = computeAngleParts(self._latOther)
+
+        return raParts, decParts
+
 
 def geocentricToGeodetic(geocentricLatitude: float) -> float:
     """Converts a geocentric latitude in degrees to a geodetic latitude in degrees."""
@@ -201,7 +244,7 @@ def geodeticToGeocentric(geodeticLatitude: float) -> float:
     return degrees(_geodeticToGeocentric(radians(geodeticLatitude)))
 
 
-def getSubPoint(position: Vector, jd: JulianDate) -> GeoPosition:
+def computeSubPoint(position: Vector, jd: JulianDate) -> GeoPosition:
     """Computes the geo-position directly below a satellite at a given time."""
 
     declination = degrees(asin(position[2] / position.mag()))
@@ -230,3 +273,17 @@ def _geodeticToGeocentric(geodeticLatitude):
     term_1 = 1 - EARTH_FLATTENING
     arg = (term_1 * term_1) * tan(geodeticLatitude)
     return atan(arg)
+
+
+def computeAngleParts(value: float) -> (float, float, float):
+    wholePart = int(value)
+    frac = value - wholePart
+    if frac < 0:
+        frac *= -1
+
+    tmp = frac * 60
+    minutesWhole = int(tmp)
+    frac = tmp - minutesWhole
+    seconds = frac * 60
+
+    return wholePart, minutesWhole, seconds

@@ -4,7 +4,8 @@ from .coordinates import (
     CelestialCoordinates,
     geocentricToGeodetic,
     geodeticToGeocentric,
-    getSubPoint,
+    computeSubPoint,
+    computeAngleParts,
 )
 
 from .exceptions import (
@@ -30,7 +31,8 @@ __all__ = (
     'CelestialCoordinates',
     'geocentricToGeodetic',
     'geodeticToGeocentric',
-    'getSubPoint',
+    'computeSubPoint',
+    'computeAngleParts',
 
     # exceptions.py
     'SattrackException',
