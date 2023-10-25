@@ -3,13 +3,14 @@ from typing import TYPE_CHECKING
 
 from pyevspace import Vector
 
-from sattrack.core.juliandate import JulianDate
 from sattrack.util.constants import TWOPI, EARTH_MU, SECONDS_PER_DAY
 from sattrack.util.helpers import atan3
 from sattrack.orbit.sgp4 import elementsFromState
 
 if TYPE_CHECKING:
     from sattrack.orbit.sgp4 import TwoLineElement
+    from sattrack.core.juliandate import JulianDate
+
 
 # Using this method produces Earth shadow times almost identical to those produced by Stellarium, the sgp4 method,
 # creates values several minutes off. Therefore, based on empirical evidence, this seems to be the correct methodology.

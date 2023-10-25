@@ -1,20 +1,43 @@
 from .body import (
+    BodyOrbitController,
     Body,
-    SUN_BODY,
-    EARTH_BODY,
+)
+
+from .earth import (
+    computeMeanSiderealTime,
+    computeApparentSiderealTime,
+    Earth
 )
 
 from .exceptions import (
     SunRiseSetException,
 )
 
+from .position import (
+    JulianTimes,
+    computeNutationDeltas,
+    computeMeanObliquity,
+    computeTrueObliquity,
+)
+
 from .sun import (
+    computeEarthHeliocentricLongitude,
+    computeEarthHeliocentricLatitude,
+    computeSunDistance,
+    computeSunGeocentricLongitude,
+    computeSunGeocentricLatitude,
+    computeSunApparentLongitude,
+    computeSunRightAscension,
+    computeSunDeclination,
+    computeSunPosition,
+    computeSunCoordinates,
+    computeSunData,
+    computeSunRiseSetTimes,
+    computeSunTransitInfo,
+    computeSunTwilightTimes,
     Twilight,
-    getTwilight,
-    getSunTimes,
-    getSunPosition,
-    getSunCelestialCoordinates,
-    getSunHourAngle,
+    computeTwilightType,
+    Sun,
 )
 
 from .topocentric import (
@@ -29,20 +52,41 @@ from .topocentric import (
 
 __all__ = (
     # body.py
+    'BodyOrbitController',
     'Body',
-    'SUN_BODY',
-    'EARTH_BODY',
+
+    # earth.py
+    'computeMeanSiderealTime',
+    'computeApparentSiderealTime',
+    'Earth',
 
     # exceptions.py
     'SunRiseSetException',
 
+    # position.py
+    'JulianTimes',
+    'computeNutationDeltas',
+    'computeMeanObliquity',
+    'computeTrueObliquity',
+
     # sun.py
+    'computeEarthHeliocentricLongitude',
+    'computeEarthHeliocentricLatitude',
+    'computeSunDistance',
+    'computeSunGeocentricLongitude',
+    'computeSunGeocentricLatitude',
+    'computeSunApparentLongitude',
+    'computeSunRightAscension',
+    'computeSunDeclination',
+    'computeSunPosition',
+    'computeSunCoordinates',
+    'computeSunData',
+    'computeSunRiseSetTimes',
+    'computeSunTransitInfo',
+    'computeSunTwilightTimes',
     'Twilight',
-    'getTwilight',
-    'getSunTimes',
-    'getSunPosition',
-    'getSunCelestialCoordinates',
-    'getSunHourAngle',
+    'computeTwilightType',
+    'Sun',
 
     # topocentric.py
     'toTopocentric',

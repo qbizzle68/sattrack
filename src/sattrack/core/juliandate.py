@@ -3,12 +3,6 @@ import time
 import datetime
 
 
-# def _isLeap(year: int) -> bool:
-#     """True if year is a leap year, false if not. A leap year is every 4 years, but not every 100 years, except
-#     for every 400 years."""
-#     return (year % 4 == 0) and (year % 100 != 0 or year % 400 == 0)
-
-
 def _jdToGregorian(value: float, timezone: float) -> (int, int, int, int, int, float):
     """Convert a Julian date to Gregorian calendar components."""
     # incorporate timezone to offset Julian date value

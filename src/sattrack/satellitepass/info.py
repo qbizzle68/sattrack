@@ -1,7 +1,10 @@
 import json
 
 from sattrack.bodies.topocentric import AltAz
-from sattrack.core.juliandate import JulianDate
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from sattrack.core.juliandate import JulianDate
 
 
 class Visibility:
@@ -29,7 +32,7 @@ class Visibility:
 class PositionInfo:
     __slots__ = '_altAz', '_time', '_visibility'
 
-    def __init__(self, altitude: float, azimuth: float, time: JulianDate, illuminated: bool, unobscured: bool):
+    def __init__(self, altitude: float, azimuth: float, time: 'JulianDate', illuminated: bool, unobscured: bool):
         self._altAz = AltAz(altitude, azimuth)
         self._visibility = Visibility(illuminated, unobscured)
         self._time = time

@@ -6,7 +6,7 @@ from pyevspace import Vector, ZXZ, Z_AXIS, Angles, getMatrixEuler, rotateMatrixF
     ReferenceFrame
 
 from sattrack.orbit.sgp4 import getState
-from sattrack.bodies.body import Body, EARTH_BODY
+from sattrack.bodies.earth import Earth
 from sattrack.orbit.elements import elementsFromTle, Elements, radiusAtPeriapsis, radiusAtApoapsis, meanToTrueAnomaly, \
     radiusAtAnomaly, flightAngleAtAnomaly, velocityAtAnomaly, nextMeanAnomaly, previousMeanAnomaly, nextTrueAnomaly, \
     previousTrueAnomaly, nearestTrueAnomaly, nearestMeanAnomaly, meanAnomalyAtTime, trueAnomalyAtTime, smaToMeanMotion
@@ -16,6 +16,7 @@ from sattrack.util.constants import TWOPI, SECONDS_PER_DAY, SIDEREAL_PER_SOLAR
 
 if TYPE_CHECKING:
     from sattrack.orbit.sgp4 import TwoLineElement
+    from sattrack.bodies.body import Body
     from sattrack.core.coordinates import GeoPosition
     from sattrack.core.juliandate import JulianDate
 
@@ -26,7 +27,7 @@ class Orbitable(ABC):
     a Satellite object is an Orbitable created with a TwoLineElement object."""
     __slots__ = '_name', '_body'
 
-    def __init__(self, name: str, body: Body = EARTH_BODY):
+    def __init__(self, name: str, body: 'Body' = Earth):
         """Initialize the orbitable with the common requirements name and parent body, which defaults to EARTH_BODY."""
 
         self._name = name
@@ -96,7 +97,7 @@ class Orbit(Orbitable):
 
     __slots__ = '_elements', '_periapsis', '_apoapsis'
 
-    def __init__(self, elements: Elements, name: str = '', body: Body = EARTH_BODY):
+    def __init__(self, elements: Elements, name: str = '', body: 'Body' = Earth):
         """Initializes an orbit from a set of orbital elements. Future and past positions can't be computed if the
         epoch attribute was not set when instantiating and elements parameter."""
 
@@ -248,7 +249,7 @@ class Satellite(Orbitable):
     def __init__(self, tle: 'TwoLineElement'):
         """Initializes the satellite object with a TLE."""
 
-        super().__init__(tle.name, EARTH_BODY)
+        super().__init__(tle.name, Earth)
         self._tle = tle
 
     @property

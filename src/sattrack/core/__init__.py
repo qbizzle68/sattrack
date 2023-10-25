@@ -18,12 +18,6 @@ from .juliandate import (
     J2000,
 )
 
-from .sidereal import (
-    siderealTime,
-    localSiderealTime,
-    earthOffsetAngle,
-)
-
 __all__ = (
     # coordinates.py
     'Coordinates',
@@ -41,9 +35,4 @@ __all__ = (
     'JulianDate',
     'now',
     'J2000',
-
-    # sidereal.py
-    'siderealTime',
-    'localSiderealTime',
-    'earthOffsetAngle',
 )

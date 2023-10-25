@@ -2,11 +2,15 @@ from enum import Enum
 from math import atan2, cos, sin, pi, sqrt, acos, asin
 
 from pyevspace import Vector, norm, vang, ZXZ, Angles, rotateEulerTo, cross, dot
+
+from sattrack.bodies.sun import Sun
 from sattrack.satellitepass.exceptions import NoSatelliteEclipseException, NoFunctionRootFound
-from sattrack.bodies.sun import getSunPosition
-from sattrack.core.juliandate import JulianDate
-from sattrack.orbit.satellite import Orbitable
 from sattrack.util.constants import TWOPI, EARTH_EQUITORIAL_RADIUS, SUN_RADIUS
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from sattrack.core.juliandate import JulianDate
+    from sattrack.orbit.satellite import Orbitable
 
 
 class Shadow(Enum):
@@ -201,11 +205,11 @@ def __get_corrected_refraction_angle(rs: float, Re: float, shadow: Shadow) -> fl
     return correctedAngle
 
 
-def _get_shadow_positions(jd: JulianDate, sat: Orbitable, shadow: Shadow, zeroEpsilon: float = 1e-5,
-                          radiusEpsilon: float = 1e-5) -> ((float, JulianDate), (float, JulianDate)):
+def _get_shadow_positions(jd: 'JulianDate', sat: 'Orbitable', shadow: Shadow, zeroEpsilon: float = 1e-5,
+                          radiusEpsilon: float = 1e-5) -> ((float, 'JulianDate'), (float, 'JulianDate')):
     Re = 6371  # start with average radius of the earth
     time = jd
-    sunPosition = getSunPosition(time)
+    sunPosition = Sun.computePosition(time)
     elements = sat.getElements(time)
     sVector = __compute_s_vector(sunPosition, elements.raan, elements.inc, elements.aop)
     apertureAngle = __get_corrected_refraction_angle(sunPosition.mag(), Re, shadow)
@@ -246,12 +250,12 @@ def _get_shadow_positions(jd: JulianDate, sat: Orbitable, shadow: Shadow, zeroEp
     return (enterPhi, enterTime), (exitPhi, exitTime)
 
 
-def __compute_anomaly_loop(startTime: JulianDate, referenceTime: JulianDate, sat: Orbitable, shadow: Shadow,
+def __compute_anomaly_loop(startTime: 'JulianDate', referenceTime: 'JulianDate', sat: 'Orbitable', shadow: Shadow,
                            enterOrExit: Eclipse, zeroEpsilon: float = 1e-5,
-                           radiusEpsilon: float = 1e-5) -> (float, JulianDate):
+                           radiusEpsilon: float = 1e-5) -> (float, 'JulianDate'):
     Re = 6371
     time = startTime
-    sunPosition = getSunPosition(time)
+    sunPosition = Sun.computePosition(time)
     elements = sat.getElements(time)
     sVector = __compute_s_vector(sunPosition, elements.raan, elements.inc, elements.aop)
 
@@ -267,7 +271,7 @@ def __compute_anomaly_loop(startTime: JulianDate, referenceTime: JulianDate, sat
             # time = sat.timeToAnomaly(phi, referenceTime, Orbitable.NEXT, Orbitable.TRUE)
             time = sat.timeToNextAnomaly(phi, referenceTime, 'true')
         elements = sat.getElements(time)
-        sunPosition = getSunPosition(time)
+        sunPosition = Sun.computePosition(time)
         sVector = __compute_s_vector(sunPosition, elements.raan, elements.inc, elements.aop)
         previousRe = Re
         Re = _get_perspective_radius(sVector, elements.sma, elements.ecc, elements.inc, elements.aop, phi)
@@ -283,31 +287,31 @@ def _get_perspective_radius(sVector: Vector, sma: float, ecc: float, inc: float,
     return __get_radius_from_latitude(latitudeTerm)
 
 
-def getShadowPositions(satellite: Orbitable, time: JulianDate,
-                       shadowType: Shadow) -> ((float, JulianDate), (float, JulianDate)):
+def getShadowPositions(satellite: 'Orbitable', time: 'JulianDate',
+                       shadowType: Shadow) -> ((float, 'JulianDate'), (float, 'JulianDate')):
     if checkEclipse(satellite, time) is False:
         raise NoSatelliteEclipseException(f"{satellite.name} is not eclipsed by Earth's shadow")
     return _get_shadow_positions(time, satellite, shadowType)
 
 
-def getShadowAnomalies(satellite: Orbitable, time: JulianDate, shadowType: Shadow) -> (float, float):
+def getShadowAnomalies(satellite: 'Orbitable', time: 'JulianDate', shadowType: Shadow) -> (float, float):
     if checkEclipse(satellite, time) is False:
         raise NoSatelliteEclipseException(f"{satellite.name} is not eclipsed by Earth's shadow")
     (enterPhi, enterTime), (exitPhi, exitTime) = _get_shadow_positions(time, satellite, shadowType)
     return enterPhi, exitPhi
 
 
-def getShadowTimes(satellite: Orbitable, time: JulianDate, shadowType: Shadow) -> (JulianDate, JulianDate):
+def getShadowTimes(satellite: 'Orbitable', time: 'JulianDate', shadowType: Shadow) -> ('JulianDate', 'JulianDate'):
     if checkEclipse(satellite, time) is False:
         raise NoSatelliteEclipseException(f"{satellite.name} is not eclipsed by Earth's shadow")
     (enterPhi, enterTime), (exitPhi, exitTime) = _get_shadow_positions(time, satellite, shadowType)
     return enterTime, exitTime
 
 
-def isEclipsed(satellite: Orbitable, time: JulianDate, shadowType: Shadow = Shadow.PENUMBRA) -> bool:
+def isEclipsed(satellite: 'Orbitable', time: 'JulianDate', shadowType: Shadow = Shadow.PENUMBRA) -> bool:
 
     satPosition = satellite.getState(time)[0]
-    sunPosition = getSunPosition(time)
+    sunPosition = Sun.computePosition(time)
     # convert vectors to relative to the satellite
     earthPosition = -satPosition
     relativeSunPosition = -satPosition + sunPosition
@@ -340,7 +344,7 @@ def checkEclipse(sat, time):
     state = sat.getState(time)
     h = cross(*state)
     uz = norm(h)
-    sunPosition = getSunPosition(time)
+    sunPosition = Sun.computePosition(time)
     s = norm(sunPosition)
     tmp = acos(dot(uz, s))
     if tmp > pi / 2:

@@ -3,14 +3,16 @@ from math import sqrt, cos, sin
 from abc import ABC, abstractmethod
 from math import tan, pi, asin, radians, atan, degrees
 
-from _pyevspace import ReferenceFrame, Angles, ZYX
-from pyevspace import Vector, norm
+from pyevspace import Vector, norm, ReferenceFrame, Angles, ZYX
 
+from sattrack.bodies.earth import Earth
 from sattrack.util.constants import EARTH_FLATTENING, TWOPI, EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS, \
     HOURS_TO_RAD, EARTH_SIDEREAL_PERIOD
-from sattrack.core.juliandate import JulianDate
-from sattrack.core.sidereal import earthOffsetAngle
 from sattrack.util.helpers import atan3
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from sattrack.core.juliandate import JulianDate
 
 
 class Coordinates(ABC):
@@ -63,20 +65,6 @@ class Coordinates(ABC):
     @property
     def longitudeRadians(self):
         return self._lng
-
-    # @staticmethod
-    # def _toParts(value: float) -> (float, float, float):
-    #     wholePart = int(value)
-    #     frac = value - wholePart
-    #     if frac < 0:
-    #         frac *= -1
-    #
-    #     tmp = frac * 60
-    #     minutesWhole = int(tmp)
-    #     frac = tmp - minutesWhole
-    #     seconds = frac * 60
-    #
-    #     return wholePart, minutesWhole, seconds
 
     @property
     def parts(self):
@@ -156,15 +144,15 @@ class GeoPosition(Coordinates):
         velocity = self._radius * TWOPI / EARTH_SIDEREAL_PERIOD
         return Vector(0, velocity, 0)
 
-    def getPositionVector(self, time: JulianDate) -> Vector:
+    def getPositionVector(self, time: 'JulianDate') -> Vector:
         return _computeNormalVector(self._latGeocentric, self._lng, self._radius, time)
 
-    def getZenithVector(self, time: JulianDate) -> Vector:
+    def getZenithVector(self, time: 'JulianDate') -> Vector:
         normalVector = _computeNormalVector(self._lat, self._lng, self._radius, time)
         return norm(normalVector)
 
-    def getReferenceFrame(self, time: JulianDate) -> ReferenceFrame:
-        lng = self._lng + earthOffsetAngle(time)
+    def getReferenceFrame(self, time: 'JulianDate') -> ReferenceFrame:
+        lng = self._lng + Earth.offsetAngle(time)
         lat = pi / 2 - self._lat
         angles = Angles(lng, lat, 0.0)
 
@@ -244,13 +232,13 @@ def geodeticToGeocentric(geodeticLatitude: float) -> float:
     return degrees(_geodeticToGeocentric(radians(geodeticLatitude)))
 
 
-def computeSubPoint(position: Vector, jd: JulianDate) -> GeoPosition:
+def computeSubPoint(position: Vector, jd: 'JulianDate') -> GeoPosition:
     """Computes the geo-position directly below a satellite at a given time."""
 
     declination = degrees(asin(position[2] / position.mag()))
 
     # longitude is equal to right-ascension minus earth's offset angle at the time
-    longitude = (degrees(atan3(position[1], position[0]) - earthOffsetAngle(jd))) % 360.0
+    longitude = (degrees(atan3(position[1], position[0]) - Earth.offsetAngle(jd))) % 360.0
     if longitude > 180.0:
         longitude = longitude - 360.0
 
@@ -258,9 +246,9 @@ def computeSubPoint(position: Vector, jd: JulianDate) -> GeoPosition:
     return GeoPosition(geocentricToGeodetic(declination), longitude)
 
 
-def _computeNormalVector(latitude: float, longitude: float, radius: float, time: JulianDate) -> Vector:
+def _computeNormalVector(latitude: float, longitude: float, radius: float, time: 'JulianDate') -> Vector:
     """Logic for computing surface vectors determined by latitude type. Angles in radians and radius in kilometers."""
-    longitude += earthOffsetAngle(time)
+    longitude += Earth.offsetAngle(time)
     return Vector(
         radius * cos(latitude) * cos(longitude),
         radius * cos(latitude) * sin(longitude),

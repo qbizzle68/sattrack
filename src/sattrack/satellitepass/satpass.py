@@ -3,13 +3,13 @@ from math import asin, degrees, atan2
 
 from pyevspace import dot
 
+from sattrack.bodies.sun import Sun
 from sattrack.satellitepass.eclipse import getShadowTimes, Shadow
 from sattrack.orbit.exceptions import SatelliteAlwaysAbove, NoPassException
 from sattrack.satellitepass.exceptions import NoSatelliteEclipseException
 from sattrack.orbit.orbitpath import OrbitPath, computeEllipseVectors
 from sattrack.config import TIME_DIFFERENCE
 from sattrack.satellitepass.info import PositionInfo, Visibility
-from sattrack.bodies.sun import getSunTimes
 from sattrack.util.helpers import atan3
 
 from typing import TYPE_CHECKING
@@ -208,7 +208,7 @@ class PassController:
             enterTime = setTime.future(0.0001)
             exitTime = enterTime
         # fixme: need to consider latitudes where the sun doesn't rise or set
-        sunRiseTime, sunSetTime = getSunTimes(riseTime, self._geo)
+        sunRiseTime, sunSetTime = Sun.computeRiseSetTimes(self._geo, riseTime)
 
         topoState = self._sat.getTopocentricState(self._geo, riseTime)
         riseInfo = PositionInfo(0.0, degrees(atan3(topoState[0][1], -topoState[0][0])), riseTime,
@@ -300,7 +300,7 @@ class PassController:
         lastTime = time.future(length)
         passList = []
         nextPass = self._getNextPass(time, True)
-        time = nextPass.riseInfo.time
+        time = nextPass.setInfo.time
 
         while time < lastTime:
             passList.append(nextPass)
@@ -309,7 +309,7 @@ class PassController:
             # If we get an exception in the middle of getting passes return the list we have up until that point.
             except (SatelliteAlwaysAbove, NoPassException):
                 return passList
-            time = nextPass.riseInfo.time
+            time = nextPass.setInfo.time
 
         return passList
 

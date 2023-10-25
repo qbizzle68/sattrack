@@ -4,12 +4,12 @@ from math import sqrt, cos, sin, pi, atan2, acos, asin, tan, atan
 
 from pyevspace import Vector, rotateMatrixFrom, getMatrixEuler, Angles, ZXZ, dot, vxcl, vang
 
+from sattrack.bodies.earth import Earth
 from sattrack.config import DUPLICATE_ZERO_EPSILON, DOMAIN_ONE, BIFURCATE_EPSILON, SPECIAL_EPSILON, SWITCH_DT, \
     CHECK_EPSILON, TIME_DIFFERENCE
 from sattrack.orbit.exceptions import RootCountChange, SatelliteAlwaysAbove, NoPassException
 from sattrack.orbit.elements import trueToMeanAnomaly, smaToMeanMotion
 from sattrack.orbit.exceptions import PassedOrbitPathRange
-from sattrack.core.sidereal import earthOffsetAngle
 from sattrack.bodies.topocentric import getAltitude
 from sattrack.util.constants import TWOPI, SIDEREAL_PER_SOLAR
 from sattrack.util.helpers import atan3, signOf, computeAngleDifference, hasSameSign
@@ -820,7 +820,7 @@ class OrbitPath:
         return numerator / denominator
 
     def _computeTimeTo(self, zi: float, zj: float, jd: 'JulianDate', direction: OccurrenceDirection):
-        lng = atan2(zj, zi) - earthOffsetAngle(jd)
+        lng = atan2(zj, zi) - Earth.offsetAngle(jd)
         dl = computeAngleDifference(lng - self._geo.longitudeRadians)
         if direction == OccurrenceDirection.NEXT_OCCURRENCE and dl < 0:
             dl += TWOPI

@@ -2,7 +2,7 @@ from math import asin, degrees, pi
 
 from pyevspace import Vector, ZYX, getMatrixEuler, Angles, rotateEulerTo, rotateOffsetTo, rotateOffsetFrom, cross
 
-from sattrack.core.sidereal import earthOffsetAngle
+from sattrack.bodies.earth import Earth
 from sattrack.util.constants import TWOPI, EARTH_SIDEREAL_PERIOD
 from sattrack.util.helpers import atan3
 
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 def _getTopocentricAngles(geo: 'GeoPosition', time: 'JulianDate') -> Angles:
     """Computes the Euler angles required for a rotation to a topocentric reference frame."""
 
-    lng = geo.longitudeRadians + earthOffsetAngle(time)
+    lng = geo.longitudeRadians + Earth.offsetAngle(time)
     lat = pi / 2 - geo.latitudeRadians
 
     return Angles(lng, lat, 0.0)
@@ -57,8 +57,7 @@ def fromTopocentric(vector: Vector, geo: 'GeoPosition', time: 'JulianDate') -> V
     """Converts a vector from a topocentric reference frame defined by a geo-position at a specified time."""
 
     geoVector = geo.getPositionVector(time)
-    angs = Angles(geo.longitudeRadians + earthOffsetAngle(time), pi / 2 - geo.latitudeRadians, 0.0)
-    # angs = Angles(radians(geo.longitude) + earthOffsetAngle(time), radians(90 - geo.latitude), 0.0)
+    angs = Angles(geo.longitudeRadians + Earth.offsetAngle(time), pi / 2 - geo.latitudeRadians, 0.0)
     matrix = getMatrixEuler(ZYX, angs)
 
     return rotateOffsetFrom(matrix, geoVector, vector)
