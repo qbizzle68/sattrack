@@ -25,7 +25,8 @@ def _jdToGregorian(value: float, timezone: float) -> (int, int, int, int, int, f
     y = D - 4716 if m > 2 else D - 4715
 
     # convert day fraction (measured from 0 hour) to time components
-    s = round(F * 86400.0, 3)
+    # s = round(F * 86400.0, 3)
+    s = F * 86400.0
     h = int(s / 3600.0)
     s -= h * 3600.0
     mi = int(s / 60.0)
@@ -169,13 +170,13 @@ class JulianDate:
 
         return self.value - jd
 
-    def date(self, timezone: float = None) -> str:
+    def date(self, timezone: float = None, n: int = 3) -> str:
         """Returns a string with the Julian date represented as a string as mm/dd/year hh:mm:ss +/- tz UTC."""
         if timezone is None:
             timezone = self._timezone
 
         m, d, y, h, mi, s = _jdToGregorian(self.value, timezone)
-        secondRound = round(s, 3)
+        secondRound = round(s, n)
         # force a leading zero in values < 0
         dayString = str(d) if d >= 10 else '0' + str(d)
         hourString = str(h) if h >= 10 else '0' + str(h)
@@ -191,10 +192,10 @@ class JulianDate:
 
         return self.date(timezone).split(' ')[0]
 
-    def time(self, timezone: float = None) -> str:
+    def time(self, timezone: float = None, n: int = 3) -> str:
         """Return the time portion of the date represented as a string as hh:mm:ss +/- tz UTC."""
 
-        return self.date(timezone).split(' ')[1]
+        return self.date(timezone, n).split(' ')[1]
 
     def toDatetime(self) -> datetime.datetime:
         """Converts the JulianDate to a Python datetime.datetime object."""
