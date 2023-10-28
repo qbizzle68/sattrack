@@ -84,32 +84,35 @@ events that occur **during** the pass will be considered.
 # todo: put the above in the README.md
 # from sattrack.core.sidereal import earthOffsetAngle
 
-from importlib import import_module as _import_module
+# from importlib import import_module as _import_module
 
 try:
-    _import_module('pyevspace')
+    import pyevspace
+    # _import_module('pyevspace')
 except ImportError:
     raise ImportError('Unable to import required dependency pyevspace.')
 
 # todo: we shouldn't need this if we migrate to urllib
 try:
-    _import_module('requests')
+    import requests
+    # _import_module('requests')
 except ImportError:
     raise ImportError('Unable to import required dependency: requests.')
 
-__all__ = []
 
-from .bodies import *
-__all__ += bodies.__all__
-
-from .core import *
-__all__ += core.__all__
-
-from .orbit import *
-__all__ += orbit.__all__
-
-from .satellitepass import *
-__all__ += satellitepass.__all__
-
-from .util import *
-__all__ += util.__all__
+# __all__ = []
+#
+# from .bodies import *
+# __all__ += bodies.__all__
+#
+# from .core import *
+# __all__ += core.__all__
+#
+# from .orbit import *
+# __all__ += orbit.__all__
+#
+# from .satellitepass import *
+# __all__ += satellitepass.__all__
+#
+# from .util import *
+# __all__ += util.__all__
