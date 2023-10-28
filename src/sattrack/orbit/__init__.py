@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # from .elements import (
 #     elementsFromTle,
 #     Elements,

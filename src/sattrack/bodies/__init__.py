@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # from .body import (
 #     BodyOrbitController,
 #     Body,
