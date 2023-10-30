@@ -1,11 +1,3 @@
-fig/
-*csv/
-*.xlsx
-graph1.py
-data/
-src/test2.py
-src/test3.py
-
 ### Python ###
 # Byte-compiled / optimized / DLL files
 __pycache__/
