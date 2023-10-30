@@ -82,8 +82,15 @@ class Elements:
                     semiMajorAxis: float, meanAnomaly: float, epoch: 'JulianDate', trueAnomaly: float = None):
         """Create an Elements object with parameter units of degrees."""
 
-        return cls(radians(raan), radians(inclination), radians(argumentOfPeriapsis), eccentricity,
-                   semiMajorAxis, radians(meanAnomaly), epoch, radians(trueAnomaly))
+        if trueAnomaly is None:
+            ta = None
+        else:
+            ta = radians(trueAnomaly)
+
+        rtn = object.__new__(cls)
+        rtn.__init__(radians(raan), radians(inclination), radians(argumentOfPeriapsis), eccentricity,
+                   semiMajorAxis, radians(meanAnomaly), epoch, ta)
+        return rtn
 
     @classmethod
     def fromTle(cls, tle: 'TwoLineElement', epoch: 'JulianDate'):
@@ -121,11 +128,6 @@ class Elements:
 
         return f'Elements({self._raan}, {self._inc}, {self._aop}, {self._ecc}, {self._sma}, {self._meanAnomaly},' \
                f'{repr(self._epoch)}, {self._trueAnomaly})'
-
-    def __reduce__(self):
-        """Allows for copying and pickling Elements types."""
-
-        return self.__class__, (self._raan, self._inc, self._aop, self._ecc, self._sma, self._meanAnomaly, self._epoch)
 
     @property
     def raan(self):

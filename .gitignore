@@ -1,5 +1,4 @@
 fig/
-test/
 *csv/
 *.xlsx
 graph1.py

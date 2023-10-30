@@ -1,6 +1,6 @@
 from math import sin, cos, radians
 
-from sattrack.util.constants import DELTAT
+from sattrack.util.constants import DELTAT, TWOPI
 from sattrack.bodies._tables import SIN_TABLE, NUTATION_TABLE
 
 from typing import TYPE_CHECKING
@@ -168,3 +168,30 @@ def computeTrueObliquity(time: 'JulianDate') -> float:
     _, nutationObliquity = computeNutationDeltas(time)
 
     return meanObliquity + nutationObliquity
+
+
+def computeMeanSiderealTime(time: 'JulianDate | JulianTimes') -> float:
+    if isinstance(time, JulianTimes):
+        JD = time.JD
+        JC = time.JC
+    else:
+        JD = time.value
+        JC = (JD - 2451545) / 36525
+
+    rtn = 4.894961212735793 + 6.300388098984957 * (JD - 2451545) \
+        + JC * JC * (6.770708127139162e-06 - JC * 4.508729661571505e-10)
+
+    return rtn % TWOPI
+
+
+def computeApparentSiderealTime(time: 'JulianDate | JulianTimes') -> float:
+    deltaPsi, deltaEpsilon = computeNutationDeltas(time)
+    meanObliquity = computeMeanObliquity(time)
+    trueObliquity = meanObliquity + deltaEpsilon
+    meanSiderealTime = computeMeanSiderealTime(time)
+
+    return (meanSiderealTime + deltaPsi * cos(trueObliquity)) % TWOPI
+
+
+def getEarthOffsetAngle(time: 'JulianDate') -> float:
+    return computeApparentSiderealTime(time)

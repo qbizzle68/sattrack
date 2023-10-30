@@ -1,17 +1,15 @@
 from enum import Enum
-from functools import total_ordering
 from math import sin, cos, tan, asin, degrees, pi, acos
 
 from pyevspace import Vector
 
 from sattrack.bodies._tables import SUN_L_TABLE, SUN_B_TABLE, SUN_R_TABLE
 from sattrack.bodies.body import BodyOrbitController, Body
-from sattrack.bodies.earth import computeApparentSiderealTime
 from sattrack.bodies.exceptions import SunRiseSetException
 from sattrack.bodies.position import computeNutationDeltas, \
-    computeTrueObliquity, JulianTimes, computeMeanObliquity
-from sattrack.bodies.topocentric import AltAz, toTopocentricOffset
-from sattrack.core.coordinates import CelestialCoordinates
+    computeTrueObliquity, JulianTimes, computeMeanObliquity, computeApparentSiderealTime
+from sattrack.bodies.topocentric import toTopocentricOffset
+from sattrack.core.coordinates import CelestialCoordinates, AltAz
 from sattrack.core.juliandate import JulianDate
 from sattrack.util.constants import AU, RAD_TO_HOURS, TWOPI, DELTAT, SUN_MU, SUN_RADIUS
 from sattrack.util.helpers import atan3
@@ -349,18 +347,12 @@ def computeSunTwilightTimes(geo: 'GeoPosition', time: JulianDate, twilightType: 
     return data[:2]
 
 
-@total_ordering
 class Twilight(Enum):
     Day = 0
     Civil = 1
     Nautical = 2
     Astronomical = 3
     Night = 4
-
-    def __lt__(self, other):
-        if self.__class__ is other.__class__:
-            return self.value < other.value
-        return NotImplemented
 
 
 def computeTwilightType(geo: 'GeoPosition', time: JulianDate) -> Twilight:
@@ -422,7 +414,7 @@ class SunController(BodyOrbitController):
 
     @staticmethod
     def computeTransitInfo(geo: 'GeoPosition', time: 'JulianDate') -> (JulianDate, float):
-        return computeSunRiseSetTimes(geo, time)
+        return computeSunTransitInfo(geo, time)
 
     @staticmethod
     def computeTwilightTimes(geo: 'GeoPosition', time: 'JulianDate', twilightType: 'Twilight'):

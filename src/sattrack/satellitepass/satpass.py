@@ -252,7 +252,7 @@ class PassController:
                 [info for info in [firstIlluminatedInfo, lastIlluminatedInfo,
                                    firstUnobscuredInfo, lastUnobscuredInfo] if info is not None]
 
-        return SatellitePass(infos)
+        return SatellitePass(infos, self._sat.name)
 
     @staticmethod
     def _nextTime(o: ('JulianDate', 'JulianDate')) -> 'JulianDate':
@@ -299,7 +299,10 @@ class PassController:
     def getPassList(self, time: 'JulianDate', length: int) -> list[SatellitePass]:
         lastTime = time.future(length)
         passList = []
-        nextPass = self._getNextPass(time, True)
+        try:
+            nextPass = self._getNextPass(time, True)
+        except (SatelliteAlwaysAbove, NoPassException):
+            return passList
         time = nextPass.setInfo.time
 
         while time < lastTime:

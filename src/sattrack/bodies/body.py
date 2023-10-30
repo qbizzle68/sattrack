@@ -7,8 +7,7 @@ from pyevspace import Vector
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from sattrack.core.juliandate import JulianDate
-    from sattrack.bodies.topocentric import AltAz
-    from sattrack.core.coordinates import CelestialCoordinates, GeoPosition
+    from sattrack.core.coordinates import CelestialCoordinates, GeoPosition, AltAz
 
 
 class BodyOrbitController(ABC):
@@ -52,7 +51,8 @@ class Body:
             if isinstance(attr, staticmethod):
                 func = attr
             elif isinstance(attr, classmethod):
-                func = attr(partial, attr, controller)
+                # Need to access the __func__ attribute of the classmethod since it's not callable directly.
+                func = partial(attr.__func__, controller)
             else:
                 func = partial(attr, self._controller)
 

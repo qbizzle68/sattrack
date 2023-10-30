@@ -240,6 +240,11 @@ class Orbit(Orbitable):
         self._periapsis = radiusAtPeriapsis(self._elements.sma, self._elements.ecc)
         self._apoapsis = radiusAtApoapsis(self._elements.sma, self._elements.ecc)
 
+    @property
+    def elements(self):
+        # Return original elements used to instantiate the object.
+        return self._elements
+
 
 class Satellite(Orbitable):
     """Derived from the Orbitable class, a Satellite object is an orbitable described by a TwoLineElement object around

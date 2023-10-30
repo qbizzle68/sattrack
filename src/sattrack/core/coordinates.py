@@ -5,7 +5,7 @@ from math import tan, pi, asin, radians, atan, degrees
 
 from pyevspace import Vector, norm, ReferenceFrame, Angles, ZYX
 
-from sattrack.bodies.earth import Earth
+from sattrack.bodies.position import getEarthOffsetAngle
 from sattrack.util.constants import EARTH_FLATTENING, TWOPI, EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS, \
     HOURS_TO_RAD, EARTH_SIDEREAL_PERIOD
 from sattrack.util.helpers import atan3
@@ -20,9 +20,6 @@ class Coordinates(ABC):
 
     def __init__(self, latitude: float, longitude: float):
         """Angles in degrees, elevation in kilometers."""
-
-        if -90 > latitude > 90:
-            raise ValueError(f'latitude must be between -90 and 90 degrees, not {latitude}')
 
         # latKey and lngKey map the latitude and longitude arguments to radians.
         self._lat = self._latKey(latitude)
@@ -45,7 +42,7 @@ class Coordinates(ABC):
         return f'{self.__class__.__name__}({self._latOther}, {self._lngOther})'
 
     def toDict(self):
-        return {"latitude": self._lat, "longitude": self._lng}
+        return {"latitude": self._latOther, "longitude": self._lngOther}
 
     def toJson(self):
         return json.dumps(self, default=lambda o: o.toDict())
@@ -87,7 +84,7 @@ class GeoPosition(Coordinates):
         self._elv = elevation
 
     def _latKey(self, value: float) -> float:
-        if -90 > value > 90:
+        if value < -90 or value > 90:
             raise ValueError(f'latitude must be between -90 and 90, not {value}')
 
         return radians(value)
@@ -107,9 +104,6 @@ class GeoPosition(Coordinates):
         tmp["elevation"] = self._elv
 
         return tmp
-
-    def toJson(self) -> str:
-        return json.dumps(self, default=lambda o: o.toDict())
 
     @property
     def latitudeGeocentric(self) -> float:
@@ -152,7 +146,7 @@ class GeoPosition(Coordinates):
         return norm(normalVector)
 
     def getReferenceFrame(self, time: 'JulianDate') -> ReferenceFrame:
-        lng = self._lng + Earth.offsetAngle(time)
+        lng = self._lng + getEarthOffsetAngle(time)
         lat = pi / 2 - self._lat
         angles = Angles(lng, lat, 0.0)
 
@@ -176,11 +170,8 @@ class CelestialCoordinates(Coordinates):
     def toDict(self) -> dict:
         return {"right-ascension": self._lngOther, "declination": self._latOther}
 
-    def toJson(self) -> str:
-        return json.dumps(self, default=lambda o: o.toDict())
-
     def _latKey(self, value: float) -> float:
-        if -90 > value > 90:
+        if value < -90 or value > 90:
             raise ValueError(f'declination must be between -90 and 90, not {value}')
 
         return radians(value)
@@ -215,9 +206,9 @@ class CelestialCoordinates(Coordinates):
 def geocentricToGeodetic(geocentricLatitude: float) -> float:
     """Converts a geocentric latitude in degrees to a geodetic latitude in degrees."""
 
-    latRadians = radians(geocentricLatitude)
-    if -90 > geocentricLatitude > 90:
+    if geocentricLatitude < -90 or geocentricLatitude > 90:
         raise ValueError(f'lat argument must be between -90 and 90 degrees, not {geocentricLatitude}')
+    latRadians = radians(geocentricLatitude)
 
     numerator = tan(latRadians)
     tmp = 1 - EARTH_FLATTENING
@@ -229,7 +220,11 @@ def geocentricToGeodetic(geocentricLatitude: float) -> float:
 def geodeticToGeocentric(geodeticLatitude: float) -> float:
     """Converts a geodetic latitude in degrees to a geocentric latitude in degrees."""
 
-    return degrees(_geodeticToGeocentric(radians(geodeticLatitude)))
+    if geodeticLatitude < -90 or geodeticLatitude > 90:
+        raise ValueError(f'lat argument must be between -90 and 90 degrees, not {geodeticLatitude}')
+    latRadians = radians(geodeticLatitude)
+
+    return degrees(_geodeticToGeocentric(latRadians))
 
 
 def computeSubPoint(position: Vector, jd: 'JulianDate') -> GeoPosition:
@@ -238,7 +233,7 @@ def computeSubPoint(position: Vector, jd: 'JulianDate') -> GeoPosition:
     declination = degrees(asin(position[2] / position.mag()))
 
     # longitude is equal to right-ascension minus earth's offset angle at the time
-    longitude = (degrees(atan3(position[1], position[0]) - Earth.offsetAngle(jd))) % 360.0
+    longitude = (degrees(atan3(position[1], position[0]) - getEarthOffsetAngle(jd))) % 360.0
     if longitude > 180.0:
         longitude = longitude - 360.0
 
@@ -248,7 +243,8 @@ def computeSubPoint(position: Vector, jd: 'JulianDate') -> GeoPosition:
 
 def _computeNormalVector(latitude: float, longitude: float, radius: float, time: 'JulianDate') -> Vector:
     """Logic for computing surface vectors determined by latitude type. Angles in radians and radius in kilometers."""
-    longitude += Earth.offsetAngle(time)
+
+    longitude += getEarthOffsetAngle(time)
     return Vector(
         radius * cos(latitude) * cos(longitude),
         radius * cos(latitude) * sin(longitude),
@@ -275,3 +271,77 @@ def computeAngleParts(value: float) -> (float, float, float):
     seconds = frac * 60
 
     return wholePart, minutesWhole, seconds
+
+
+class AltAz:
+    __slots__ = '_altitude', '_azimuth', '_direction'
+
+    def __init__(self, altitude: float, azimuth: float):
+        # Args in degrees, will be modded to valid ranges.
+
+        if not -90 <= altitude <= 90:
+            raise ValueError(f'altitude must be in (-90, 90), was {altitude}')
+
+        self._altitude = altitude
+        self._azimuth = azimuth % 360
+        self._direction = self.azimuthAngleString(self._azimuth)
+
+    @staticmethod
+    def azimuthAngleString(azimuth: float):
+        """Converts an azimuth angle in degrees to a compass direction string."""
+        if azimuth > 348.25 or azimuth <= 11.25:
+            return 'N'
+        elif azimuth <= 33.75:
+            return 'NNE'
+        elif azimuth <= 56.25:
+            return 'NE'
+        elif azimuth <= 78.75:
+            return 'ENE'
+        elif azimuth <= 101.25:
+            return 'E'
+        elif azimuth <= 123.75:
+            return 'ESE'
+        elif azimuth <= 146.25:
+            return 'SE'
+        elif azimuth <= 168.75:
+            return 'SSE'
+        elif azimuth <= 191.25:
+            return 'S'
+        elif azimuth <= 213.75:
+            return 'SSW'
+        elif azimuth <= 236.25:
+            return 'SW'
+        elif azimuth <= 258.75:
+            return 'WSW'
+        elif azimuth <= 281.25:
+            return 'W'
+        elif azimuth <= 303.75:
+            return 'WNW'
+        elif azimuth <= 326.25:
+            return 'NW'
+        else:
+            return 'NNW'
+
+    def toDict(self):
+        return {"altitude": self._altitude, "azimuth": self._azimuth, "direction": self._direction}
+
+    def toJson(self):
+        return json.dumps(self, default=lambda o: o.toDict())
+
+    def __str__(self):
+        return f'altitude: {self._altitude}, azimuth: {self._azimuth}, direction: {self._direction}'
+
+    def __repr__(self):
+        return f'AltAz({self._altitude}, {self._azimuth})'
+
+    @property
+    def altitude(self):
+        return self._altitude
+
+    @property
+    def azimuth(self):
+        return self._azimuth
+
+    @property
+    def direction(self):
+        return self._direction

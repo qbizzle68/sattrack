@@ -4,8 +4,6 @@ from .body import (
 )
 
 from .earth import (
-    computeMeanSiderealTime,
-    computeApparentSiderealTime,
     Earth
 )
 
@@ -17,7 +15,7 @@ from .position import (
     JulianTimes,
     computeNutationDeltas,
     computeMeanObliquity,
-    computeTrueObliquity,
+    computeTrueObliquity, computeMeanSiderealTime, computeApparentSiderealTime,
 )
 
 from .sun import (
@@ -47,5 +45,5 @@ from .topocentric import (
     fromTopocentric,
     getAltitude,
     getAzimuth,
-    AltAz,
 )
+from ..core.coordinates import AltAz

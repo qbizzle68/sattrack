@@ -1,0 +1,4 @@
+The SGP4 files have been modified for this project. In 'tcppver.out', some test which time
+ranges don't start with zero had the leading zero time vector data removed. Also, the time
+info listed after the second line of each TLE in SGP4-VER.TLE are not all accurate, and have
+been modified. The only inaccuracies seem to be the end time of ranges.

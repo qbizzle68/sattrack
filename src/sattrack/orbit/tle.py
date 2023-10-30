@@ -1,5 +1,6 @@
 import requests
 
+# noinspection PyUnresolvedReferences
 from sattrack.orbit.sgp4 import TwoLineElement
 from sattrack.orbit.exceptions import NoTLEFound
 
@@ -23,6 +24,7 @@ def getTle(value: str, query: str = 'name') -> TwoLineElement | None:
         A TwoLineElement object from the search parameters.
     """
 
+    # todo: handle return codes properly
     response = requests.get(_CELESTRAK_URL.format(query.upper(), value.replace(' ', '%20')))
     lines = response.text.splitlines()
 

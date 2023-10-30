@@ -29,3 +29,15 @@ dependencies = [
 [project.urls]
 "Homepage" = "https://github.com/qbizzle68/sattrack"
 "Bug Tracker" = "https://github.com/qbizzle68/sattrack/issues"
+
+[tool.coverage.run]
+source = ['src/sattrack']
+omit = ['*/api.py']
+
+[tool.coverage.report]
+exclude_also = [
+    "def __repr__",
+    "if TYPE_CHECKING:",
+    "return NotImplemented",
+    "pass"
+]

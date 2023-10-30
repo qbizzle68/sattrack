@@ -19,7 +19,7 @@ EROS C3
 #1-a
 This is first case.
 GeoPosition(62.5818464830717, 119.94391125013482, 0)
-JulianDate(5, 31, 2023, 22, 20, 13.789000000004307, -5.0)
+JulianDate(2023, 5, 31, 22, 20, 13.789000000004307, -5.0)
 
 (sign is -1 here)
 Disappear time: JulianDate(5, 31, 2023, 22, 34, 45.8859999999986, -5.0)
@@ -29,12 +29,12 @@ Disappear geo: GeoPosition(62.5818464830717, 3.0543140675080167, 0)
 #1-b
 This is second case where path is already up.
 GeoPosition(62.5818464830717, 3.0543140675080167, 0)
-JulianDate(5, 31, 2023, 22, 34, 44.8859999999986, -5.0)
+JulianDate(2023, 5, 31, 22, 34, 44.8859999999986, -5.0)
 
 #1-c
 This is second case where path hasn't risen yet.
 GeoPosition(62.5818464830717, 3.0543140675080167, 0)
-JulianDate(5, 31, 2023, 22, 34, 35.8859999999986, -5.0)
+JulianDate(2023, 5, 31, 22, 34, 35.8859999999986, -5.0)
 
 I cannot find an example for the third case right now. We'll have to rely on a failed test to eventually give us
 an instance of the case. Note, there is no guarantee the third case exists, but theoretically it should absolutely be
@@ -57,7 +57,7 @@ EROS C3
 2 54880 139.3547  57.2287 0010278 128.8396 231.3337 15.33076291 42651
 
 GeoPosition(24.398227134243953, -6.974285244256678, 0)
-JulianDate(10, 4, 2023, 23, 9, 7.3840000000054715, -5.0)
+JulianDate(2023, 10, 4, 23, 9, 7.3840000000054715, -5.0)
 
 
 CORNER CASE #3
@@ -69,7 +69,7 @@ EROS C3
 2 54880 139.3547  57.2287 0010278 128.8396 231.3337 15.33076291 42651
 
 GeoPosition(-9.446130666073614, 12.911490208536591, 0)
-JulianDate(10, 5, 2023, 0, 23, 45.31400000000008, -5.0)
+JulianDate(2023, 10, 5, 0, 23, 45.31400000000008, -5.0)
 
 CORNER CASE #4
 
@@ -81,7 +81,7 @@ EROS C3
 2 54880 139.3543  62.6197 0010306 135.8883 224.2754 15.33122369 42795
 
 GeoPosition(15.357004864903063, -14.06174376034106, 0)
-JulianDate(10, 5, 2023, 19, 16, 15.285000000003492, -5.0)
+JulianDate(2023, 10, 5, 19, 16, 15.285000000003492, -5.0)
 
 
 CASE # 4
@@ -96,7 +96,7 @@ ISS (ZARYA)
 2 25544  51.6412 171.0935 0006002  52.3064  31.3687 15.49560192417995
 
 GeoPosition(-27.080047954447423, -10.187580831104158, 0)
-JulianDate(10, 8, 2023, 19, 31, 40.56500000000233, -5.0)
+JulianDate(2023, 10, 8, 19, 31, 40.56500000000233, -5.0)
 
 
 
@@ -104,7 +104,7 @@ JulianDate(10, 8, 2023, 19, 31, 40.56500000000233, -5.0)
 Cases for finding satellite passes
 
 All cases use this time unless noted
-JulianDate(10, 17, 2023, 19, 0, 0, -5)
+JulianDate(2023, 10, 17, 19, 0, 0, -5)
 
 - No orbit pass times:
     - Orbit path is up
@@ -125,6 +125,7 @@ GeoPosition(38.0, 83.0, 0)
 
         - Sat is not geosynchronous (should get a SatellitePass value)
 
+Note this is a customized TLE to get desired effect.
 TwoLineElement('''SPACEWAY 2
 1 28903U 05046B   23289.61779785  .00000119  00000+0  00000+0 0  9990
 2 28903   3.0252  83.0468 0000855 140.0482 245.3432  1.10271510 41570''')
@@ -170,7 +171,7 @@ TwoLineElement('''ISS (ZARYA)
 GeoPosition(38.0, -97.0, 0)
 
 
-Randomly by change found this:
+Randomly by chance found this:
 Path raises at JulianDate(10, 21, 2023, 3, 57, 12.365, -5).
 Satellite rises at JulianDate(10, 21, 2023, 3, 57, 34.448, -5).
 

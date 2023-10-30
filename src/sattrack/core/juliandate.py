@@ -2,14 +2,16 @@ import json
 import time
 import datetime
 
+from sattrack.util.constants import SECONDS_PER_DAY
 
-def _jdToGregorian(value: float, timezone: float) -> (int, int, int, int, int, float):
+
+def _jdToGregorian(number: int, fraction: float, timezone: float) -> (int, int, int, int, int, float):
     """Convert a Julian date to Gregorian calendar components."""
+
     # incorporate timezone to offset Julian date value
-    value += (timezone / 24.0) + 0.5
+    extraDay, F = divmod(fraction + (timezone / 24.0) + 0.5, 1.0)
     # algorithm taken from the 'Solar Position Algorithm for Solar Radiation Applications' paper in appendix A.3
-    Z = int(value)
-    F = value - Z
+    Z = int(number + extraDay)
     if Z < 2299161:
         A = Z
     else:
@@ -25,14 +27,38 @@ def _jdToGregorian(value: float, timezone: float) -> (int, int, int, int, int, f
     y = D - 4716 if m > 2 else D - 4715
 
     # convert day fraction (measured from 0 hour) to time components
-    # s = round(F * 86400.0, 3)
     s = F * 86400.0
     h = int(s / 3600.0)
     s -= h * 3600.0
     mi = int(s / 60.0)
     s -= mi * 60.0
 
-    return m, d, y, h, mi, s
+    return y, m, d, h, mi, s
+
+
+def _dateToJd(year: int, month: int, day: int, hour: int, minute: int, second: float, timezone: float = 0):
+    """Logic to compute the Julian day number and fraction from Gregorian date components."""
+
+    if month == 1 or month == 2:
+        year = year - 1
+        month = month + 12
+
+    # We want to separate integer number and float fraction to maintain precision.
+    # This is a modified version of the JD conversion, the 0.5 if moved 'up' to the float part.
+    D = day + (hour / 24.0) + (minute / 1440.0) + (second / 86400.0) - (timezone / 24.0) - 0.5
+    dayInt, dayFrac = divmod(D, 1.0)
+
+    # We only add in integer part of the day here.
+    dayNumber = int(365.25 * (year + 4716)) + int(30.6001 * (month + 1)) + dayInt - 1524
+
+    if dayNumber > 2299160:
+        A = int(year / 100)
+        B = 2 - A + int(A / 4)
+        dayNumber += B
+
+    # We can take every precaution above to ensure dayNumber stays an integer in out computations, but the simplest
+    # and most guaranteed way is to just convert it here.
+    return int(dayNumber), dayFrac
 
 
 class JulianDate:
@@ -43,8 +69,12 @@ class JulianDate:
 
     __slots__ = '_dayNumber', '_dayFraction', '_timezone'
 
-    def __init__(self, month: int, day: int, year: int, hour: int, minute: int, second: float, timezone: int = 0):
-        self._dateToJd(month, day, year, hour, minute, second, timezone)
+    def __init__(self, year: int, month: int, day: int, hour: int, minute: int, second: float, timezone: int = 0):
+        number, fraction = _dateToJd(year, month, day, hour, minute, second, timezone)
+
+        self._dayNumber = number
+        self._dayFraction = fraction
+        self._timezone = timezone
 
     @classmethod
     def fromNumber(cls, number: float, timezone: float = 0.0) -> 'JulianDate':
@@ -68,7 +98,7 @@ class JulianDate:
             tz = date.tzinfo.utcoffset(None) / datetime.timedelta(hours=1)
 
         seconds = date.second + date.microsecond / 1e6
-        return JulianDate(date.month, date.day, date.year, date.hour, date.minute, seconds, tz)
+        return JulianDate(date.year, date.month, date.day, date.hour, date.minute, seconds, tz)
 
     def __str__(self) -> str:
         """Creates a string representation of the JulianDate."""
@@ -78,8 +108,8 @@ class JulianDate:
     def __repr__(self) -> str:
         """Creates a string representation of the JulianDate."""
 
-        m, d, y, h, mi, s = _jdToGregorian(self.value, self._timezone)
-        return f'JulianDate({m}, {d}, {y}, {h}, {mi}, {s}, {self._timezone})'
+        y, m, d, h, mi, s = _jdToGregorian(self._dayNumber, self._dayFraction, self._timezone)
+        return f'JulianDate({y}, {m}, {d}, {h}, {mi}, {s}, {self._timezone})'
 
     def toDict(self) -> dict:
         """Returns a dictionary of the JulianDate to create json formats of other types containing a GeoPosition."""
@@ -164,20 +194,19 @@ class JulianDate:
 
         return JulianDate.fromNumber(self._dayNumber + self._dayFraction + days, self._timezone)
 
-    def difference(self, jd: int | float) -> float:
-        """Compute the difference between a JulianDate and a Julian date number. This is a shorthand for
-        (self.value - jd.value)."""
-
-        return self.value - jd
-
     def date(self, timezone: float = None, n: int = 3) -> str:
         """Returns a string with the Julian date represented as a string as mm/dd/year hh:mm:ss +/- tz UTC."""
         if timezone is None:
             timezone = self._timezone
 
-        m, d, y, h, mi, s = _jdToGregorian(self.value, timezone)
+        y, m, d, h, mi, s = _jdToGregorian(self._dayNumber, self._dayFraction, timezone)
         secondRound = round(s, n)
+        # It's possible for the seconds place to round to 60, so we need to bump everything.
+        if secondRound == 60:
+            y, m, d, h, mi, _ = _jdToGregorian(self._dayNumber, self._dayFraction + (1 / SECONDS_PER_DAY), timezone)
+            secondRound = 0 if n is None else 0.0
         # force a leading zero in values < 0
+        monthString = str(m) if m >= 10 else '0' + str(m)
         dayString = str(d) if d >= 10 else '0' + str(d)
         hourString = str(h) if h >= 10 else '0' + str(h)
         minuteString = str(mi) if mi >= 10 else '0' + str(mi)
@@ -185,7 +214,7 @@ class JulianDate:
         # force a leading + on positive timezone offsets
         timezoneString = str(timezone) if timezone < 0 else '+' + str(timezone)
 
-        return f'{m}/{dayString}/{y} {hourString}:{minuteString}:{secondString} {timezoneString} UTC'
+        return f'{y}/{monthString}/{dayString} {hourString}:{minuteString}:{secondString} {timezoneString} UTC'
 
     def day(self, timezone: float = None) -> str:
         """Return the day portion of the date represented as a string as mm/dd/year."""
@@ -200,34 +229,26 @@ class JulianDate:
     def toDatetime(self) -> datetime.datetime:
         """Converts the JulianDate to a Python datetime.datetime object."""
 
-        month, day, year, hour, minutes, secondsFloat = _jdToGregorian(self.value, self._timezone)
+        year, month, day, hour, minutes, secondsFloat = _jdToGregorian(self._dayNumber, self._dayFraction,
+                                                                       self._timezone)
 
         # Split seconds into seconds and microseconds and convert to integers.
-        secondsInt = int(secondsFloat)
-        microSeconds = round((secondsFloat - secondsInt) * 1000000)
+        secondsWhole, microSeconds = divmod(secondsFloat, 1.0)
+        microSeconds = int(microSeconds * 1000000)
 
         # Get timezone from datetime module.
         timezone = datetime.timezone(datetime.timedelta(hours=self._timezone))
 
-        return datetime.datetime(year, month, day, hour, minutes, secondsInt, microSeconds, timezone)
+        return datetime.datetime(year, month, day, hour, minutes, int(secondsWhole), microSeconds, timezone)
 
-    def _dateToJd(self, month: int, day: int, year: int, hour: int, minute: int, second: float, timezone: float = 0):
-        """Logic to compute the Julian day number and fraction from Gregorian date components."""
+    def dayOfYear(self):
+        y, m, d, _, _, _ = _jdToGregorian(self._dayNumber, self._dayFraction, self._timezone)
 
-        # Use methodology from the Julian date wiki to convert from Gregorian date.
-        term0 = int((1461 * (year + 4800 + int((month - 14) / 12))) / 4)
-        term1 = int((367 * (month - 2 - (12 * int((month - 14) / 12)))) / 12)
-        term2 = int((3 * int((year + 4900 + int((month - 14) / 12)) / 100)) / 4)
-        self._dayNumber = term0 + term1 - term2 + day - 32075
+        n1 = int(275 * m / 9)
+        n2 = int((m + 9) / 12)
+        n3 = (1 + int((y - 4 * int(y / 4) + 2) / 3))
 
-        self._dayFraction = ((hour - 12) / 24.0) + (minute / 1440.0) + (second / 86400.0) - (timezone / 24.0)
-        if self._dayFraction >= 1.0:
-            self._dayNumber += 1
-            self._dayFraction -= 1.0
-        elif self._dayFraction < 0:
-            self._dayNumber -= 1
-            self._dayFraction += 1.0
-        self._timezone = timezone
+        return n1 - (n2 * n3) + d - 30
 
 
 def now(timezone: float = None) -> JulianDate:
@@ -236,7 +257,8 @@ def now(timezone: float = None) -> JulianDate:
 
     # Use the time module to compute the timezone offset of the local machine.
     if timezone is None:
-        timezone = time.localtime().tm_gmtoff / 3600.0
+        gmtoff = time.localtime().tm_gmtoff or 0
+        timezone = gmtoff / 3600.0
 
     delta = datetime.timedelta(hours=timezone)
     tz = datetime.timezone(delta)
@@ -246,4 +268,4 @@ def now(timezone: float = None) -> JulianDate:
 
 
 # JulianDate instance of the J2000 epoch.
-J2000 = JulianDate(1, 1, 2000, 12, 0, 0, timezone=0)
+J2000 = JulianDate(2000, 1, 1, 12, 0, 0, timezone=0)

@@ -1,6 +1,6 @@
 import json
 
-from sattrack.bodies.topocentric import AltAz
+from sattrack.core.coordinates import AltAz
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -15,6 +15,12 @@ class Visibility:
         self._illuminated = illuminated
         self._unobscured = unobscured
         self._visible = illuminated and unobscured
+
+    def __str__(self):
+        return f'visible: {self._visible}, illuminated: {self._illuminated}, unobscured: {self._unobscured}'
+
+    def __repr__(self):
+        return f'{self.__class__.__name__}({self._illuminated}, {self._unobscured})'
 
     @property
     def illuminated(self):
