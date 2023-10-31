@@ -1,7 +1,7 @@
 import unittest
 from math import pi
 
-from _pyevspace import Vector, Matrix
+from pyevspace import Vector, Matrix
 
 from sattrack.core.coordinates import GeoPosition
 from sattrack.core.juliandate import JulianDate

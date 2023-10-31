@@ -1,7 +1,7 @@
 import unittest
 from math import degrees
 
-from _pyevspace import Vector
+from pyevspace import Vector
 
 from sattrack.bodies.exceptions import SunRiseSetException
 from sattrack.bodies.position import JulianTimes, computeNutationDeltas, computeTrueObliquity

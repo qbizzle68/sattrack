@@ -1,4 +1,4 @@
-import pyevspace
+from pyevspace import *
 import requests
 
 from .bodies.api import *

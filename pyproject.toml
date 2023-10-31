@@ -22,7 +22,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Astronomy",
 ]
 dependencies = [
-    "pyevspace==0.0.12.5",
+    "pyevspace",
     "requests",
 ]
 
