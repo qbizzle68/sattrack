@@ -1008,6 +1008,16 @@ class OrbitPath:
         times = self._computeTimes(self._initRoots, directions)
         return tuple(sorted(times, key=lambda o: o.value))
 
+    def computeOrbitPassTimesExact(self, time: 'JulianDate') -> tuple['JulianDate | None']:
+        times = self.computeOrbitPassTimes(time)
+        if len(times) == 4:
+            if times[1] < time:
+                return times[2:]
+            else:
+                return times[:2]
+
+        return times
+
     def _computeAnomalies(self, time: 'JulianDate') -> (float, float):
         a, b, c = computeEllipseVectors(self._sat, time)
         zeta = self._geo.getZenithVector(time)
@@ -1063,8 +1073,33 @@ class OrbitPath:
         return time
 
     def refineRiseSetTime(self, time: 'JulianDate') -> 'JulianDate':
+        """
+        this is causing an infinite loop when:
+        tle = TwoLineElement('''1 25544U 98067A   23318.17700966  .00014852  00000+0  27428-3 0  9998
+2 25544  51.6432 305.6070 0001026 294.3429 150.8504 15.49307096425059''')
+        jd = JulianDate(2023, 11, 28, 16, 40, 0, -6)
+        geo = GeoPosition(0.5, -150)
+
+        """
         updatedTime = time
         alt = getAltitude(self._sat, self._geo, updatedTime)
+        # earthAngularMomentum = Vector(0, 0, 7.29211586e-5)
+        # while abs(alt) > 4.848e-6:  # 1 arc-second
+        #     position, velocity = self._sat.getState(updatedTime)
+        #     coriolis = cross(earthAngularMomentum, position)
+        #     relativeVelocity = velocity - coriolis
+        #
+        #     topoPosition = toTopocentricOffset(position, self._geo, updatedTime)
+        #     topoVelocity = toTopocentric(relativeVelocity, self._geo, updatedTime)
+        #
+        #     uTopo = topoPosition -topoVelocity * topoPosition[2] / topoVelocity[2]
+        #     u = fromTopocentric(uTopo, self._geo, updatedTime) + self._geo.getPositionVector(updatedTime)
+        #
+        #     dt = (u - position).mag() / velocity.mag()
+        #     updatedTime = updatedTime.future(dt / 86400)
+        #     alt = getAltitude(self._sat, self._geo, updatedTime)
+
+
         while abs(alt) > 4.848e-6:   # 1 arc-second
             topoPosition, topoVelocity = self._sat.getTopocentricState(self._geo, updatedTime)
             velExclude = vxcl(topoVelocity, topoPosition)
@@ -1254,6 +1289,7 @@ class OrbitPath:
 
         return riseTime, setTime
 
+    # todo: remove this when altering tests
     def computeSatellitePassTimes(self, time: 'JulianDate | SatellitePass', nextOccurrence: bool = True)\
             -> ('JulianDate', 'JulianDate'):
 
@@ -1293,3 +1329,205 @@ class OrbitPath:
             riseTime, setTime = self._computePrevPassTimes(time, currentRange, nextRange)
 
         return riseTime, setTime
+
+    """def _computeInitialMaximumApproximation(self, time: 'JulianDate', nextOccurrence: bool) -> ('JulianDate', float):
+        position, velocity = self._sat.getState(time)
+        zeta = self._geo.getZenithVector(time)
+        gamma = self._geo.getPositionVector(time)
+        relativePosition = position - gamma
+        maxParameter = self.computeSatelliteMaximumParameter(time)
+
+        if dot(relativePosition, zeta) > 0:
+            coriolis = cross(EARTH_ANGULAR_MOMENTUM, position)
+            relativeVelocity = velocity - coriolis
+            velocityDirection = dot(relativeVelocity, zeta)
+            if velocityDirection > 0:
+                approxTime = self._sat.timeToNextAnomaly(maxParameter, time, 'true')
+            elif velocityDirection < 0:
+                approxTime = self._sat.timeToPreviousAnomaly(maxParameter, time, 'true')
+            else:
+                approxTime = self._sat.timeToNearestAnomaly(maxParameter, time, 'true')
+        else:
+            if nextOccurrence:
+                approxTime = self._sat.timeToNextAnomaly(maxParameter, time, 'true')
+            else:
+                approxTime = self._sat.timeToPreviousAnomaly(maxParameter, time, 'true')
+
+        return approxTime, maxParameter
+
+    def _findMaximumAltitude(self, time: 'JulianDate'):
+        #Find the nearest time a satellite achieves its maximum altitude (note, this is not always
+        #a positive value).
+
+        prevTime = time.future(-1)
+        approxTime = time
+        # while dot(position, zeta) <= 0:
+        epsilon = 0.1 / SECONDS_PER_DAY
+        while abs(prevTime - approxTime) >= epsilon:
+            zeta = self._geo.getZenithVector(approxTime)
+            a, b, _ = computeEllipseVectors(self._sat, approxTime)
+            t = atan3(dot(zeta, b), dot(zeta, a))
+
+            prevTime = approxTime
+            approxTime = self._sat.timeToNearestAnomaly(t, approxTime, 'true')
+            # if nextOccurrence:
+            #     approxTime = self._sat.timeToNextAnomaly(t, time, 'true')
+            # else:
+            #     approxTime = self._sat.timeToPreviousAnomaly(t, time, 'true')
+
+        return approxTime
+
+        # if nextOccurrence is True
+        # if approxTime > validEnd, compute again with time=validEnd, nextOccurrence=False
+            # if that ans < validStart no pass that range
+            # if that ans < time no remaining pass that range
+        # if nextOccurrence is False
+        # if approxTime < validStart, compute again with time=validStart, nextOccurrence=True
+            # if that ans > validEnd no pass that range
+            # if that ans > time no remaining pass that range (prior)
+            """
+
+    def computeSatelliteMaximumParameter(self, time):
+        a, b, _ = computeEllipseVectors(self._sat, time)
+        zeta = self._geo.getZenithVector(time)
+
+        return atan3(dot(b, zeta), dot(a, zeta))
+
+    """def _checkOrbitPassExists(self, range):
+        if len(range) == 0:
+            raise PassedOrbitPathRange('Orbit path disappeared.')
+
+    def _getPreviousRange(self, startTime: 'JulianDate') -> ('JulianDate', 'JulianDate'):
+        previousDayRange = self.computeOrbitPassTimesExact(startTime.future(-1))
+        self._checkOrbitPassExists(previousDayRange)
+        nextRange = self.computeOrbitPassTimesExact(previousDayRange[1].future(0.0001))
+        self._checkOrbitPassExists(nextRange)
+
+        if abs(nextRange[0] - startTime) < (1 / SECONDS_PER_DAY):
+            # nextRange == (validStartTime, validEntTime), so previousDayRange is the correct previous range
+            validStartTime, validEndTime = previousDayRange
+        else:
+            # nextRange should actually be the previous range
+            validStartTime, validEndTime = nextRange
+
+        return validStartTime, validEndTime
+
+    def _findNextPassMax(self, time, nextOccurrence, maximumSearchPeriod):
+        nextPassTime = None
+        approxTime = time
+        validRange = self.computeOrbitPassTimesExact(time)
+        self._checkOrbitPassExists(validRange)
+        validStartTime, validEndTime = validRange
+
+        if nextOccurrence:
+            if time < validStartTime:
+                approxTime = validStartTime
+        else:
+            if time < validStartTime:
+                validStartTime, validEndTime = self._getPreviousRange(validStartTime)
+                approxTime = validEndTime
+
+        while nextPassTime is None:
+            if abs(time - approxTime) > maximumSearchPeriod:
+                raise TimeoutError(f'Timeout: No satellite pass found within {maximumSearchPeriod} days.')
+
+            approxTime, maxParameter = self._computeInitialMaximumApproximation(approxTime, nextOccurrence)
+
+            # position, velocity = self._sat.getState(approxTime)
+            # zeta = self._geo.getZenithVector(approxTime)
+            # gamma = self._geo.getPositionVector(approxTime)
+            # relativePosition = position - gamma
+            # maxParameter = self.computeSatelliteMaximumParameter(approxTime)
+            # if dot(relativePosition, zeta) > 0:
+            #     coriolis = cross(EARTH_ANGULAR_MOMENTUM, position)
+            #     relativeVelocity = velocity - coriolis
+            #     velocityDirection = dot(relativeVelocity, zeta)
+            #     if velocityDirection > 0:
+            #         approxTime = self._sat.timeToNextAnomaly(maxParameter, approxTime, 'true')
+            #     elif velocityDirection < 0:
+            #         approxTime = self._sat.timeToPreviousAnomaly(maxParameter, approxTime, 'true')
+            #     else:
+            #         approxTime = self._sat.timeToNearestAnomaly(maxParameter, approxTime, 'true')
+            # else:
+            #     if nextOccurrence:
+            #         approxTime = self._sat.timeToNextAnomaly(maxParameter, approxTime, 'true')
+            #     else:
+            #         approxTime = self._sat.timeToPreviousAnomaly(maxParameter, approxTime, 'true')
+
+            maximumAltitudeTime = self._findMaximumAltitude(approxTime)
+            if nextOccurrence is True and maximumAltitudeTime > validEndTime:
+                validRange = self.computeOrbitPassTimesExact(validEndTime.future(0.0001))
+                self._checkOrbitPassExists(validRange)
+                validStartTime, validEndTime = validRange
+                approxTime = validStartTime
+            elif nextOccurrence is False and maximumAltitudeTime < validStartTime:
+                validStartTime, validEndTime = self._getPreviousRange(validStartTime)
+                approxTime = validEndTime
+            else:
+                # the valid ranges are computed using instantaneous oscillating orbital elements, so which therefore
+                # make them even more a prediction than an SGP4 state vector already is, so on the case the orbital
+                # path just breaches the horizon, the satellite may actually not. Therefore, although it may seem
+                # redundant at first, we need to validate the satellite is actually up here.
+                # fixme: use (first test) this in the getAltitude implementation and replace it here
+                position, _ = self._sat.getState(maximumAltitudeTime)
+                gamma = self._geo.getPositionVector(maximumAltitudeTime)
+                zeta = self._geo.getZenithVector(maximumAltitudeTime)
+                if dot(position - gamma, zeta) > 0:
+                    nextPassTime = maximumAltitudeTime
+                else:
+                    # fixme: we may be setting this outside a valid range, but it will be caught on the next iteration.
+                    #   packaging up the 'resetting' of the time and valid range and allowing it to be called here could
+                    #   improve performance.
+                    if nextOccurrence:
+                        strictTime = approxTime.future(0.0001)
+                        approxTime = self._sat.timeToNextAnomaly(maxParameter, strictTime, 'true')
+                    else:
+                        strictTime = approxTime.future(-0.0001)
+                        approxTime = self._sat.timeToPreviousAnomaly(maxParameter, strictTime, 'true')
+
+        return nextPassTime
+
+    def computeSatellitePassTime(self, time: 'JulianDate | SatellitePass', nextOccurrence: bool = True,
+                                 maximumSearchPeriod: float = 30) -> ('JulianDate', 'JulianDate'):
+        #Returns the middle time 
+
+        if nextOccurrence is not True and nextOccurrence is not False:
+            raise ValueError(f'nextOccurrence must be True or False, not {nextOccurrence}')
+
+        if hasattr(time, 'setInfo'):
+            if nextOccurrence:
+                time = time.setInfo.time.future(0.0001)
+            else:
+                time = time.setInfo.time.future(-0.0001)
+
+        try:
+            return self._findNextPassMax(time, nextOccurrence, maximumSearchPeriod)
+        except PassedOrbitPathRange:
+            raise NoPassException('No satellite passes occur.')
+
+
+
+        position, _ = self._sat.getState(time)
+        zeta = self._geo.getZenithVector(time)
+        if dot(position, zeta) > 0:
+            # sat is currently up
+            approxTime = time
+        else:
+            try:
+                approxTime = self._findApproxPassTime(time, nextOccurrence)
+            except NoPassException as e:
+                # raise appropriate exception
+                pass
+            """
+
+        # try:
+        #     # find approx time of next pass
+        #     pass
+        # except NoPassException as e:
+        #     # raise appropriate exception
+        #     pass"""
+
+        # refine to most precise approximation we can have
+        # passTime = self._refineApproxPassTime(approxTime)
+
+        # return

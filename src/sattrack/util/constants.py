@@ -1,6 +1,8 @@
 from math import pi
+from pyevspace import Vector
 
 # Mass constants
+
 NEWTON_G = 6.67408e-11
 EARTH_MU = 3.986004418e14 * 1e-9  # converted to km^3s^-2
 SUN_MU = 1.32712440018e20 * 1e-9  # converted to km^3s^-2
@@ -11,6 +13,7 @@ EARTH_FLATTENING = 1.0 / 298.26
 EARTH_POLAR_RADIUS = EARTH_EQUITORIAL_RADIUS * (1 - EARTH_FLATTENING)
 CJ2 = -2.064734896e14
 EARTH_SIDEREAL_PERIOD = 86164.090531
+EARTH_ANGULAR_MOMENTUM = Vector(0, 0, 7.29211586e-5)
 
 #   Sun constants
 SUN_RADIUS = 6.957e5    # km

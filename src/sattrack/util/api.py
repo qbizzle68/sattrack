@@ -7,7 +7,9 @@ from .constants import (
     EARTH_POLAR_RADIUS,
     CJ2,
     EARTH_SIDEREAL_PERIOD,
+    EARTH_ANGULAR_MOMENTUM,
     SUN_RADIUS,
+
     AU,
     TWOPI,
     SIDEREAL_PER_SOLAR,

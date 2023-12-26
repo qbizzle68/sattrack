@@ -1,9 +1,11 @@
 from abc import abstractmethod, ABC
 from copy import deepcopy
+from math import asin
 from typing import TYPE_CHECKING
 
 from pyevspace import Vector, ZXZ, Z_AXIS, Angles, getMatrixEuler, rotateMatrixFrom, getMatrixAxis, \
     ReferenceFrame
+from pyevspace.core import dot
 
 from sattrack.orbit.sgp4 import getState
 from sattrack.bodies.earth import Earth
@@ -89,6 +91,15 @@ class Orbitable(ABC):
     def isGeosynchronous(self) -> bool:
         """Some package utilities may need to distinguish between geo- and non-geosynchronous satellites."""
         pass
+
+    def getAltitude(self, geo: 'GeoPosition', time: 'JulianDate') -> float:
+        position, _ = self.getState(time)
+        gamma = geo.getPositionVector(time)
+        zeta = geo.getZenithVector(time)
+
+        relativePosition = position - gamma
+        sinTheta = dot(relativePosition, zeta) / relativePosition.mag()
+        return asin(sinTheta)
 
 
 class Orbit(Orbitable):

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from pyevspace import Vector
 
 from sattrack.util.constants import TWOPI, EARTH_MU, SECONDS_PER_DAY
-from sattrack.util.helpers import atan3
+from sattrack.util.helpers import atan3, computeAngleDifference
 from sattrack.orbit.sgp4 import elementsFromState
 
 if TYPE_CHECKING:
