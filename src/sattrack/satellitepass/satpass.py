@@ -181,7 +181,9 @@ class PassController:
         self._sat = sat
         self._geo = geo
         self._path = OrbitPath(sat, geo)
-        self._ACCURACY_BUFFER = 10 / MINUTES_PER_DAY
+        # this value can have issues for a pass that is much less than a
+        # minute, but we have to cut it off somewhere
+        self._ACCURACY_BUFFER = 10 / SECONDS_PER_DAY
 
     @property
     def orbitable(self) -> 'Orbitable':
