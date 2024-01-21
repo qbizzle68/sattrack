@@ -15,6 +15,7 @@
 #define SGP4_LINE_LENGTH    130 // sgp4 library methods expect lines
                                 // with length of 130
 #define EARTH_MU            3.986004418e5 // km^3s^-2
+#define SETREC_SIZE         sizeof(elsetrec)
 
 /* struct for TwoLineElement type */
 typedef struct {
@@ -245,10 +246,10 @@ get_state(PyObject* self, PyObject* const* args, Py_ssize_t size)
     }
 
     // build and return state
-    PyObject* rtn = Py_BuildValue("(OO)", position, velocity);
-    Py_DECREF(position);
-    Py_DECREF(velocity);
-    return rtn;
+PyObject* rtn = Py_BuildValue("(OO)", position, velocity);
+Py_DECREF(position);
+Py_DECREF(velocity);
+return rtn;
 }
 
 /* this should be replacable with access to Vector buffer */
@@ -271,7 +272,7 @@ static PyObject*
 _get_tle_repr(const tle_t* self, const char* format)
 {
     const size_t buffer_size = snprintf(NULL, 0, format,
-                                        self->name, self->line1, self->line2);
+        self->name, self->line1, self->line2);
 
     char* buffer = (char*)malloc(buffer_size + 1);
     if (!buffer) {
@@ -296,8 +297,126 @@ static PyObject*
 tle_repr(const tle_t* self)
 {
     const char* format = "TwoLineElement('''"
-                         TLE_STR_FORMAT"''')";
+        TLE_STR_FORMAT"''')";
     return _get_tle_repr(self, format);
+}
+
+static const char* PICKLE_VERSION_KEY = "_pickle_version";
+static int PICKLE_VERSION = 1;
+
+static PyObject*
+tle_satrec_to_bytes(const elsetrec* satrec) {
+    char* raw_bytes = (char*)calloc(SETREC_SIZE + 1, 1);
+    if (raw_bytes == NULL) {
+        return NULL;
+    }
+    memcpy(raw_bytes, satrec, SETREC_SIZE);
+
+    PyObject* bytes_object = PyBytes_FromStringAndSize(raw_bytes, SETREC_SIZE);
+    free(raw_bytes);
+
+    return bytes_object;
+}
+
+static PyObject*
+tle__getState__(const tle_t* self, PyObject* Py_UNUSED(ignored)) {
+    PyObject* bytes_object = tle_satrec_to_bytes(&self->satrec);
+
+    PyObject* state = Py_BuildValue("{sNsssssssi}",
+        "satrec", bytes_object,
+        "name", self->name,
+        "line1", self->line1,
+        "line2", self->line2,
+        PICKLE_VERSION_KEY, PICKLE_VERSION);
+
+    return state;
+}
+
+static int
+tle_bytes_to_satrec(elsetrec* satrec, PyObject* bytes) {
+    const char* raw_bytes = PyBytes_AsString(bytes);
+    if (raw_bytes == NULL) {
+        return -1;
+    }
+
+    memcpy(satrec, raw_bytes, SETREC_SIZE);
+    raw_bytes = NULL;
+
+    return 0;
+}
+
+static int
+tle_set_from_state(PyObject* state, const char* key, char* dest, size_t num) {
+    PyObject* item = PyDict_GetItemString(state, key);
+    if (item == NULL) {
+        PyErr_Format(PyExc_KeyError, "No \"%s\" in pickled dict.", key);
+        return -1;
+    }
+
+    const char* tmp = PyUnicode_AsUTF8(item);
+    if (tmp == NULL) {
+        return -1;
+    }
+
+    memcpy(dest, tmp, num);
+    return 0;
+}
+
+static PyObject*
+tle__setstate__(tle_t* self, PyObject* state) {
+    if (!PyDict_CheckExact(state)) {
+        PyErr_SetString(PyExc_ValueError, "Pickled object is not a dict.");
+        return NULL;
+    }
+
+    PyObject* tmp = PyDict_GetItemString(state, PICKLE_VERSION_KEY);
+    if (tmp == NULL) {
+        PyErr_Format(PyExc_KeyError, "No \"%s\" in pickled dict.", PICKLE_VERSION_KEY);
+        return NULL;
+    }
+    int pickle_version = (int)PyLong_AsLong(tmp);
+    if (pickle_version != PICKLE_VERSION) {
+        PyErr_Format(PyExc_ValueError,
+                     "Pickle version mismatch. Get version %d but expected version %d.",
+                     pickle_version, PICKLE_VERSION);
+        return NULL;
+    }
+
+    PyObject* bytes = PyDict_GetItemString(state, "satrec");
+    if (bytes == NULL) {
+        PyErr_SetString(PyExc_KeyError, "No \"satrec\" in pickled dict.");
+        return NULL;
+    }
+    if (tle_bytes_to_satrec(&self->satrec, bytes) < 0) {
+        return NULL;
+    }
+
+    // todo: create a __new__ method that allocates the strings so we don't have to here or in __init__
+    self->name = (char*)calloc(SAT_NAME_LENGTH, 1);
+    if (self->name == NULL) {
+        return NULL;
+    }
+    if (tle_set_from_state(state, "name", self->name, SAT_NAME_LENGTH) < 0) {
+        return NULL;
+    }
+
+    self->line1 = (char*)calloc(TLE_LINE_LENGTH, 1);
+    if (self->line1 == NULL) {
+        return NULL;
+    }
+    if (tle_set_from_state(state, "line1", self->line1, TLE_LINE_LENGTH) < 0) {
+        return NULL;
+    }
+
+    self->line2 = (char*)calloc(TLE_LINE_LENGTH, 1);
+    if (self->line2 == NULL) {
+        return NULL;
+    }
+    if (tle_set_from_state(state, "line2", self->line2, TLE_LINE_LENGTH) < 0) {
+        return NULL;
+    }
+
+    Py_RETURN_NONE;
 }
 
 static int
@@ -559,7 +678,7 @@ static PyGetSetDef tle_getset[] = {
     {NULL}
 };
 
-static PyMemberDef tle_member[] = {
+static PyMemberDef tle_members[] = {
     {"name", T_STRING, offsetof(tle_t, name), READONLY,
      PyDoc_STR("Name of the satllite if provided when creating instance.")},
 
@@ -634,11 +753,20 @@ static PyMemberDef tle_member[] = {
     {NULL},
 };
 
+static PyMethodDef tle_methods[] = {
+    {"__getstate__", (PyCFunction)tle__getState__, METH_NOARGS,
+    "Pickle the TwoLineElement object"},
+    {"__setstate__", (PyCFunction)tle__setstate__, METH_O,
+    "Un-pickle the TwoLineElement object"},
+    {NULL}
+};
+
 static PyType_Slot tle_slots[] = {
     {Py_tp_getset,  tle_getset},
     {Py_tp_init,    (void*)tle_init},
     {Py_tp_new,     (void*)PyType_GenericNew},
-    {Py_tp_members, (void*)tle_member},
+    {Py_tp_members, (void*)tle_members},
+    {Py_tp_methods, (void*)tle_methods},
     {Py_tp_free,    (void*)tle_free},
     {Py_tp_str,     (void*)tle_str},
     {Py_tp_repr,    (void*)tle_repr},
