@@ -7,6 +7,7 @@ from pyevspace import Vector, ZXZ, Z_AXIS, Angles, getMatrixEuler, rotateMatrixF
     ReferenceFrame
 from pyevspace.core import dot
 
+# noinspection PyUnresolvedReferences
 from sattrack.orbit.sgp4 import getState
 from sattrack.bodies.earth import Earth
 from sattrack.orbit.elements import elementsFromTle, Elements, radiusAtPeriapsis, radiusAtApoapsis, meanToTrueAnomaly, \
@@ -14,7 +15,7 @@ from sattrack.orbit.elements import elementsFromTle, Elements, radiusAtPeriapsis
     previousTrueAnomaly, nearestTrueAnomaly, nearestMeanAnomaly, meanAnomalyAtTime, trueAnomalyAtTime, smaToMeanMotion
 from sattrack.bodies.topocentric import toTopocentricState
 from sattrack.core.juliandate import now
-from sattrack.util.constants import TWOPI, SECONDS_PER_DAY, SIDEREAL_PER_SOLAR
+from sattrack.util.constants import TWOPI, SECONDS_PER_DAY, SIDEREAL_PER_SOLAR, EARTH_ANGULAR_VELOCITY
 
 if TYPE_CHECKING:
     from sattrack.orbit.sgp4 import TwoLineElement
@@ -221,8 +222,7 @@ class Orbit(Orbitable):
         return self._apoapsis
 
     def isGeosynchronous(self) -> bool:
-        tmp = 1 / SIDEREAL_PER_SOLAR
-        period = tmp * TWOPI / SECONDS_PER_DAY
+        period = EARTH_ANGULAR_VELOCITY * TWOPI / SECONDS_PER_DAY
         delta = period * 0.01
 
         elements = self._elements
@@ -362,8 +362,7 @@ class Satellite(Orbitable):
         return self._tle.apogee
 
     def isGeosynchronous(self) -> bool:
-        tmp = 1 / SIDEREAL_PER_SOLAR
-        period = tmp * TWOPI / SECONDS_PER_DAY
+        period = EARTH_ANGULAR_VELOCITY * TWOPI / SECONDS_PER_DAY
         delta = period * 0.01
 
         elements = self.getElements(now())

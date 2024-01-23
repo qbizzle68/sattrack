@@ -5,7 +5,7 @@ from math import tan, pi, asin, radians, atan, degrees
 
 from pyevspace import Vector, norm, ReferenceFrame, Angles, ZYX
 
-from sattrack.bodies.position import getEarthOffsetAngle
+from sattrack.bodies.position import computeEarthOffsetAngle
 from sattrack.util.constants import EARTH_FLATTENING, TWOPI, EARTH_EQUITORIAL_RADIUS, EARTH_POLAR_RADIUS, \
     HOURS_TO_RAD, EARTH_SIDEREAL_PERIOD
 from sattrack.util.helpers import atan3
@@ -146,7 +146,7 @@ class GeoPosition(Coordinates):
         return norm(normalVector)
 
     def getReferenceFrame(self, time: 'JulianDate') -> ReferenceFrame:
-        lng = self._lng + getEarthOffsetAngle(time)
+        lng = self._lng + computeEarthOffsetAngle(time)
         lat = pi / 2 - self._lat
         angles = Angles(lng, lat, 0.0)
 
@@ -233,7 +233,7 @@ def computeSubPoint(position: Vector, jd: 'JulianDate') -> GeoPosition:
     declination = degrees(asin(position[2] / position.mag()))
 
     # longitude is equal to right-ascension minus earth's offset angle at the time
-    longitude = (degrees(atan3(position[1], position[0]) - getEarthOffsetAngle(jd))) % 360.0
+    longitude = (degrees(atan3(position[1], position[0]) - computeEarthOffsetAngle(jd))) % 360.0
     if longitude > 180.0:
         longitude = longitude - 360.0
 
@@ -244,7 +244,7 @@ def computeSubPoint(position: Vector, jd: 'JulianDate') -> GeoPosition:
 def _computeNormalVector(latitude: float, longitude: float, radius: float, time: 'JulianDate') -> Vector:
     """Logic for computing surface vectors determined by latitude type. Angles in radians and radius in kilometers."""
 
-    longitude += getEarthOffsetAngle(time)
+    longitude += computeEarthOffsetAngle(time)
     return Vector(
         radius * cos(latitude) * cos(longitude),
         radius * cos(latitude) * sin(longitude),

@@ -2,7 +2,7 @@ from math import asin, degrees, pi
 
 from pyevspace import Vector, ZYX, getMatrixEuler, Angles, rotateEulerTo, rotateOffsetTo, rotateOffsetFrom, cross
 
-from sattrack.bodies.position import getEarthOffsetAngle
+from sattrack.bodies.position import computeEarthOffsetAngle
 from sattrack.util.constants import TWOPI, EARTH_SIDEREAL_PERIOD
 from sattrack.util.helpers import atan3
 
@@ -17,7 +17,7 @@ def _getTopocentricAngles(geo: 'GeoPosition', time: 'JulianDate') -> Angles:
     """Computes the Euler angles required for a rotation to a topocentric reference frame."""
 
     # lng = geo.longitudeRadians + Earth.offsetAngle(time)
-    lng = geo.longitudeRadians + getEarthOffsetAngle(time)
+    lng = geo.longitudeRadians + computeEarthOffsetAngle(time)
     lat = pi / 2 - geo.latitudeRadians
 
     return Angles(lng, lat, 0.0)
@@ -31,6 +31,7 @@ def toTopocentric(vector: Vector, geo: 'GeoPosition', time: 'JulianDate') -> Vec
     return rotateEulerTo(ZYX, angs, vector)
 
 
+# todo: add an offset keyword parameter to toTopocentric to replace this method
 def toTopocentricOffset(position: Vector, geo: 'GeoPosition', time: 'JulianDate') -> Vector:
     """Converts a position vector to a topocentric (SEZ) reference frame by offsetting by the
     geo-position's vector."""
@@ -54,17 +55,16 @@ def toTopocentricState(position: Vector, velocity: Vector, geo: 'GeoPosition', t
     return topocentricPosition, topocentricVelocity
 
 
+# todo: add an offset argument to this and add appropriate logic for it
 def fromTopocentric(vector: Vector, geo: 'GeoPosition', time: 'JulianDate') -> Vector:
     """Converts a vector from a topocentric reference frame defined by a geo-position at a specified time."""
 
     geoVector = geo.getPositionVector(time)
     # angs = Angles(geo.longitudeRadians + Earth.offsetAngle(time), pi / 2 - geo.latitudeRadians, 0.0)
-    angs = Angles(geo.longitudeRadians + getEarthOffsetAngle(time), pi / 2 - geo.latitudeRadians, 0.0)
+    angs = Angles(geo.longitudeRadians + computeEarthOffsetAngle(time), pi / 2 - geo.latitudeRadians, 0.0)
     matrix = getMatrixEuler(ZYX, angs)
 
     return rotateOffsetFrom(matrix, geoVector, vector)
-
-# todo: make a fromTopocentricOffset() function
 
 
 def getAltitude(satellite: 'Orbitable', geo: 'GeoPosition', time: 'JulianDate') -> float:

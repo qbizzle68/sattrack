@@ -43,6 +43,7 @@ from .satellite import (
     Satellite,
 )
 
+# noinspection PyUnresolvedReferences
 from .sgp4 import (
     TwoLineElement,
     getState,
@@ -51,5 +52,6 @@ from .sgp4 import (
 )
 
 from .tle import (
+    TLEResponseIterator,
     getTle,
 )

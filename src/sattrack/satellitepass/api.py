@@ -19,6 +19,8 @@ from .info import (
 )
 
 from .satpass import (
+    PassTimeController,
     SatellitePass,
+    PassFinder,
     PassController,
 )

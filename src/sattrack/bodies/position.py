@@ -193,5 +193,5 @@ def computeApparentSiderealTime(time: 'JulianDate | JulianTimes') -> float:
     return (meanSiderealTime + deltaPsi * cos(trueObliquity)) % TWOPI
 
 
-def getEarthOffsetAngle(time: 'JulianDate') -> float:
+def computeEarthOffsetAngle(time: 'JulianDate') -> float:
     return computeApparentSiderealTime(time)

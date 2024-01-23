@@ -8,6 +8,8 @@ from .constants import (
     CJ2,
     EARTH_SIDEREAL_PERIOD,
     EARTH_ANGULAR_MOMENTUM,
+    EARTH_ANGULAR_VELOCITY,
+
     SUN_RADIUS,
 
     AU,

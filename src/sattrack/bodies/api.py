@@ -15,7 +15,10 @@ from .position import (
     JulianTimes,
     computeNutationDeltas,
     computeMeanObliquity,
-    computeTrueObliquity, computeMeanSiderealTime, computeApparentSiderealTime,
+    computeTrueObliquity,
+    computeMeanSiderealTime,
+    computeApparentSiderealTime,
+    computeEarthOffsetAngle,
 )
 
 from .sun import (
