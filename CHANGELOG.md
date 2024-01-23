@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2024-01-23
+
+### Added
+
+- Added \__getstate\__() and \__setstate\__() method to TwoLineElement for Pickle support.
+- The PassFinder class to replace the PassController class, which greatly improves satellite pass
+  finding accuracy while avoiding infinite looping issues.
+- Added classes to facilitate solving implicit functions for finding maximum satellite positions
+  for generating satellite pass times.
+
+### Fixed
+
+- Fixed an issue where a current pass would not be computed when given a pass time.
+
+### Changed
+
+- Complete re-haul of pass finding logic to ensure all passes are found without causing
+  infinite loops.
+- PassController now simply acts as a wrapper around the new PassFinder class to preserve the
+  interface for current projects. The PassController will be depreciated in future versions.
+
+### Security
+
+- Bumped urllib3 minimum version to 1.26.17.
+- Bumped Jinja2 minimum version to 3.1.3.
+
+## [0.3.1] - 2023-12-26
+
+### Fixed
+
+- Significant refactoring of the satellite pass logic, to avoid infinite loop scenarios.
+
+### Changed
+
+- Changed the pyevspace version to its current version (0.14.2).
+- Upgraded the interface between sattrack and the requests library including improved error handling.
+
 ## [0.3.0] - 2023-10-30
 
 ### Added
@@ -80,7 +117,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Stable pass finder for circular, prograde, LEO objects.
 
-[Unreleased]: https://github.com/qbizzle68/sattrack/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/qbizzle68/sattrack/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/qbizzle68/sattrack/compute/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/qbizzle68/sattrack/compute/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/qbizzle68/sattrack/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/qbizzle68/sattrack/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/qbizzle68/sattrack/compare/v0.1.1...v0.1.2
