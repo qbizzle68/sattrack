@@ -642,7 +642,7 @@ class PassController:
 
         return self._finder.computeNextPass(time, nextOccurrence, maximumSearchPeriod)
 
-    def getPassList(self, time: 'JulianDate', duration: float, UNUSED: float) -> list[SatellitePass]:
+    def getPassList(self, time: 'JulianDate', duration: float, UNUSED: float = 0) -> list[SatellitePass]:
         if duration == 0:
             raise ValueError(f'duration must be a non-zero number of days')
 

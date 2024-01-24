@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2024-01-23
+
+### Fixed
+
+- Fixed PassController.getPassList now unused argument which was changed to an un-defaulted value. This
+  value was changed to an unused parameter in version [0.4.0], and now defaults to zero.
+
 ## [0.4.0] - 2024-01-23
 
 ### Added
@@ -117,7 +124,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Stable pass finder for circular, prograde, LEO objects.
 
-[Unreleased]: https://github.com/qbizzle68/sattrack/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/qbizzle68/sattrack/compare/v0.4.1...HEAD
+[0.4.0]: https://github.com/qbizzle68/sattrack/compute/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/qbizzle68/sattrack/compute/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/qbizzle68/sattrack/compute/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/qbizzle68/sattrack/compare/v0.2.0...v0.3.0
