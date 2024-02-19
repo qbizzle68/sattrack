@@ -80,6 +80,7 @@ class GeoPosition(Coordinates):
         super().__init__(latitude, longitude)
 
         self._latGeocentric = _geodeticToGeocentric(self._lat)
+        # todo: add elevation to this
         self._radius = self._computeRadius()
         self._elv = elevation
 
