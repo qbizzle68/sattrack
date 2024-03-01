@@ -1,4 +1,5 @@
 from enum import Enum
+from functools import lru_cache, partial
 from math import sin, cos, tan, asin, degrees, pi, acos
 
 from pyevspace import Vector
@@ -19,6 +20,7 @@ if TYPE_CHECKING:
     from sattrack.core.coordinates import GeoPosition
 
 
+@lru_cache(maxsize=8)
 def _computeFromTable(table: list[list[float]], time: JulianDate | JulianTimes) -> list[float]:
     if isinstance(time, JulianTimes):
         JME = time.JME
@@ -27,16 +29,12 @@ def _computeFromTable(table: list[list[float]], time: JulianDate | JulianTimes) 
         JCE = (JDE - 2451545) / 36525
         JME = JCE / 10
 
-    output = []
-    for subTable in table:
-        Ln = 0
-        for (a, b, c) in subTable:
-            Ln += a * cos(b + c * JME)
-        output.append(Ln)
+    tableSums = [sum((a * cos(b + c * JME) for (a, b, c) in subTable)) for subTable in table]
 
-    return output
+    return tableSums
 
 
+@lru_cache(maxsize=8)
 def computeEarthHeliocentricLongitude(time: JulianDate | JulianTimes) -> float:
     # Returns the Earth heliocentric longitude in radians.
 
@@ -48,11 +46,12 @@ def computeEarthHeliocentricLongitude(time: JulianDate | JulianTimes) -> float:
         JME = JCE / 10
 
     (L0, L1, L2, L3, L4, L5) = _computeFromTable(SUN_L_TABLE, time)
-    rtn = L0 + JME * (L1 + JME * (L2 + JME * (L3 + JME * (L4 + JME * L5))))
+    heliocentricLongitude = L0 + JME * (L1 + JME * (L2 + JME * (L3 + JME * (L4 + JME * L5))))
 
-    return (rtn / 1e8) % TWOPI
+    return (heliocentricLongitude / 1e8) % TWOPI
 
 
+@lru_cache(maxsize=8)
 def computeEarthHeliocentricLatitude(time: JulianDate | JulianTimes) -> float:
     # Returns the Earth heliocentric latitude in radians.
 
@@ -64,13 +63,14 @@ def computeEarthHeliocentricLatitude(time: JulianDate | JulianTimes) -> float:
         JME = JCE / 10
 
     (B0, B1) = _computeFromTable(SUN_B_TABLE, time)
-    rtn = ((B0 + JME * B1) / 1e8) % TWOPI
-    if rtn > pi:
-        rtn -= TWOPI
+    heliocentricLatitude = ((B0 + JME * B1) / 1e8) % TWOPI
+    if heliocentricLatitude > pi:
+        heliocentricLatitude -= TWOPI
 
-    return rtn
+    return heliocentricLatitude
 
 
+@lru_cache(maxsize=8)
 def computeSunDistance(time: JulianDate | JulianTimes) -> float:
     # Returns the Earth radius in Astronomical Units.
 
@@ -82,26 +82,28 @@ def computeSunDistance(time: JulianDate | JulianTimes) -> float:
         JME = JCE / 10
 
     (R0, R1, R2, R3, R4) = _computeFromTable(SUN_R_TABLE, time)
-    rtn = R0 + JME * (R1 + JME * (R2 + JME * (R3 + JME * R4)))
+    sunDistance = R0 + JME * (R1 + JME * (R2 + JME * (R3 + JME * R4)))
 
-    return rtn / 1e8
+    return sunDistance / 1e8
 
 
+@lru_cache(maxsize=8)
 def computeSunGeocentricLongitude(time: JulianDate) -> float:
     # Returns the Sun's geocentric longitude in radians.
 
-    L = computeEarthHeliocentricLongitude(time)
+    heliocentricLongitude = computeEarthHeliocentricLongitude(time)
 
-    return (L + pi) % TWOPI
+    return (heliocentricLongitude + pi) % TWOPI
 
 
+@lru_cache(maxsize=8)
 def computeSunGeocentricLatitude(time: JulianDate) -> float:
     # Returns the Sun's geocentric latitude in radians.
 
-    B = computeEarthHeliocentricLatitude(time)
+    heliocentricLatitude = computeEarthHeliocentricLatitude(time)
 
     # computeEarthHeliocentricLatitude modulates output to [0-TWOPI), so we don't need to.
-    return -B
+    return -heliocentricLatitude
 
 
 # Don't think this will be needed publicly, but can be changed to.
@@ -110,13 +112,14 @@ def _computeAberrationCorrection(arg: JulianDate | float) -> float:
     radius will be computed, otherwise arg should be the Earth's radius in AU."""
 
     if isinstance(arg, (JulianDate, JulianTimes)):
-        R = computeSunDistance(arg)
+        sunDistance = computeSunDistance(arg)
     else:
-        R = arg
+        sunDistance = arg
 
-    return -9.93373536319817e-05 / R
+    return -9.93373536319817e-05 / sunDistance
 
 
+@lru_cache(maxsize=8)
 def computeSunApparentLongitude(time: JulianDate) -> float:
     # Compute the apparent solar longitude in radians.
 
@@ -153,17 +156,17 @@ def computeSunDeclination(time: JulianDate) -> float:
     return asin(term1 + term2)
 
 
-def _computeSunCoordinatesFast(time: JulianTimes, R: float = None) -> CelestialCoordinates:
+def _computeSunCoordinatesFast(time: JulianTimes, sunDistance: float = None) -> CelestialCoordinates:
     # Compute solar celestial coordinates directly, saving some function calling overhead.
     # If R is not None, it should be the Earth Sun distance in AU to pass to
     # _computeAberrationCorrection()
 
     solarLongitude = (computeEarthHeliocentricLongitude(time) + pi) % TWOPI
     nutationLongitude, nutationObliquity = computeNutationDeltas(time)
-    if R is None:
+    if sunDistance is None:
         aberrationCorrection = _computeAberrationCorrection(time)
     else:
-        aberrationCorrection = _computeAberrationCorrection(R)
+        aberrationCorrection = _computeAberrationCorrection(sunDistance)
 
     apparentLongitude = solarLongitude + nutationLongitude + aberrationCorrection
 
@@ -173,13 +176,10 @@ def _computeSunCoordinatesFast(time: JulianTimes, R: float = None) -> CelestialC
     sunLatitude = -computeEarthHeliocentricLatitude(time)
 
     numerator = sin(apparentLongitude) * cos(trueObliquity) - tan(sunLatitude) * sin(trueObliquity)
-    # numerator = sin(solarLongitude) * cos(trueObliquity) - tan(sunLatitude) * sin(trueObliquity)
     rightAscension = atan3(numerator, cos(apparentLongitude))
-    # rightAscension = atan3(numerator, cos(solarLongitude))
 
     term1 = sin(sunLatitude) * cos(trueObliquity)
     term2 = cos(sunLatitude) * sin(trueObliquity) * sin(apparentLongitude)
-    # term2 = cos(sunLatitude) * sin(trueObliquity) * sin(solarLongitude)
 
     declination = asin(term1 + term2)
 
@@ -189,7 +189,8 @@ def _computeSunCoordinatesFast(time: JulianTimes, R: float = None) -> CelestialC
 def computeSunPosition(time: JulianDate) -> Vector:
     # Compute the Sun's geocentric position vector:
 
-    rightAscension, declination = _computeSunCoordinatesFast(time)
+    rightAscension = computeSunRightAscension(time)
+    declination = computeSunDeclination(time)
     sunDistance = computeSunDistance(time)
 
     zTerm = sunDistance * sin(declination)
@@ -203,12 +204,13 @@ def computeSunPosition(time: JulianDate) -> Vector:
 def computeSunCoordinates(time: JulianDate) -> CelestialCoordinates:
     # Compute the Sun's celestial coordinates.
 
-    rightAscension, declination = _computeSunCoordinatesFast(time)
+    rightAscension = computeSunRightAscension(time)
+    declination = computeSunDeclination(time)
 
-    raHours = rightAscension * RAD_TO_HOURS
-    decDegrees = degrees(declination)
+    rightAscensionHours = rightAscension * RAD_TO_HOURS
+    declinationDegrees = degrees(declination)
 
-    return CelestialCoordinates(raHours, decDegrees)
+    return CelestialCoordinates(rightAscensionHours, declinationDegrees)
 
 
 # todo: this can be generalized to compute rise/set times of any object
@@ -230,9 +232,15 @@ def _computeSunAngleData(geo: 'GeoPosition', time: JulianDate, target: float) \
     time_0 = JulianTimes(ut.future(dt))
     time_p1 = JulianTimes(ut.future(dt + 1))
 
-    alpha_m1, delta_m1 = _computeSunCoordinatesFast(time_m1)
-    alpha_0, delta_0 = _computeSunCoordinatesFast(time_0)
-    alpha_p1, delta_p1 = _computeSunCoordinatesFast(time_p1)
+    # alpha_m1, delta_m1 = _computeSunCoordinatesFast(time_m1)
+    # alpha_0, delta_0 = _computeSunCoordinatesFast(time_0)
+    # alpha_p1, delta_p1 = _computeSunCoordinatesFast(time_p1)
+    alpha_m1 = computeSunRightAscension(time_m1)
+    delta_m1 = computeSunDeclination(time_m1)
+    alpha_0 = computeSunRightAscension(time_0)
+    delta_0 = computeSunDeclination(time_0)
+    alpha_p1 = computeSunRightAscension(time_p1)
+    delta_p1 = computeSunDeclination(time_p1)
 
     m0 = ((alpha_0 - geo.longitudeRadians - apparentSiderealTime) / TWOPI) % 1.0
 
@@ -313,11 +321,13 @@ def _computeSunAngleData(geo: 'GeoPosition', time: JulianDate, target: float) \
 
 # fixme: name this better
 # Public interface to _computeSunAngleData if wanting all four values.
-def computeSunData(geo: 'GeoPosition', time: JulianDate) -> (JulianDate, JulianDate, JulianDate, float):
-    target = -0.01454441043328608
-    data = _computeSunAngleData(geo, time, target)
-
-    return data
+# def computeSunData(geo: 'GeoPosition', time: JulianDate) -> (JulianDate, JulianDate, JulianDate, float):
+#     target = -0.01454441043328608
+#     data = _computeSunAngleData(geo, time, target)
+#
+#     return data
+computeSunData = partial(_computeSunAngleData, target=-0.01454441043328608)
+computeSunData.__doc__ = 'Computes the rise, set, and transit times of the Sun, and also the transit time altitude'
 
 
 def computeSunRiseSetTimes(geo: 'GeoPosition', time: JulianDate) -> (JulianDate, JulianDate):
@@ -360,13 +370,13 @@ def computeTwilightType(geo: 'GeoPosition', time: JulianDate) -> Twilight:
     topoSunPosition = toTopocentricOffset(sunPosition, geo, time)
     sunAngle = asin(topoSunPosition[2] / topoSunPosition.mag())
 
-    if sunAngle < -0.3141592653589793:  # 18 degrees
+    if sunAngle < -0.3141592653589793:      # 18 degrees
         return Twilight.Night
     elif sunAngle < -0.20943951023931956:   # 12 degrees
         return Twilight.Astronomical
     elif sunAngle < -0.10471975511965978:   # 6 degrees
         return Twilight.Nautical
-    elif sunAngle < -0.01454441043328608:    # 50 arc-minutes
+    elif sunAngle < -0.01454441043328608:   # 50 arc-minutes
         return Twilight.Civil
     else:
         return Twilight.Day
@@ -380,7 +390,8 @@ class SunController(BodyOrbitController):
     def computePosition(self, time: 'JulianDate') -> Vector:
         timeEphem = JulianTimes(time)
         sunDistance = computeSunDistance(timeEphem)
-        rightAscension, declination = _computeSunCoordinatesFast(timeEphem, sunDistance)
+        rightAscension = computeSunRightAscension(timeEphem)
+        declination = computeSunDeclination(timeEphem)
 
         zTerm = sunDistance * sin(declination)
         topoProjection = sunDistance * cos(declination)
@@ -391,12 +402,13 @@ class SunController(BodyOrbitController):
 
     def computeCelestialCoordinates(self, time: 'JulianDate') -> CelestialCoordinates:
         timeEphem = JulianTimes(time)
-        rightAscension, declination = _computeSunCoordinatesFast(timeEphem)
+        rightAscension = computeSunRightAscension(timeEphem)
+        declination = computeSunDeclination(timeEphem)
 
-        raHours = rightAscension * RAD_TO_HOURS
-        decDegrees = degrees(declination)
+        rightAscensionHours = rightAscension * RAD_TO_HOURS
+        declinationDegrees = degrees(declination)
 
-        return CelestialCoordinates(raHours, decDegrees)
+        return CelestialCoordinates(rightAscensionHours, declinationDegrees)
 
     def computeAltAz(self, geo: 'GeoPosition', time: 'JulianDate') -> 'AltAz':
         # todo: compute this correctly
