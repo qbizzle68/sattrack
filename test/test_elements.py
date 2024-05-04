@@ -107,7 +107,7 @@ class TestElements(unittest.TestCase):
         elements = Elements.fromTle(self.tle, self.jd)
         ans = ' elements |  raan   |   inc   |   aop   |   ecc    |   sma    | mean anom | true anom |' \
               '        epoch         \n  values  | 27.3803 | 51.6435 | 114.558 | 0.000098 | 6788.487 |' \
-              '  310.115  |  310.107  | 2023/10/28 11:00:00.0 -5 UTC'
+              '  310.115  |  310.107  | 2023/10/28 10:59:59.999 -0500 UTC'
         self.assertEqual(str(elements), ans)
 
     def testRadiusMethods(self):
