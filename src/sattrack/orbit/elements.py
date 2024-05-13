@@ -302,7 +302,7 @@ def nextMeanAnomaly(meanMotion: float, m0: float, epoch0: 'JulianDate', m1: floa
     """Finds the time a satellite next achieves a mean anomaly based on the time of a previous anomaly and mean motion.
     Anomalies are in radians and mean motion is in revolutions / day."""
 
-    periapsisPass = epoch0.future(-m0 / (TWOPI * meanMotion))
+    periapsisPass = epoch0 - (m0 / (TWOPI * meanMotion))
     revolutions = (time - periapsisPass) * meanMotion
 
     m0 = (revolutions - floor(revolutions)) * TWOPI
@@ -310,7 +310,7 @@ def nextMeanAnomaly(meanMotion: float, m0: float, epoch0: 'JulianDate', m1: floa
     if m1 < m0:
         dm += TWOPI
 
-    return time.future((dm / meanMotion) / TWOPI)
+    return time + ((dm / meanMotion) / TWOPI)
 
 
 def previousMeanAnomaly(meanMotion: float, m0: float, epoch0: 'JulianDate', m1: float, time: 'JulianDate')\
@@ -318,7 +318,7 @@ def previousMeanAnomaly(meanMotion: float, m0: float, epoch0: 'JulianDate', m1: 
     """Finds the time a satellite previously achieved a mean anomaly based on the time of a previous anomaly and mean
     motion. Anomalies are in radians and mean motion is in revolutions / day."""
 
-    periapsisPass = epoch0.future(-m0 / (TWOPI * meanMotion))
+    periapsisPass = epoch0 - (m0 / (TWOPI * meanMotion))
     revolutions = (time - periapsisPass) * meanMotion
 
     m0 = (revolutions - floor(revolutions)) * TWOPI
@@ -326,7 +326,7 @@ def previousMeanAnomaly(meanMotion: float, m0: float, epoch0: 'JulianDate', m1: 
     if m0 < m1:
         dm -= TWOPI
 
-    return time.future((dm / meanMotion) / TWOPI)
+    return time + ((dm / meanMotion) / TWOPI)
 
 
 def nextTrueAnomaly(meanMotion: float, eccentricity: float, t0: float, epoch0: 'JulianDate',
@@ -376,7 +376,7 @@ def nearestMeanAnomaly(meanMotion: float, m0: float, epoch0, m1: float):
         else:
             dma = m1 - m0
 
-    return epoch0.future(dma / (meanMotion * TWOPI))
+    return epoch0 + (dma / (meanMotion * TWOPI))
 
 
 def meanAnomalyAtTime(meanMotion: float, m0: float, epoch0: 'JulianDate', time: 'JulianDate') -> float:

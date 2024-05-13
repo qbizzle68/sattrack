@@ -125,7 +125,7 @@ class MaximumMeanAnomalyFinder:
     @staticmethod
     def _refineApproximateTime(boundary: Boundary, epsilon: float) -> Boundary:
         while (boundaryRange := boundary.range()) > epsilon:
-            middleTime = boundary.lower.x.future(boundaryRange / 2)
+            middleTime = boundary.lower.x + (boundaryRange / 2)
             left, right = boundary.bifurcate(middleTime)
             boundary = left if right.hasSameSign() else right
 
@@ -157,7 +157,7 @@ class MaximumMeanAnomalyFinder:
         nextPoint = basePoint
         while self._toContinueSearch(nextPoint.x, time, duration):
             basePoint = nextPoint
-            nextTime = basePoint.x.future(step)
+            nextTime = basePoint.x + step
             nextPoint = self._function.computePoint(nextTime)
 
             if basePoint.y * nextPoint.y <= 0:
@@ -187,7 +187,7 @@ class MaximumMeanAnomalyFinder:
 
         maximumAnomalyList = []
         while abs(chunkStartTime - time) < duration:
-            chunkDuration = min((time.future(duration) - chunkStartTime, MAXIMUM_ANOMALY_CHUNK_DURATION))
+            chunkDuration = min((time + duration - chunkStartTime, MAXIMUM_ANOMALY_CHUNK_DURATION))
 
             result = self._searchChunk(chunkStartTime, step, chunkDuration)
             if result is not None:
@@ -203,9 +203,9 @@ class MaximumMeanAnomalyFinder:
                     else:
                         maximumAnomalyList.append(exactRoot)
 
-                chunkStartTime = exactRoot.future(deltaTime)
+                chunkStartTime = exactRoot + deltaTime
             else:
-                chunkStartTime = chunkStartTime.future(step)
+                chunkStartTime = chunkStartTime + step
 
         return maximumAnomalyList
 
@@ -266,7 +266,7 @@ class MeanAnomalyIntersectionFinder:
 
     def _execComputeIntersectionTime(self, passTime: 'JulianDate', isRising: bool) -> 'JulianDate':
         time = passTime
-        previousTime = time.future(-1)
+        previousTime = time - 1
 
         while abs(previousTime - time) > TIME_DIFFERENCE:
             middleMeanAnomaly, offsetAdjustment = self._computeIntersectionAnomalyTerms(time)
@@ -302,7 +302,7 @@ class MeanAnomalyIntersectionFinder:
             angularVelocityVector = cross(topocentricPosition, topocentricVelocity) / topocentricPosition.mag2()
             dt = (alt / angularVelocityVector.mag()) / SECONDS_PER_DAY
 
-            updatedTime = updatedTime.future(dt * direction)
+            updatedTime = updatedTime + (dt * direction)
 
             alt = self._sat.getAltitude(self._geo, updatedTime)
 
@@ -545,7 +545,7 @@ class PassFinder:
         try:
             shadowEnterTime, shadowExitTime = getShadowTimes(self._sat, riseTime, Shadow.PENUMBRA)
         except NoSatelliteEclipseException:
-            shadowEnterTime = setTime.future(0.0001)
+            shadowEnterTime = setTime + 0.0001
             shadowExitTime = shadowEnterTime
         # fixme: need to consider latitudes where the sun doesn't rise or set
         sunRiseTime, sunSetTime = Sun.computeRiseSetTimes(self._geo, riseTime)
@@ -589,9 +589,9 @@ class PassFinder:
     def computeNextPass(self, time: 'JulianDate', nextOccurrence: bool = True, timeout: float = 7) -> SatellitePass:
         if isinstance(time, SatellitePass):
             if nextOccurrence:
-                time = time.setInfo.time.future(0.001)
+                time = time.setInfo.time + 0.001
             else:
-                time = time.riseInfo.time.future(-0.001)
+                time = time.riseInfo.time - 0.001
 
         maximumTime = self._passController.computePassTime(time, nextOccurrence, timeout)
 
@@ -679,7 +679,7 @@ class PassControllerOld:
 
     def _computeCurrentMaximumTime(self, time):
 
-        previousTime = time.future(-1)
+        previousTime = time - 1
         approxTime = time
 
         # epsilon = 0.1 / SECONDS_PER_DAY
@@ -696,10 +696,10 @@ class PassControllerOld:
 
         maxParameter = self._computeMaximumAnomaly(time)
         if nextOccurrence:
-            adjustedTime = time.future(self._ACCURACY_BUFFER)
+            adjustedTime = time + self._ACCURACY_BUFFER
             nextTime = self._sat.timeToNextAnomaly(maxParameter, adjustedTime, 'true')
         else:
-            adjustedTime = time.future(-self._ACCURACY_BUFFER)
+            adjustedTime = time - self._ACCURACY_BUFFER
             nextTime = self._sat.timeToPreviousAnomaly(maxParameter, adjustedTime, 'true')
 
         nextMaxTime = self._computeCurrentMaximumTime(nextTime)
@@ -769,7 +769,7 @@ class PassControllerOld:
     def _computeIntersectionTimeExec(self, maxTime: 'JulianDate', isRising: bool) -> 'JulianDate':
 
         time = maxTime
-        prevTime = time.future(-1)
+        prevTime = time - 1
 
         # epsilon = 10 / SECONDS_PER_DAY
         while abs(prevTime - time) > TIME_DIFFERENCE:
@@ -805,7 +805,7 @@ class PassControllerOld:
             angularVelocityVector = cross(topocentricPosition, topocentricVelocity) / topocentricPosition.mag2()
             dt = (alt / angularVelocityVector.mag()) / SECONDS_PER_DAY
 
-            updatedTime = updatedTime.future(dt * direction)
+            updatedTime = updatedTime + (dt * direction)
 
             alt = self._sat.getAltitude(self._geo, updatedTime)
 
@@ -837,7 +837,7 @@ class PassControllerOld:
         try:
             enterTime, exitTime = getShadowTimes(self._sat, riseTime, Shadow.PENUMBRA)
         except NoSatelliteEclipseException:
-            enterTime = setTime.future(0.0001)
+            enterTime = setTime + 0.0001
             exitTime = enterTime
         # fixme: need to consider latitudes where the sun doesn't rise or set
         sunRiseTime, sunSetTime = Sun.computeRiseSetTimes(self._geo, riseTime)
@@ -853,7 +853,7 @@ class PassControllerOld:
         topoState = self._sat.getTopocentricState(self._geo, maxTime)
         maxInfo = PositionInfo(degrees(asin(topoState[0][2] / topoState[0].mag())),
                                degrees(atan3(topoState[0][1], -topoState[0][0])),
-                               riseTime.future((setTime - riseTime) / 2),
+                               riseTime + ((setTime - riseTime) / 2),
                                maxTime < enterTime or maxTime > exitTime,
                                maxTime < sunRiseTime or maxTime > sunSetTime)
 
@@ -888,12 +888,12 @@ class PassControllerOld:
     def getNextPass(self, time: 'JulianDate', number: int = 1, maximumSearchPeriod: float = 30) -> SatellitePass:
         if number > 0:
             if isinstance(time, SatellitePass):
-                time = time.setInfo.time.future(0.0001)
+                time = time.setInfo.time + 0.0001
 
             findNext = True
         elif number < 0:
             if isinstance(time, SatellitePass):
-                time = time.riseInfo.time.future(-0.0001)
+                time = time.riseInfo.time - 0.0001
 
             findNext = False
         else:

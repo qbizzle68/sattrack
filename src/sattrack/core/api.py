@@ -14,6 +14,5 @@ from .exceptions import (
 
 from .juliandate import (
     JulianDate,
-    now,
     J2000,
 )

@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added several methods to the `JulianDate` class for improved behavior similar to Python's
+  built-in `datetime` class. Most methods involve formatting/parsing dates based on user
+  specified [format codes][python format codes].
+  - Class methods:
+    - `strptime(dateString, formatString)` - for parsing and instantiating a `JulianDate`
+      object from a format string.
+    - `fromisoformat(dateString)` - for parsing and instantiating a `JulianDate` object
+      from an ISO 8601 formatted string.
+  - Instance methods:
+    - `__format__(format_spec)` - to support Python's built-in `format` method.
+    - `asTimezone(timezone)` - for creating a new `JulianDate` instance with the given
+      timezone.
+    - `strftime(formatString)` - also for string formatting.
+
+### Changed
+
+- Refactored the `JulianDate` class to behave more like the builtin python `datetime` module. Now
+  supports `datetime.timezone` instances to handle daylight/standard time ambiguities.
+
+- Made significant improvements within the `bodies` subpackage, explicitly the `position` and `sun`
+  modules, that results in much more efficient computations by caching commonly computed values and
+  using built-in methods where possible.
+
 ## [0.4.1] - 2024-01-23
 
 ### Fixed
@@ -133,3 +158,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.1.2]: https://github.com/qbizzle68/sattrack/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/qbizzle68/sattrack/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/qbizzle68/sattrack/releases/tag/v0.1.0
+[python format codes]: https://docs.python.org/3/library/datetime.html#strftime-and-strptime-behavior

@@ -89,7 +89,7 @@ class TestTle(unittest.TestCase):
             iterCount = int(round((end - start) / step))
             itr = [start + step * i for i in range(iterCount + 1)]
             for i, dt in enumerate(itr):
-                time = jd.future(dt / 1440)
+                time = jd + (dt / 1440)
                 stateComp = sat.getState(time)
 
                 # fixme: Right now the values of satellite number 26900 are too far off.

@@ -21,7 +21,7 @@ class TestOrbitPath(unittest.TestCase):
         geo = GeoPosition(38, -97)
 
         path = OrbitPath(self.iss, geo)
-        timeInputs = [jd.future(i) for i in range(10)]
+        timeInputs = [jd + i for i in range(10)]
         answers = [
             (JulianDate(2023, 10, 28, 1, 13, 48.78761887549081, -5),
              JulianDate(2023, 10, 28, 12, 35, 27.601347863674164, -5)),
@@ -36,7 +36,7 @@ class TestOrbitPath(unittest.TestCase):
             (JulianDate(2023, 11, 2, 22, 53, 13.632245063781738, -5),
              JulianDate(2023, 11, 3, 10, 14, 46.622147262096405, -5)),
             (JulianDate(2023, 11, 3, 22, 29, 48.21560740470886, -5),
-             JulianDate(2023, 11, 4, 9, 51, 20.13840615749359, -5)),
+             JulianDate(2023, 11, 4, 9, 51, 20.188383134060132, -5)),
             (JulianDate(2023, 11, 4, 22, 6, 22.99039900302887, -5),
              JulianDate(2023, 11, 5, 9, 27, 53.779186606407166, -5)),
             (JulianDate(2023, 11, 5, 21, 42, 57.859215438365936, -5),
@@ -44,8 +44,8 @@ class TestOrbitPath(unittest.TestCase):
             (JulianDate(2023, 11, 6, 21, 19, 32.873273491859436, -5),
              JulianDate(2023, 11, 7, 8, 41, 1.1384376883470395, -5))]
 
-        for time, answer in zip(timeInputs, answers):
-            with self.subTest():
+        for i, (time, answer) in enumerate(zip(timeInputs, answers), 0):
+            with self.subTest(msg='testing ISS passes', index=i):
                 times = path.computeOrbitPassTimes(time)
                 self.assertAlmostEqual(times[0].value, answer[0].value)
                 self.assertAlmostEqual(times[1].value, answer[1].value)

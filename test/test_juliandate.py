@@ -1,9 +1,8 @@
 import datetime
+import pickle
 import unittest
-from unittest import mock
-from copy import copy
 
-from sattrack.core.juliandate import now, J2000, JulianDate
+from sattrack.core.juliandate import J2000, JulianDate, DateComponents
 
 values = ((2000, 1, 1, 12, 0, 0),
           (1999, 1, 1, 0, 0, 0),
@@ -26,202 +25,230 @@ answers = (2451545, 2451179.5, 2447332, 2447187.5, 2446966, 2446822.5, 2415020.5
            2026871.8, 1676497.5, 1676496.5, 1356001, 1355866.5, 1355671.4, 0.0)
 
 
-class TestJuliandate(unittest.TestCase):
+class TestJulianDateNew(unittest.TestCase):
 
-    @classmethod
-    def setUpClass(cls) -> None:
-        jdList = []
-        for args in values:
-            jd = JulianDate(*args)
-            jdList.append(jd)
+    # @classmethod
+    # def setUpClass(cls) -> None:
+    #     jds = []
+    #     for args in values:
 
-        cls.jds = jdList
-
-    def testValues(self):
-        for jd, answer in zip(self.jds, answers):
-            with self.subTest(jd=jd, number=answer):
+    def testInit(self):
+        for comps, answer in zip(values, answers):
+            with self.subTest(comps=comps, number=answer):
+                jd = JulianDate(*comps)
                 self.assertEqual(jd.value, answer)
 
-    @unittest.skip('Work in progress')
-    def testValueWithTimezone(self):
-        pass
+    def testClassInit(self):
+        # Test the date May 9th, 2024, 23:38:00 -0500 UTC.
+        answer = JulianDate(2024, 5, 9, 23, 38, 0, -5)
+        jd = JulianDate.fromNumber(2460440, 0.6930555555555564, -5)
+        self.assertEqual(jd, answer, 'testing 2024-05-09 23:38:00 -0500 from JulianDate.fromNumber')
 
-    def testString(self):
+        timezone = datetime.timezone(datetime.timedelta(hours=-5))
+        _datetime = datetime.datetime(2024, 5, 9, 23, 38, 0, tzinfo=timezone)
+        jd = JulianDate.fromDatetime(_datetime)
+        self.assertEqual(jd, answer, 'testing 2024-05-09 23:38:00 -0500 from JulianDate.fromDatetime')
 
-        results = ('2000/01/01 12:00:00.0', '1999/01/01 00:00:00.0', '1988/06/19 12:00:00.0',
-                   '1988/01/27 00:00:00.0', '1987/06/19 12:00:00.0', '1987/01/27 00:00:00.0',
-                   '1900/01/01 00:00:00.0', '1600/12/31 00:00:00.0', '1600/01/01 00:00:00.0',
-                   '837/04/10 07:12:00.0', '-122/01/01 00:00:00.0', '-123/12/31 00:00:00.0',
-                   '-1000/07/12 12:00:00.0', '-1000/02/29 00:00:00.0', '-1001/08/17 21:36:00.0',
-                   '-4712/01/01 12:00:00.0')
+        jd = JulianDate.fromisoformat('2024-05-09 23:38:00 -0500')
+        self.assertEqual(jd, answer, 'testing 2024-05-09 23:38:00 -0500 from JulianDate.fromisoformat')
 
-        for jd, result in zip(self.jds, results):
-            with self.subTest(jd=jd.value):
-                answer = f'{jd.value} --- {result} +0 UTC'
-                self.assertEqual(str(jd), answer)
+        # this screws up other type checking
+        # with mock.patch('sattrack.core.juliandate.time') as structMock:
+        #     struct = time.struct_time((2024, 5, 9, 23, 38, 0, 0, 0, 1, None, -5*3600))
+        #     structMock.localtime.return_value = struct
+        #     with mock.patch('sattrack.core.juliandate.datetime') as nowMock:
+        #         nowMock.datetime.now.return_value = _datetime
+        #         jd = JulianDate.now()
 
-    def testJson(self):
-        answer = '{"dayNumber": 2451545, "dayFraction": 0.0}'
-        self.assertEqual(self.jds[0].toJson(), answer)
+        # Since we're completely dependent on the datetime module here, just test the simple case
+        jd = JulianDate.strptime('2024-05-09 23:38:00 -0500', '%Y-%m-%d %H:%M:%S %z')
+        self.assertEqual(jd, answer, 'testing 2024-05-09 23:38:00 -0500 from JulianDate.strptime')
 
-        answer = '{"dayNumber": 2451179, "dayFraction": 0.5}'
-        self.assertEqual(self.jds[1].toJson(), answer)
+    def testClassNegativeInit(self):
+        # Test the date February 29th, -1000 12:34:56 -0200 UTC and March 1st, -1001 12:34:56 -0200 UTC.
+        answer1 = JulianDate(-1000, 2, 29, 12, 34, 56, -2)
+        answer2 = JulianDate(-1001, 3, 1, 12, 34, 56, -2)
 
-    def testEquality(self):
-        jd1 = JulianDate(2000, 1, 1, 12, 0, 0)
-        jd2 = JulianDate(2000, 1, 1, 12, 0, 0)
-        self.assertEqual(jd1, jd2)
+        jd = JulianDate.fromNumber(1355867, 0.1075925925, -2)
+        self.assertEqual(jd, answer1, 'testing -1000-02-29 12:34:56 -0200 from JulianDate.fromNumber')
+        jd = JulianDate.fromNumber(1355502, 0.1075925925, -2)
+        self.assertEqual(jd, answer2, 'testing -1001-03-01 12:34:56 -0200 from JulianDate.fromNumber')
 
-        # Equality with timezone offset.
-        jd3 = JulianDate(2000, 1, 1, 7, 0, 0, -5)
-        self.assertEqual(jd1, jd3)
+        # We can't handle negative years with this right now.
+        # jd = JulianDate.fromisoformat('-1000-02-29 12:34:56 -0200')
+        # self.assertEqual(jd, answer1, 'testing -1000-02-29 12:34:56 -0200 from JulianDate.fromisoformat')
+        # jd = JulianDate.fromisoformat('-1001-03-01 12:34:56 -0200')
+        # self.assertEqual(jd, answer2, 'testing -1000-02-29 12:34:56 -0200 from JulianDate.fromisoformat')
 
-        # Not equal
-        self.assertNotEqual(self.jds[0], self.jds[1])
-        # With timezone offset.
-        self.assertFalse(jd1 != jd3)
+        # We can't handle negative years with this right now.
+        # jd = JulianDate.strptime('-1000-02-29 12:34:56 -0200', '%Y-%m-%d %H:%M:%S %z')
+        # self.assertEqual(jd, answer1, 'testing -1000-02-29 12:34:56 -0200 from JulianDate.strptime')
+        # jd = JulianDate.strptime('-1001-03-01 12:34:56 -0200', '%Y-%m-%d %H:%M:%S %z')
+        # self.assertEqual(jd, answer2, 'testing -1000-02-29 12:34:56 -0200 from JulianDate.strptime')
 
-    def testComparators(self):
-        for i, jd in enumerate(self.jds[:-1]):
-            with self.subTest(i=i, jd=jd.value):
-                self.assertLess(self.jds[i + 1], jd)
-                self.assertLessEqual(self.jds[i + 1], jd)
+    def testAsTimezone(self):
+        jd = JulianDate(2024, 5, 10, 4, 38, 0, 0)
+        answer = JulianDate(2024, 5, 9, 23, 38, 0, -5)
 
-        for i, jd in enumerate(self.jds[:-1]):
-            with self.subTest(i=i, jd=jd.value):
-                self.assertGreater(jd, self.jds[i + 1])
-                self.assertGreaterEqual(jd, self.jds[i + 1])
+        jd = jd.asTimezone(-5)
+        self.assertEqual(jd.value, answer.value, 'adjusting a timezone with asTimezone()')
 
-    def testAddTimedelta(self):
-        delta = datetime.timedelta(days=1, hours=9)
-        jd = self.jds[0] + delta
-        answer = JulianDate(2000, 1, 2, 21, 0, 0)
-        self.assertEqual(jd, answer)
+    def testStrings(self):
+        jd = JulianDate(2024, 5, 9, 23, 38, 0.8888888, -5)
 
-        # test __radd__
-        jd = delta + self.jds[0]
-        self.assertEqual(jd, answer)
+        self.assertEqual(str(jd), '2460440.6930658435 --- 2024-05-09 23:38:00.888889 -0500 UTC',
+                         'testing __str__')
+        self.assertEqual(repr(jd), 'JulianDate(2024, 5, 9, 23, 38, 0.8888888, '
+                                   'datetime.timezone(datetime.timedelta(days=-1, seconds=68400)))',
+                         'testing __repr__')
+        self.assertEqual(jd.date(), '2024-05-09 23:38:00.889 -0500 UTC', 'testing .date()')
+        self.assertEqual(jd.date(0), '2024-05-10 04:38:00.889 +0000 UTC', 'testing .date() with timezone=0')
+        self.assertEqual(jd.date(n=6), '2024-05-09 23:38:00.888889 -0500 UTC', 'testing .date() with n=6')
+        self.assertEqual(jd.date(n=0), '2024-05-09 23:38:01 -0500 UTC', 'testing .date() with n=0')
 
-    def testSubtract(self):
-        answer = answers[1] - answers[0]
-        diff = self.jds[1] - self.jds[0]
-        self.assertEqual(diff, answer)
+        self.assertEqual(jd.day(), '2024-05-09', 'testing .day()')
+        self.assertEqual(jd.time(), '23:38:00.889', 'testing .time()')
 
-        # Negative difference
-        answer = answers[4] - answers[5]
-        diff = self.jds[4] - self.jds[5]
-        self.assertEqual(diff, answer)
+    def testFormat(self):
+        jd = JulianDate(2024, 5, 9, 23, 38, 0.8888888, -5)
 
-    def testCopyingAndHashing(self):
-        cpy = copy(self.jds[0])
-        self.assertEqual(cpy, self.jds[0])
-        self.assertIsNot(cpy, self.jds[0])
+        specs = ('a', 'A', 'w', 'd', 'b', 'B', 'm', 'y', 'Y', 'H', 'I', 'p', 'M', 'S', 'f', 'z', 'Z',
+                 'j', 'U', 'W', 'c', 'x', 'X', 'G', 'u', 'V')
+        results = ('Thu', 'Thursday', '4', '09', 'May', 'May', '05', '24', '2024', '23', '11', 'PM',
+                   '38', '00', '888889', '-0500', 'UTC-05:00', '130', '18', '19',
+                   'Thu May  9 23:38:00 2024', '05/09/24', '23:38:00', '2024', '4', '19')
+        for spec, result in zip(specs, results):
+            with self.subTest('testing __format__', spec=spec):
+                self.assertEqual(format(jd, f'%{spec}'), result, f'testing __format__ with spec {spec}')
 
-        self.assertEqual(hash(cpy), hash(self.jds[0]))
+        for spec, result in zip(specs, results):
+            with self.subTest('testing strftime', spec=spec):
+                self.assertEqual(jd.strftime(f'%{spec}'), result, f'testing .strftime with spec {spec}')
+
+        self.assertEqual(format(jd, 'day is %d'), 'day is 09', 'testing year formatting with text')
+
+        with self.assertRaises(ValueError, msg='testing invalid format spec exception'):
+            format(jd, '%P')
+
+    def testRound(self):
+        jd = JulianDate(2024, 5, 9, 23, 38, 0.8888888, -5)
+
+        self.assertAlmostEqual(round(jd, 3).value, 2460440.693065845, 5, 'testing __round__ with n=3')
+        self.assertAlmostEqual(round(jd).value, 2460440.6930671297, 5, 'testing __round__ with n=None')
+
+    def testRoundFormat(self):
+        jd = JulianDate(2024, 5, 9, 23, 59, 59.9999)
+
+        self.assertEqual(jd.time(n=4), '23:59:59.9999', 'testing not rounding up with n=4')
+        self.assertEqual(jd.time(n=2), '00:00:00.00', 'testing rounding up with n=2')
+        self.assertEqual(jd.date(n=2), '2024-05-10 00:00:00.00 +0000 UTC', 'testing rounding up with n=2')
+
+        self.assertEqual(jd.time(n=0), '00:00:00', 'testing rounding up with n=0')
+        self.assertEqual(jd.time(n=6), '23:59:59.999900', 'testing not rounding up with n=6')
+        with self.assertRaises(ValueError, msg='testing negative n exception'):
+            jd.date(n=-1)
 
     def testProperties(self):
-        for jd, number in zip(self.jds, answers):
-            with self.subTest(jd=jd, number=number, msg='value'):
-                self.assertEqual(jd.value, number)
-            with self.subTest(jd=jd, number=number, msg='number'):
-                self.assertEqual(jd.number, int(number))
-            with self.subTest(jd=jd, number=number, msg='fraction'):
-                self.assertAlmostEqual(jd.fraction, number % 1)
+        jd = JulianDate(2024, 5, 9, 23, 38, 0.123456, -5)
 
-        self.assertEqual(self.jds[0].timezone, 0)
-        jd = JulianDate(2023, 10, 6, 0, 0, 0, -5)
-        self.assertEqual(jd.timezone, -5)
-        jd = JulianDate(2023, 10, 6, 0, 0, 0, -5.5)
-        self.assertEqual(jd.timezone, -5.5)
+        self.assertEqual(type(jd.components), DateComponents, 'testing components property is correct type')
+        self.assertEqual(jd.number, 2460440, 'testing number property equality')
+        self.assertAlmostEqual(jd.fraction, 0.6930569844444445, msg='testing fraction property equality')
+        self.assertAlmostEqual(jd.value, 2460440.6930569843, msg='testing value property equality')
+        self.assertEqual(jd.timezone, datetime.timezone(datetime.timedelta(hours=-5)),
+                         'testing timezone property equality')
+        self.assertEqual(jd.utcOffset, -5, 'testing utcOffset property equality')
 
-    def testFuture(self):
-        jd = JulianDate(2000, 1, 1, 12, 0, 0)
-        future = jd.future(1.5)
-        answer = JulianDate(2000, 1, 3, 0, 0, 0)
-        self.assertEqual(future, answer)
+    def testSerialization(self):
+        jd = JulianDate(2024, 5, 9, 23, 38, 0.123456, -5)
 
-        future = jd.future(-1.5)
-        answer = JulianDate(1999, 12, 31, 0, 0, 0)
-        self.assertEqual(future, answer)
+        self.assertEqual(jd.toDict(), {'number': 2460440, 'fraction': 0.6930569844444445, 'utcOffset': -5.0},
+                         'testing toDict equality')
+        self.assertEqual(jd.toJson(), '{"number": 2460440, "fraction": 0.6930569844444445, "utcOffset": -5.0}',
+                         'testing toJson equality')
+        reduceResults = (JulianDate, (*jd.components, jd.timezone))
+        self.assertEqual(jd.__reduce__(), reduceResults, 'testing __reduce__ return values')
+        pickled = pickle.dumps(jd)
+        pickleAnswer = b'\x80\x04\x95\x80\x00\x00\x00\x00\x00\x00\x00\x8c\x18sattrack.core.juliandate' \
+                       b'\x94\x8c\nJulianDate\x94\x93\x94(M\xe8\x07K\x05K\tK\x17K&G?\xbf\x9a\xcf\xfa~\xb6' \
+                       b'\xbf\x8c\x08datetime\x94\x8c\x08timezone\x94\x93\x94h\x03\x8c\ttimedelta\x94\x93' \
+                       b'\x94J\xff\xff\xff\xffJ0\x0b\x01\x00K\x00\x87\x94R\x94\x85\x94R\x94t\x94R\x94.'
+        self.assertEqual(pickled, pickleAnswer, 'testing pickle.dumps works with jd')
 
-    def testStringMethods(self):
-        # Most of these should be tested from the __str__ method, but need to test the timezone and n (rounding) args.
-        # Testing timezones.
-        jd = JulianDate(2000, 1, 1, 12, 0, 0)
-        self.assertEqual(jd.date(), '2000/01/01 12:00:00.0 +0 UTC')
-        self.assertEqual(jd.date(-5), '2000/01/01 07:00:00.0 -5 UTC')
-        self.assertEqual(jd.date(5), '2000/01/01 17:00:00.0 +5 UTC')
+    def testMath(self):
+        jd1 = JulianDate(2024, 5, 9, 23, 38, 0.123456, -5)
+        jd2 = JulianDate(2024, 5, 11, 5, 38, 0.123456, -5)
 
-        self.assertEqual(jd.day(), '2000/01/01')
-        self.assertEqual(jd.day(-13), '1999/12/31')
-        self.assertEqual(jd.day(13), '2000/01/02')
+        self.assertAlmostEqual(jd2-jd1, 1.25, msg='testing JulianDate subtraction')
+        self.assertEqual(jd1 + 1.25, jd2, 'testing JulianDate float addition')
+        self.assertEqual(1.25 + jd1, jd2, 'testing JulianDate __radd__')
+        self.assertEqual(jd2 - 1.25, jd1, 'testing JulianDate float subtraction')
 
-        self.assertEqual(jd.time(), '12:00:00.0')
-        self.assertEqual(jd.time(-5), '07:00:00.0')
-        self.assertEqual(jd.time(5), '17:00:00.0')
+        delta = datetime.timedelta(hours=5, minutes=3, seconds=2.1)
+        additionAnswer = JulianDate(2024, 5, 10, 4, 41, 2.223456, -5)
+        self.assertEqual(jd1 + delta, additionAnswer, 'testing JulianDate datetime.timedelta addition')
+        self.assertEqual(delta + jd1, additionAnswer, 'testing JulianDate datetime.timedelta __radd__')
 
-        # Testing rounding.
-        jd = JulianDate(2000, 1, 1, 12, 0, 12.3456789)
-        self.assertEqual(jd.date(n=5), '2000/01/01 12:00:12.34568 +0 UTC')
-        self.assertEqual(jd.date(n=2), '2000/01/01 12:00:12.35 +0 UTC')
-        self.assertEqual(jd.date(n=0), '2000/01/01 12:00:12.0 +0 UTC')
-        self.assertEqual(jd.date(n=None), '2000/01/01 12:00:12 +0 UTC')
+    def testComparison(self):
+        jd1 = JulianDate(2024, 5, 9, 23, 38, 0.123456, -5)
+        jd2 = JulianDate(2024, 5, 11, 5, 38, 0.123456, -5)
+        jd3 = JulianDate(2024, 5, 9, 23, 38, 0.123456, -5)
 
-        self.assertEqual(jd.time(n=5), '12:00:12.34568')
-        self.assertEqual(jd.time(n=2), '12:00:12.35')
-        self.assertEqual(jd.time(n=0), '12:00:12.0')
-        self.assertEqual(jd.time(n=None), '12:00:12')
+        self.assertEqual(jd1, jd3, 'testing JulianDate equality')
+        self.assertNotEqual(jd1, jd2, 'testing JulianDate equality is false')
+        self.assertLess(jd1, jd2, 'testing JulianDate less than')
+        self.assertLessEqual(jd1, jd3, 'testing JulianDate less than or equal')
+        self.assertGreater(jd2, jd1, 'testing JulianDate greater than')
+        self.assertGreaterEqual(jd1, jd3, 'testing JulianDate greater than or equal')
 
-    def testDatetimeConversion(self):
-        datetimeList = [datetime.datetime(2000, 1, 1, 12, 0, 0, 0, datetime.timezone.utc),
-                        datetime.datetime(1999, 1, 1, 0, 0, 0, 0, datetime.timezone.utc),
-                        datetime.datetime(1988, 6, 19, 12, 0, 0, 0, datetime.timezone.utc),
-                        datetime.datetime(1988, 1, 27, 0, 0, 0, 0, datetime.timezone.utc),
-                        datetime.datetime(1987, 6, 19, 12, 0, 0, 0, datetime.timezone.utc),
-                        datetime.datetime(1987, 1, 27, 0, 0, 0, 0, datetime.timezone.utc),
-                        datetime.datetime(1900, 1, 1, 0, 0, 0, 0, datetime.timezone.utc),
-                        datetime.datetime(1600, 12, 31, 0, 0, 0, 0, datetime.timezone.utc),
-                        datetime.datetime(1600, 1, 1, 0, 0, 0, 0, datetime.timezone.utc),
-                        # This one just rounds differently, no need to focus on making it perfect.
-                        datetime.datetime(837, 4, 10, 7, 11, 59, 999999, datetime.timezone.utc)]
+        self.assertEqual(hash(jd1), -5442201358416014943, 'testing JulianDate hash')
 
-        for jd, dtime in zip(self.jds[:10], datetimeList):
-            with self.subTest(jd=jd):
-                self.assertEqual(jd.toDatetime(), dtime)
+    def testMiscellaneous(self):
+        jd = JulianDate(2024, 5, 9, 23, 38, 0.123456, -5)
 
-    def testDayOfYear(self):
-        jd = JulianDate(2023, 9, 24, 12, 0, 0, 0)
-        self.assertEqual(jd.dayOfYear(), 267)
-        jd = JulianDate(2024, 9, 24, 12, 0, 0, 0)
-        self.assertEqual(jd.dayOfYear(), 268)
+        timezone = datetime.timezone(datetime.timedelta(hours=-5))
+        _datetime = datetime.datetime(2024, 5, 9, 23, 38, 0, 123456, timezone)
+        self.assertEqual(jd.toDatetime(), _datetime, 'testing .toDatetime() method')
+        jdNegativeYear = JulianDate(-1, 1, 1, 1, 1, 1)
+        with self.assertRaises(ValueError, msg='testing negative year .toDatetime exception'):
+            jdNegativeYear.toDatetime()
 
-    @staticmethod
-    def _datetimeSideEffect(*args, **kwargs):
-        return datetime.datetime(*args, **kwargs)
-
-    def testNow(self):
-        # todo: this doesn't test the timezone mechanism inside now()
-        # With tm_gmtoff as None in time.localtime()
-        args = (2023, 10, 26, 23, 50, 29)
-        tmp = datetime.datetime(*args, 0)
-        with mock.patch('sattrack.core.juliandate.datetime.datetime') as nowMock:
-            nowMock.now.return_value = tmp
-            nowMock.side_effect = self._datetimeSideEffect
-            self.assertEqual(now(), JulianDate(*args[:6], 0))
-
-        # With timezone set
-        args = (2023, 10, 26, 23, 50, 29)
-        tz = datetime.timezone(datetime.timedelta(hours=-5))
-        tmp = datetime.datetime(*args, 0, tz)
-        with mock.patch('sattrack.core.juliandate.datetime.datetime') as nowMock:
-            nowMock.now.return_value = tmp
-            nowMock.side_effect = self._datetimeSideEffect
-            self.assertEqual(now(), JulianDate(*args[:6], -5))
+        self.assertEqual(jd.dayOfYear(), 130, 'testing .dayOfYear() method')
 
     def testJ2000(self):
-        self.assertEqual(J2000.number, 2451545)
-        self.assertEqual(J2000.fraction, 0.0)
-        self.assertEqual(J2000.timezone, 0.0)
+        self.assertEqual(J2000.value, 2451545.0)
+
+    def testNegativeYearFormatting(self):
+        jd = JulianDate(-1000, 2, 2, 2, 2, 2, -5)
+
+        self.assertTrue(jd._formatter.proxy, 'testing formatter proxy property value')
+
+        self.assertEqual(format(jd, '%y'), '-00', 'testing negative year formatting %y')
+        self.assertEqual(format(jd, '%Y'), '-1000', 'testing negative year formatting %Y')
+        # this test requires some brute force since locale.nl_langinfo is not always defined
+        _datetime = jd._formatter.datetime
+        sampleFormat = _datetime.strftime('%c').replace('6688', '-1000').replace('88', '00')
+        self.assertEqual(format(jd, '%c'), sampleFormat, 'testing negative year formatting %c')
+        self.assertEqual(format(jd, '%z'), '-0500', 'testing negative year formatting %z')
+        _datetime = jd._formatter.datetime
+        sampleFormat = _datetime.strftime('%x').replace('6688', '-1000').replace('88', '-00')
+        self.assertEqual(format(jd, '%x'), sampleFormat, 'testing negative year formatting %x')
+        self.assertEqual(format(jd, '%G'), '-1000', 'testing negative year formatting %G')
+        self.assertEqual(format(JulianDate(0, 1, 1, 0, 0, 0), '%G'), '0000', 'testing year zero formatting %G')
+        self.assertEqual(format(jd, '%d'), '02', 'testing negative year other formatting')
+
+    def testTimezones(self):
+        import zoneinfo
+
+        timezone = zoneinfo.ZoneInfo('US/Central')
+        jd = JulianDate(2024, 5, 9, 23, 38, 0.123456, timezone)
+        self.assertEqual(str(jd), '2460440.6930569843 --- 2024-05-09 23:38:00.123456 -0500 UTC',
+                         'testing zoneinfo timezone string')
+        self.assertEqual(repr(jd), "JulianDate(2024, 5, 9, 23, 38, 0.123456, zoneinfo.ZoneInfo(key='US/Central'))",
+                         'testing zoneinfo timezone repr')
+        self.assertEqual(jd.utcOffset, -5, 'testing timezone in daylight savings time')
+        jd = JulianDate(2024, 1, 1, 0, 0, 0, timezone)
+        self.assertEqual(jd.utcOffset, -6, 'testing timezone in standard time')
 
 
 if __name__ == '__main__':

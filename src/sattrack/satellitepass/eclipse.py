@@ -228,14 +228,14 @@ def _get_shadow_positions(jd: 'JulianDate', sat: 'Orbitable', shadow: Shadow, ze
             or (abs(approxPhi2 + TWOPI - phi0) < errorBuffer):
         # dt = (jd - sat.timeToAnomaly(approxPhi1, jd, Orbitable.PREVIOUS, Orbitable.TRUE))
         dt = (jd - sat.timeToPreviousAnomaly(approxPhi1, jd, 'true'))
-        referenceTime = jd.future(-dt)
+        referenceTime = jd - dt
     else:
         # phi2Time = sat.timeToAnomaly(approxPhi2, jd, Orbitable.NEXT, Orbitable.TRUE)
         # phi1Time = sat.timeToAnomaly(approxPhi1, phi2Time, Orbitable.PREVIOUS, Orbitable.TRUE)
         phi2Time = sat.timeToNextAnomaly(approxPhi2, jd, 'true')
         phi1Time = sat.timeToPreviousAnomaly(approxPhi1, phi2Time, 'true')
         dt = (phi2Time - phi1Time) / 2
-        referenceTime = phi1Time.future(dt)
+        referenceTime = phi1Time + dt
 
     enterPhi, enterTime = __compute_anomaly_loop(jd, referenceTime, sat, shadow,
                                                  Eclipse.ENTER, zeroEpsilon, radiusEpsilon)

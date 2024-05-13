@@ -25,9 +25,9 @@ class TestOrbit(unittest.TestCase):
         self.assertEqual(self.orbit.name, 'orbit')
 
     def testOrbitAnomalies(self):
-        anomaly = self.orbit.anomalyAtTime(self.jd.future(0.5), 'true')
+        anomaly = self.orbit.anomalyAtTime(self.jd + 0.5, 'true')
         self.assertAlmostEqual(anomaly, 5.739947586418642)
-        anomaly = self.orbit.anomalyAtTime(self.jd.future(0.5), 'mean')
+        anomaly = self.orbit.anomalyAtTime(self.jd + 0.5, 'mean')
         self.assertAlmostEqual(anomaly, 5.75021880414991)
         with self.assertRaises(ValueError):
             self.orbit.anomalyAtTime(self.jd, 'blah')
@@ -74,10 +74,10 @@ class TestOrbit(unittest.TestCase):
         self.assertAlmostEqual(elements.meanAnomaly, self.elements.meanAnomaly)
         self.assertAlmostEqual(elements.trueAnomaly, self.elements.trueAnomaly)
 
-        elements = self.orbit.getElements(self.jd.future(0.5))
+        elements = self.orbit.getElements(self.jd + 0.5)
         self.assertAlmostEqual(elements.meanAnomaly, 5.75021880414991)
         self.assertAlmostEqual(elements.trueAnomaly, 5.739947586418642)
-        self.assertAlmostEqual(elements.epoch.value, self.jd.future(0.5).value)
+        self.assertAlmostEqual(elements.epoch.value, (self.jd + 0.5).value)
 
         # Test elements property.
         self.assertIs(self.orbit.elements, self.elements)
@@ -122,9 +122,9 @@ class TestSatellite(unittest.TestCase):
 
     def testAnomalies(self):
 
-        anomaly = self.iss.anomalyAtTime(self.jd.future(0.5), 'true')
+        anomaly = self.iss.anomalyAtTime(self.jd + 0.5, 'true')
         self.assertAlmostEqual(anomaly, 5.863433066840235)
-        anomaly = self.iss.anomalyAtTime(self.jd.future(0.5), 'mean')
+        anomaly = self.iss.anomalyAtTime(self.jd + 0.5, 'mean')
         self.assertAlmostEqual(anomaly, 5.8634735325189595)
         with self.assertRaises(ValueError):
             self.iss.anomalyAtTime(self.jd, 'blah')

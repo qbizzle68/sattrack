@@ -628,9 +628,21 @@ tle_epoch(tle_t* self, void* Py_UNUSED(_))
         return NULL;
     }
 
-    double jdValue = TLE_JDNUMBER(self) + TLE_JDFRACTION(self);
+    // todo: write tests in python that test all branches of this
+    double number = TLE_JDNUMBER(self);
+    double fraction = TLE_JDFRACTION(self);
+    const double numberExtra = number - int(number);
+    if (numberExtra > 0) {
+        number -= numberExtra;
+        fraction += numberExtra;
+        if (fraction > 1.0) {
+            const int fractionExtra = int(fraction);
+            number += fractionExtra;
+            fraction -= fractionExtra;
+        }
+    }
     return PyObject_CallMethod(state->JulianDate, "fromNumber",
-                               "d", jdValue);
+                               "dd", number, fraction);
 }
 
 static PyObject*

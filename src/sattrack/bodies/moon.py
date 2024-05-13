@@ -4,10 +4,13 @@ from pyevspace import Vector
 
 from sattrack.bodies._tables import MOON_LR_TERM_TABLE, MOON_B_TERM_TABLE
 from sattrack.bodies.position import computeNutationDeltas, computeTrueObliquity
-from sattrack.core.juliandate import JulianDate
 from sattrack.core.coordinates import CelestialCoordinates
 from sattrack.util.constants import DELTAT, TWOPI, RAD_TO_HOURS
 from sattrack.util.helpers import atan3
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from sattrack.core.juliandate import JulianDate
 
 
 def _computeMoonMeanLongitude(time: 'JulianDate') -> float:

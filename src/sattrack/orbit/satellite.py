@@ -14,14 +14,13 @@ from sattrack.orbit.elements import elementsFromTle, Elements, radiusAtPeriapsis
     radiusAtAnomaly, flightAngleAtAnomaly, velocityAtAnomaly, nextMeanAnomaly, previousMeanAnomaly, nextTrueAnomaly, \
     previousTrueAnomaly, nearestTrueAnomaly, nearestMeanAnomaly, meanAnomalyAtTime, trueAnomalyAtTime, smaToMeanMotion
 from sattrack.bodies.topocentric import toTopocentricState
-from sattrack.core.juliandate import now
+from sattrack.core.juliandate import JulianDate
 from sattrack.util.constants import TWOPI, SECONDS_PER_DAY, SIDEREAL_PER_SOLAR, EARTH_ANGULAR_VELOCITY
 
 if TYPE_CHECKING:
     from sattrack.orbit.sgp4 import TwoLineElement
     from sattrack.bodies.body import Body
     from sattrack.core.coordinates import GeoPosition
-    from sattrack.core.juliandate import JulianDate
 
 
 class Orbitable(ABC):
@@ -365,7 +364,7 @@ class Satellite(Orbitable):
         period = EARTH_ANGULAR_VELOCITY * TWOPI / SECONDS_PER_DAY
         delta = period * 0.01
 
-        elements = self.getElements(now())
+        elements = self.getElements(JulianDate.now())
         meanMotion = smaToMeanMotion(elements.sma, self.body.mu)
 
         return period - delta <= meanMotion <= period + delta

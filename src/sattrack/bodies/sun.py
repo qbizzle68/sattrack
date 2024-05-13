@@ -218,19 +218,20 @@ def _computeSunAngleData(geo: 'GeoPosition', time: JulianDate, target: float) \
         -> (JulianDate, JulianDate, JulianDate, float):
     # Returns rise time, set time, transit time and transit altitude.
 
-    tzOffset = time.timezone / 24.0
+    tzOffset = time.utcOffset / 24.0
     localVal = time.value + tzOffset
-    num = int(localVal)
+    number = int(localVal)
     if localVal - int(localVal) < 0.5:
-        num -= 1
-    ut = JulianDate.fromNumber(num + 0.5 - tzOffset, time.timezone)
+        number -= 1
+    numberAdjust, fraction = divmod(0.5 - tzOffset, 1.0)
+    ut = JulianDate.fromNumber(number + numberAdjust, fraction, time.timezone)
 
     apparentSiderealTime = computeApparentSiderealTime(ut)
 
     dt = DELTAT / 86400
-    time_m1 = JulianTimes(ut.future(dt - 1))
-    time_0 = JulianTimes(ut.future(dt))
-    time_p1 = JulianTimes(ut.future(dt + 1))
+    time_m1 = JulianTimes(ut + (dt - 1))
+    time_0 = JulianTimes(ut + dt)
+    time_p1 = JulianTimes(ut + (dt + 1))
 
     # alpha_m1, delta_m1 = _computeSunCoordinatesFast(time_m1)
     # alpha_0, delta_0 = _computeSunCoordinatesFast(time_0)
@@ -316,7 +317,7 @@ def _computeSunAngleData(geo: 'GeoPosition', time: JulianDate, target: float) \
     denominator = TWOPI * cos(deltaPrime2) * cos(geo.latitudeRadians) * sin(HPrime2)
     S = m2 + (h2 - target) / denominator
 
-    return ut.future(R), ut.future(S), ut.future(T), h0
+    return ut + R, ut + S, ut + T, h0
 
 
 # fixme: name this better

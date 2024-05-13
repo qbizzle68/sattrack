@@ -830,7 +830,7 @@ class OrbitPath:
 
         # Use sidereal day length as one revolution, not solar day length.
         dt = SIDEREAL_PER_SOLAR * dl / TWOPI
-        return jd.future(dt)
+        return jd + dt
 
     def _computeSpecificRoot(self, jd: 'JulianDate', enum: int) -> FunctionRoot:
         roots = self._func.computeRoots(self._sat, jd)
@@ -851,7 +851,7 @@ class OrbitPath:
 
         time = jd
         while self._checkTime(time) > 1:
-            time = time.future(moveDirection * SWITCH_DT)
+            time = time + (moveDirection * SWITCH_DT)
 
         return time
 
@@ -859,7 +859,7 @@ class OrbitPath:
             -> FunctionRoot:
         time = start
         root = deepcopy(root)
-        prevTime = time.future(-1)
+        prevTime = time - 1
 
         while abs((check := self._checkTime(time)) - 1) > CHECK_EPSILON or abs(time - prevTime) > TIME_DIFFERENCE:
             root = self._computeSpecificRoot(time, enum)
@@ -1044,7 +1044,7 @@ class OrbitPath:
         # Forward is true to find the next pass, false to find the previous.
         # Rise is true to find the rise time, false to find the set time.
         time = startTime
-        prevTime = time.future(-1)
+        prevTime = time - 1
         firstPass = True
 
         while abs(time - prevTime) > TIME_DIFFERENCE * 10:
@@ -1068,7 +1068,7 @@ class OrbitPath:
             n = smaToMeanMotion(elements.sma, self._sat.body.mu)
             dt = dm / n
             prevTime = time
-            time = time.future(dt / 86400)
+            time = time + (dt / 86400)
 
         return time
 
@@ -1115,7 +1115,7 @@ class OrbitPath:
             alpha = velExclude.mag() / topoPosition.mag()
             dt = c / alpha
 
-            updatedTime = updatedTime.future(dt / 86400)
+            updatedTime = updatedTime + (dt / 86400)
             alt = getAltitude(self._sat, self._geo, updatedTime)
 
         return updatedTime
@@ -1256,7 +1256,7 @@ class OrbitPath:
                     currentRange = nextRange
                     nextRange = None
                 else:
-                    currentRange, nextRange = self._computeOrbitPassRange(currentRange[1].future(0.0001), True)
+                    currentRange, nextRange = self._computeOrbitPassRange(currentRange[1] + 0.0001, True)
                     if not currentRange:
                         raise NoPassException(f'{self._sat.name} orbit path is no longer visible over {self._geo}')
                 time = currentRange[0]
@@ -1278,7 +1278,7 @@ class OrbitPath:
                     currentRange = nextRange
                     nextRange = None
                 else:
-                    currentRange, nextRange = self._computeOrbitPassRange(currentRange[1].future(-1), False)
+                    currentRange, nextRange = self._computeOrbitPassRange(currentRange[1] - 1, False)
                     if not currentRange:
                         raise NoPassException(f'{self._sat.name} orbit path is no longer visible over {self._geo}')
                     time = currentRange[1]
@@ -1298,9 +1298,9 @@ class OrbitPath:
         # We can't check if time is a SatellitePass and import his class (recursive import)
         if hasattr(time, 'maxInfo'):
             if nextOccurrence is True:
-                time = time.setInfo.time.future(0.0001)
+                time = time.setInfo.time + 0.0001
             else:
-                time = time.riseInfo.time.future(-0.0001)
+                time = time.riseInfo.time - 0.0001
 
         topoState = self._sat.getTopocentricState(self._geo, time)
         orbitPassTimes = self.computeOrbitPassTimes(time)
