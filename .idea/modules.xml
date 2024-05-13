@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/sat-track.iml" filepath="$PROJECT_DIR$/.idea/sat-track.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/sattrack.iml" filepath="$PROJECT_DIR$/.idea/sattrack.iml" />
     </modules>
   </component>
 </project>
