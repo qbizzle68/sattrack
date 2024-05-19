@@ -22,15 +22,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `asTimezone(timezone)` - for creating a new `JulianDate` instance with the given
       timezone.
     - `strftime(formatString)` - also for string formatting.
+- Added the `EclipseFinder` class to better encapsulate the shadow position algorithm. This
+  class is now used by the `PassFinder` class to compute earth/satellite shadow positions.
 
 ### Changed
 
 - Refactored the `JulianDate` class to behave more like the builtin python `datetime` module. Now
   supports `datetime.timezone` instances to handle daylight/standard time ambiguities.
-
 - Made significant improvements within the `bodies` subpackage, explicitly the `position` and `sun`
   modules, that results in much more efficient computations by caching commonly computed values and
   using built-in methods where possible.
+- Enumerations from the `sattrack.satellitepass.eclipse` module are now global integers. Any scope
+  resolution is no longer needed, e.g. instead of `Shadow.UMBRA` just use `UMBRA`.
+- The `isEclipsed` method is now mostly a wrapper around an instantiation of an `EclipseFinder`
+  object. If a `NoSatelliteEclipseException` is raised by the `EclipseFinder` instance, False
+  is returned instead of propagating the exception.
+
+### Deprecated
+
+- All shadow finding functions from the `sattrack.satellitepass.eclipse` module are removed and
+  have their respective versions in the new `EclipseFinder` class.
+- The `future` method of the `JulianDate` class will be removed in a future version, and the
+  `__add__` and `__sub__` methods now accept numeric values to replace this functionality.
 
 ## [0.4.1] - 2024-01-23
 
