@@ -8,16 +8,15 @@ from sattrack.bodies.sun import Sun
 from sattrack.bodies.topocentric import toTopocentric
 from sattrack.core._analysis import AnalyticFunction, Boundary
 from sattrack.orbit.elements import smaToMeanMotion, eccentricToMeanAnomaly
-from sattrack.satellitepass.eclipse import getShadowTimes, Shadow
+from sattrack.satellitepass.eclipse import EclipseFinder, UMBRA
 from sattrack.orbit.exceptions import SatelliteAlwaysAbove, NoPassException, PassedOrbitPathRange
 from sattrack.satellitepass.exceptions import NoSatelliteEclipseException
-from sattrack.orbit.orbitpath import OrbitPath, computeEllipseVectors
+from sattrack.orbit.orbitpath import computeEllipseVectors
 from sattrack.config import TIME_DIFFERENCE, MAXIMUM_ANOMALY_DISCONTINUITY_GAP, MAXIMUM_ANOMALY_DIFFERENCE, \
     MAXIMUM_ANOMALY_STEP_SIZE, MAXIMUM_ANOMALY_CHUNK_DURATION, MAXIMUM_ANOMALY_REFINE_GAP
 from sattrack.satellitepass.info import PositionInfo, Visibility
-from sattrack.util.constants import SECONDS_PER_DAY, MINUTES_PER_DAY, TWOPI, EARTH_ANGULAR_MOMENTUM, \
-    EARTH_ANGULAR_VELOCITY
-from sattrack.util.helpers import atan3, signOf, computeAngleDifference
+from sattrack.util.constants import SECONDS_PER_DAY, TWOPI, EARTH_ANGULAR_MOMENTUM, EARTH_ANGULAR_VELOCITY
+from sattrack.util.helpers import atan3, computeAngleDifference
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -505,12 +504,13 @@ class SatellitePass:
 
 
 class PassFinder:
-    __slots__ = '_sat', '_geo', '_passController'
+    __slots__ = '_sat', '_geo', '_passController', '_eclipseFinder'
 
     def __init__(self, satellite: 'Orbitable', geo: 'GeoPosition'):
         self._sat = satellite
         self._geo = geo
         self._passController = PassTimeController(self._sat, self._geo)
+        self._eclipseFinder = EclipseFinder(self._sat)
 
     @property
     def orbitable(self) -> 'Orbitable':
@@ -543,7 +543,8 @@ class PassFinder:
         riseTime, setTime = self._passController.computeIntersectionTimes(maximumTime)
 
         try:
-            shadowEnterTime, shadowExitTime = getShadowTimes(self._sat, riseTime, Shadow.PENUMBRA)
+            # shadowEnterTime, shadowExitTime = getShadowTimes(self._sat, riseTime, Shadow.PENUMBRA)
+            shadowEnterTime, shadowExitTime = self._eclipseFinder.computeShadowTimes(riseTime, UMBRA)
         except NoSatelliteEclipseException:
             shadowEnterTime = setTime + 0.0001
             shadowExitTime = shadowEnterTime
@@ -609,331 +610,6 @@ class PassFinder:
         satellitePassList = [self._computeSatellitePass(time) for time in maximumTimeList]
 
         return satellitePassList
-
-
-class PassController:
-    __slots__ = '_sat', '_geo', '_path', '_finder'
-
-    def __init__(self, satellite: 'Orbitable', geo: 'GeoPosition'):
-        self._sat = satellite
-        self._geo = geo
-        self._path = OrbitPath(satellite, geo)
-        self._finder = PassFinder(satellite, geo)
-
-    @property
-    def orbitable(self):
-        return self._sat
-
-    @property
-    def geo(self):
-        return self._geo
-
-    @property
-    def path(self):
-        return self._path
-
-    def getNextPass(self, time: 'JulianDate', number: int = 1, maximumSearchPeriod: float = 14) -> SatellitePass:
-        if number > 0:
-            nextOccurrence = True
-        elif number < 0:
-            nextOccurrence = False
-        else:
-            raise ValueError(f'number must be a non-zero integer, not {number}')
-
-        return self._finder.computeNextPass(time, nextOccurrence, maximumSearchPeriod)
-
-    def getPassList(self, time: 'JulianDate', duration: float, UNUSED: float = 0) -> list[SatellitePass]:
-        if duration == 0:
-            raise ValueError(f'duration must be a non-zero number of days')
-
-        return self._finder.computePassList(time, duration)
-
-
-class PassControllerOld:
-    __slots__ = '_sat', '_geo', '_path', '_ACCURACY_BUFFER'
-
-    def __init__(self, sat: 'Orbitable', geo: 'GeoPosition'):
-        self._sat = sat
-        self._geo = geo
-        self._path = OrbitPath(sat, geo)
-        # this value can have issues for a pass that is much less than a
-        # minute, but we have to cut it off somewhere
-        self._ACCURACY_BUFFER = 10 / SECONDS_PER_DAY
-
-    @property
-    def orbitable(self) -> 'Orbitable':
-        return self._sat
-
-    @property
-    def geo(self) -> 'GeoPosition':
-        return self._geo
-
-    @property
-    def path(self) -> 'OrbitPath':
-        return self._path
-
-    def _computeMaximumAnomaly(self, time):
-        a, b, _ = computeEllipseVectors(self._sat, time)
-        zeta = self._geo.getZenithVector(time)
-        return atan3(dot(zeta, b), dot(zeta, a))
-
-    def _computeCurrentMaximumTime(self, time):
-
-        previousTime = time - 1
-        approxTime = time
-
-        # epsilon = 0.1 / SECONDS_PER_DAY
-        while abs(approxTime - previousTime) > TIME_DIFFERENCE:
-            maxParameter = self._computeMaximumAnomaly(approxTime)
-            previousTime = approxTime
-            approxTime = self._sat.timeToNearestAnomaly(maxParameter, approxTime, 'true')
-
-        return approxTime
-
-    def _computeNextMaximumTime(self, time: 'JulianDate', nextOccurrence: bool) -> 'JulianDate':
-        """time should be a maximum altitude time, otherwise this might not get the next
-        occurrence, but the current one again."""
-
-        maxParameter = self._computeMaximumAnomaly(time)
-        if nextOccurrence:
-            adjustedTime = time + self._ACCURACY_BUFFER
-            nextTime = self._sat.timeToNextAnomaly(maxParameter, adjustedTime, 'true')
-        else:
-            adjustedTime = time - self._ACCURACY_BUFFER
-            nextTime = self._sat.timeToPreviousAnomaly(maxParameter, adjustedTime, 'true')
-
-        nextMaxTime = self._computeCurrentMaximumTime(nextTime)
-        # This range is way too big. This may be called right before a pass occurs, so the nextMaxTime happens
-        # within this range, and 'looks' like an error, but is valid.
-        if abs(nextMaxTime - time) < (10 / MINUTES_PER_DAY):
-            return self._computeNextMaximumTime(nextTime, nextOccurrence)
-
-        return nextMaxTime
-
-    def _computeMaximumTimeExec(self, time: 'JulianDate', number: int, nextOccurrence: bool,
-                                maximumSearchPeriod: float) -> 'JulianDate':
-
-        lastPositiveAltitude = time
-        if self._sat.getAltitude(self._geo, time) > 0:
-            nextTime = self._computeCurrentMaximumTime(time)
-        elif number > 0:
-            nextTime = self._computeNextMaximumTime(time, True)
-        else:
-            nextTime = self._computeNextMaximumTime(time, False)
-
-        count = 0
-        if self._sat.getAltitude(self._geo, nextTime) > 0:
-            lastPositiveAltitude = nextTime
-            count = 1
-
-        while count < abs(number):
-            if abs(lastPositiveAltitude - nextTime) > maximumSearchPeriod:
-                raise TimeoutError(f'Timeout: No satellite pass found within {maximumSearchPeriod} days.')
-            nextTime = self._computeNextMaximumTime(nextTime, nextOccurrence)
-            if self._sat.getAltitude(self._geo, nextTime) > 0:
-                lastPositiveAltitude = nextTime
-                count += 1
-
-        return nextTime
-
-    def computeMaximumTime(self, time: 'JulianDate', number: int, maximumSearchPeriod: float = 30) -> 'JulianDate':
-        if number == 0:
-            raise ValueError(f'number must be a non-zero integer, not {number}')
-        directionSign = signOf(number)
-        nextOccurrence = bool(directionSign + 1)
-
-        return self._computeMaximumTimeExec(time, number, nextOccurrence, maximumSearchPeriod)
-
-    def _computeIntersectionAnomalyTerms(self, time: 'JulianDate') -> (float, float):
-        """Returns the offset term, then maximum term."""
-
-        a, b, c = computeEllipseVectors(self._sat, time)
-        zeta = self._geo.getZenithVector(time)
-        gamma = self._geo.getPositionVector(time)
-
-        zDotA = dot(zeta, a)
-        zDotB = dot(zeta, b)
-        numerator = dot(zeta, gamma - c)
-        denominator = sqrt(zDotA * zDotA + zDotB * zDotB)
-
-        try:
-            lhs = acos(numerator / denominator)
-        except ValueError as e:
-            if e.args[0] == 'math domain error':
-                raise PassedOrbitPathRange()
-            raise e
-
-        rhs = atan3(zDotB, zDotA)
-        return lhs, rhs
-
-    def _computeIntersectionTimeExec(self, maxTime: 'JulianDate', isRising: bool) -> 'JulianDate':
-
-        time = maxTime
-        prevTime = time - 1
-
-        # epsilon = 10 / SECONDS_PER_DAY
-        while abs(prevTime - time) > TIME_DIFFERENCE:
-            offsetTerm, maxTerm = self._computeIntersectionAnomalyTerms(time)
-            if isRising:
-                targetAnomaly = (maxTerm - offsetTerm) % TWOPI
-            else:
-                targetAnomaly = (maxTerm + offsetTerm) % TWOPI
-
-            prevTime = time
-            time = self._sat.timeToNearestAnomaly(targetAnomaly, time, 'true')
-
-        return time
-
-    def _refineIntersectionTime(self, time: 'JulianDate') -> 'JulianDate':
-        updatedTime = time
-        alt = self._sat.getAltitude(self._geo, updatedTime)
-        _, topocentricVelocity = self._sat.getTopocentricState(self._geo, updatedTime)
-        direction = -1 if topocentricVelocity[2] > 0 else 1
-
-        while abs(alt) > 4.848e-6:  # 1 arc-second
-            # todo: fix how we compute topocentric coordinates (publicly and privately)
-            position, velocity = self._sat.getState(updatedTime)
-
-            gamma = self._geo.getPositionVector(updatedTime)
-            relativePosition = position - gamma
-            topocentricPosition = toTopocentric(relativePosition, self._geo, updatedTime)
-
-            coriolis = cross(EARTH_ANGULAR_MOMENTUM, position)
-            relativeVelocity = velocity - coriolis
-            topocentricVelocity = toTopocentric(relativeVelocity, self._geo, updatedTime)
-
-            angularVelocityVector = cross(topocentricPosition, topocentricVelocity) / topocentricPosition.mag2()
-            dt = (alt / angularVelocityVector.mag()) / SECONDS_PER_DAY
-
-            updatedTime = updatedTime + (dt * direction)
-
-            alt = self._sat.getAltitude(self._geo, updatedTime)
-
-        return updatedTime
-
-    def computeIntersectionTimes(self, time: 'JulianDate', number: int, maximumSearchPeriod: float = 30)\
-            -> ('JulianDate', 'JulianDate'):
-        if number > 0:
-            maxTime = self._computeMaximumTimeExec(time, number, True, maximumSearchPeriod)
-        elif number < 0:
-            maxTime = self._computeMaximumTimeExec(time, number, False, maximumSearchPeriod)
-        else:
-            raise ValueError(f'number must be a non-zero integer, not {number}')
-
-        riseTime = self._computeIntersectionTimeExec(maxTime, True)
-        setTime = self._computeIntersectionTimeExec(maxTime, False)
-
-        refinedRiseTime = self._refineIntersectionTime(riseTime)
-        refinedSetTime = self._refineIntersectionTime(setTime)
-
-        return refinedRiseTime, refinedSetTime
-
-    def _getNextPassExec(self, maxTime: 'JulianDate') -> SatellitePass:
-        riseTime = self._computeIntersectionTimeExec(maxTime, True)
-        setTime = self._computeIntersectionTimeExec(maxTime, False)
-        riseTime = self._refineIntersectionTime(riseTime)
-        setTime = self._refineIntersectionTime(setTime)
-
-        try:
-            enterTime, exitTime = getShadowTimes(self._sat, riseTime, Shadow.PENUMBRA)
-        except NoSatelliteEclipseException:
-            enterTime = setTime + 0.0001
-            exitTime = enterTime
-        # fixme: need to consider latitudes where the sun doesn't rise or set
-        sunRiseTime, sunSetTime = Sun.computeRiseSetTimes(self._geo, riseTime)
-
-        topoState = self._sat.getTopocentricState(self._geo, riseTime)
-        riseInfo = PositionInfo(0.0, degrees(atan3(topoState[0][1], -topoState[0][0])), riseTime,
-                                riseTime < enterTime, riseTime < sunRiseTime or riseTime > sunSetTime)
-        topoState = self._sat.getTopocentricState(self._geo, setTime)
-        setInfo = PositionInfo(0.0, degrees(atan3(topoState[0][1], -topoState[0][0])), setTime,
-                               setTime < enterTime or setTime > exitTime,
-                               setTime < sunRiseTime or setTime > sunSetTime)
-
-        topoState = self._sat.getTopocentricState(self._geo, maxTime)
-        maxInfo = PositionInfo(degrees(asin(topoState[0][2] / topoState[0].mag())),
-                               degrees(atan3(topoState[0][1], -topoState[0][0])),
-                               riseTime + ((setTime - riseTime) / 2),
-                               maxTime < enterTime or maxTime > exitTime,
-                               maxTime < sunRiseTime or maxTime > sunSetTime)
-
-        firstIlluminatedInfo = lastIlluminatedInfo = firstUnobscuredInfo = lastUnobscuredInfo = None
-        if riseTime < exitTime < setTime:
-            topoState = self._sat.getTopocentricState(self._geo, exitTime)
-            firstIlluminatedInfo = PositionInfo(degrees(asin(topoState[0][2] / topoState[0].mag())),
-                                                degrees(atan3(topoState[0][1], -topoState[0][0])), exitTime, True,
-                                                exitTime < sunRiseTime or exitTime >= sunSetTime)
-        if riseTime < enterTime < setTime:
-            topoState = self._sat.getTopocentricState(self._geo, enterTime)
-            lastIlluminatedInfo = PositionInfo(degrees(asin(topoState[0][2] / topoState[0].mag())),
-                                               degrees(atan3(topoState[0][1], -topoState[0][0])), enterTime, True,
-                                               enterTime < sunRiseTime or enterTime >= sunSetTime)
-        if riseTime < sunSetTime < setTime:
-            topoState = self._sat.getTopocentricState(self._geo, sunSetTime)
-            firstUnobscuredInfo = PositionInfo(degrees(asin(topoState[0][2] / topoState[0].mag())),
-                                               degrees(atan3(topoState[0][1], -topoState[0][0])), sunSetTime,
-                                               sunSetTime < enterTime or sunSetTime >= exitTime, True)
-        if riseTime < sunRiseTime < setTime:
-            topoState = self._sat.getTopocentricState(self._geo, sunRiseTime)
-            lastUnobscuredInfo = PositionInfo(degrees(asin(topoState[0][2] / topoState[0].mag())),
-                                              degrees(atan3(topoState[0][1], -topoState[0][0])), sunRiseTime,
-                                              sunRiseTime < enterTime or sunRiseTime >= exitTime, True)
-
-        infos = [riseInfo, setInfo, maxInfo] + \
-                [info for info in [firstIlluminatedInfo, lastIlluminatedInfo,
-                                   firstUnobscuredInfo, lastUnobscuredInfo] if info is not None]
-
-        return SatellitePass(infos, self._sat.name)
-
-    def getNextPass(self, time: 'JulianDate', number: int = 1, maximumSearchPeriod: float = 30) -> SatellitePass:
-        if number > 0:
-            if isinstance(time, SatellitePass):
-                time = time.setInfo.time + 0.0001
-
-            findNext = True
-        elif number < 0:
-            if isinstance(time, SatellitePass):
-                time = time.riseInfo.time - 0.0001
-
-            findNext = False
-        else:
-            raise ValueError(f'number must be a non-zero integer, not {number}')
-
-        approxMaximumTime = self._computeMaximumTimeExec(time, number, findNext, maximumSearchPeriod)
-        return self._getNextPassExec(approxMaximumTime)
-
-    def getPassList(self, time: 'JulianDate', duration: float, maximumSearchPeriod: float = 30) -> list[SatellitePass]:
-        if duration > 0:
-            findNext = True
-            firstNumber = 1
-            nextNumber = 2
-        elif duration < 0:
-            findNext = False
-            firstNumber = -1
-            nextNumber = -2
-        else:
-            raise ValueError('duration must be a non-zero number of days')
-
-        nextMaximumTime = self._computeMaximumTimeExec(time, firstNumber, findNext, maximumSearchPeriod)
-
-        maximumTimeList = []
-        while abs(nextMaximumTime - time) < abs(duration):
-            maximumTimeList.append(nextMaximumTime)
-            try:
-                nextMaximumTime = self._computeMaximumTimeExec(nextMaximumTime, nextNumber, findNext,
-                                                               maximumSearchPeriod)
-            except (SatelliteAlwaysAbove, NoPassException, PassedOrbitPathRange):
-                break
-
-        passList = []
-        for passTime in maximumTimeList:
-            try:
-                nextPass = self._getNextPassExec(passTime)
-                passList.append(nextPass)
-            except (SatelliteAlwaysAbove, NoPassException, PassedOrbitPathRange):
-                break
-
-        return passList
 
 
 """

@@ -1,362 +1,433 @@
-from enum import Enum
-from math import atan2, cos, sin, pi, sqrt, acos, asin
+"""Ref[1] = SHADOW TIMES OF EARTH SATELLITES, Alessandro de Iaco Veris - Rivista Italiana di Compositi e
+Nanotecnologie – Volume 9, n°1 Giugno 2014
 
-from pyevspace import Vector, norm, vang, ZXZ, Angles, rotateEulerTo, cross, dot
+Ref[1] defines the algorithm used for computing the shadow times of earth satellites, incorporating the
+oblateness of the earth, correction for umbra/penumbra, and atmospheric refraction. These yield very
+accurate results; so much so that it is worth it to compute them and compare their positions to satellite
+anomalies to determine if the satellite is eclipsed, as opposed to basic geometry assuming round earth
+and avoiding specifics like umbra/penumbra and atmospheric refraction."""
+
+from math import atan2, cos, sin, pi, sqrt, acos, asin
+from typing import TYPE_CHECKING
+
+from pyevspace.core import norm, Angles, rotateEulerTo, ZXZ, cross, dot
 
 from sattrack.bodies.sun import Sun
-from sattrack.satellitepass.exceptions import NoSatelliteEclipseException, NoFunctionRootFound
-from sattrack.util.constants import TWOPI, EARTH_EQUITORIAL_RADIUS, SUN_RADIUS
+from sattrack.core.exceptions import SattrackException
+from sattrack.satellitepass.exceptions import NoFunctionRootFound, NoSatelliteEclipseException
+from sattrack.util.constants import TWOPI, SUN_RADIUS, EARTH_EQUITORIAL_RADIUS
+from sattrack.util.helpers import computeAngleDifference
 
-from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from sattrack.core.juliandate import JulianDate
     from sattrack.orbit.satellite import Orbitable
+    from pyevspace import Vector
+
+# Enumerations to distinguishing significant values in finding eclipse positions.
+UMBRA = 0x0
+PENUMBRA = 0x1
+ANNULAR = 0x2
+ENTER = 0x10
+EXIT = 0x11
 
 
-class Shadow(Enum):
-    UMBRA = 0
-    PENUMBRA = 1
-    ANNULAR = 2
+class EclipseFinder:
+    __slots__ = '_satellite', '_sVector', '_gamma', '_R', '_elements', '_zeta',
 
+    def __init__(self, satellite: 'Orbitable'):
+        self._satellite = satellite
+        self._R = 6371
+        self._elements = self._sVector = self._zeta = None
 
-class Eclipse(Enum):
-    ENTER = 0
-    EXIT = 1
+    def _computeSVector(self, sunPosition: 'Vector') -> 'Vector':
+        """Computes the vector s from Ref[1]."""
 
+        sVector = -norm(sunPosition)
+        elements = self._elements
+        angles = Angles(elements.raan, elements.inc, elements.aop)
 
-def __compute_s_vector(sunPosition: Vector, raan: float, inclination: float, aop: float) -> Vector:
-    S = -norm(sunPosition)
+        return rotateEulerTo(ZXZ, angles, sVector)
 
-    return rotateEulerTo(ZXZ, Angles(raan, inclination, aop), S)
+    @staticmethod
+    def _computeGamma(sVector: 'Vector') -> float:
+        """Computes the vector γ from Ref[1]."""
 
+        return atan2(sVector[1], -sVector[0])
 
-def __compute_gamma(sVector: Vector) -> float:
-    return atan2(sVector[1], -sVector[0])
+    def _zeroFunction(self, phi: float, shadow: int) -> float:
+        """The modified shadow zero function g(φ) for Escobal's method of finding shadow times
+        from Ref[1]. The shadow parameter must be UMBRA or PENUMBRA and is used to determine
+        the sign of certain terms."""
 
+        R = self._R
+        zeta = self._zeta
+        cosPhi = cos(phi)
+        cosZeta = cos(zeta)
+        ecc = self._elements.ecc
+        eTerm = 1 + ecc * cosPhi
+        aTerm = self._elements.sma * (1 - ecc * ecc)
+        sTerm = -self._sVector[0] * cosPhi - self._sVector[1] * sin(phi)
 
-def __escobal_method(R: float, sVector: Vector, phi: float, zeta: float, sma: float, ecc: float,
-                     shadow: Shadow) -> float:
-    # Escobal's re-defined shadow function from Ref[1]
-    cosPhi = cos(phi)
-    cosZeta = cos(zeta)
-    eTerm = 1 + ecc * cosPhi
-    aTerm = sma * (1 - ecc * ecc)
-    sTerm = -sVector[0] * cosPhi - sVector[1] * sin(phi)
+        term1 = R * R * eTerm * eTerm
+        term2 = aTerm * aTerm * sTerm * sTerm
+        term3 = aTerm * aTerm * cosZeta * cosZeta
+        term4 = 2 * aTerm * R * sTerm * eTerm * sin(zeta)
 
-    term1 = R * R * eTerm * eTerm
-    term2 = aTerm * aTerm * sTerm * sTerm
-    term3 = aTerm * aTerm * cosZeta * cosZeta
-    term4 = 2 * aTerm * R * sTerm * eTerm * sin(zeta)
+        # subtract term4 for penumbra
+        if shadow == PENUMBRA:
+            term4 = -term4
 
-    # subtract term4 for penumbra
-    if shadow is Shadow.PENUMBRA:
-        term4 *= -1
+        return term1 + term2 - term3 + term4
 
-    return term1 + term2 - term3 + term4
+    def _zeroFunctionDerivative(self, phi: float, shadow: int) -> float:
+        """The derivative of the modified shadow zero function g(φ) for Escobal's method of finding
+        shadow times in Ref[1]."""
 
+        ecc = self._elements.ecc
+        sVector = self._sVector
+        R = self._R
+        cosPhi = cos(phi)
+        sinPhi = sin(phi)
+        eTerm = 1 + ecc * cosPhi
+        aTerm = self._elements.sma * (1 - ecc * ecc)
+        sTerm = -sVector[0] * cosPhi - sVector[1] * sinPhi
+        eTermPrime = -ecc * sinPhi
+        sTermPrime = sVector[0] * sinPhi - sVector[1] * cosPhi
 
-def __escobal_method_derivative(R: float, sVector: Vector, phi: float, zeta: float, sma: float, ecc: float,
-                                shadow: Shadow) -> float:
-    # derivative of Escobal's re-defined shadow function from Ref[1]
-    cosPhi = cos(phi)
-    sinPhi = sin(phi)
-    eTerm = 1 + ecc * cosPhi
-    aTerm = sma * (1 - ecc * ecc)
-    sTerm = -sVector[0] * cosPhi - sVector[1] * sinPhi
-    eTermPrime = -ecc * sinPhi
-    sTermPrime = sVector[0] * sinPhi - sVector[1] * cosPhi
+        term1 = 2 * R * R * eTerm * eTermPrime
+        term2 = 2 * aTerm * aTerm * sTerm * sTermPrime
+        term4 = 2 * R * aTerm * sin(self._zeta) * (sTerm * eTermPrime + sTermPrime * eTerm)
 
-    term1 = 2 * R * R * eTerm * eTermPrime
-    term2 = 2 * aTerm * aTerm * sTerm * sTermPrime
-    term4 = 2 * R * aTerm * sin(zeta) * (sTerm * eTermPrime + sTermPrime * eTerm)
+        if shadow == PENUMBRA:
+            term4 *= -1
 
-    if shadow is Shadow.PENUMBRA:
-        term4 *= -1
+        return term1 + term2 + term4
 
-    return term1 + term2 + term4
+    def _computeZeroNewton(self, guess: float, shadow: int, epsilon: float = 1e-5) -> float:
+        """Find the zeros of the zero function g(φ) using Newton-Raphson method."""
 
+        phi = guess
+        gi = self._zeroFunction(phi, shadow)
 
-# todo: a satellite can have 0, 2, or 4 solutions, need to find solution to this issue
-#   idea: test if guessing 8 always hits the unique solutions
-#   later if there is only 2 solutions and they don't checkout they're invalid
-def __find_zero_newton(R: float, sVector: Vector, guess: float, zeta: float, sma: float, ecc: float, shadow: Shadow,
-                       epsilon: float = 1e-5) -> float:
-    phi = guess
-    gi = __escobal_method(R, sVector, phi, zeta, sma, ecc, shadow)
-    while abs(gi) > epsilon:
-        phi = phi - (gi / __escobal_method_derivative(R, sVector, phi, zeta, sma, ecc, shadow))
-        gi = __escobal_method(R, sVector, phi, zeta, sma, ecc, shadow)
-    return phi % TWOPI
+        while abs(gi) > epsilon:
+            giPrime = self._zeroFunctionDerivative(phi, shadow)
+            phi = phi - (gi / giPrime)
+            gi = self._zeroFunction(phi, shadow)
 
+        return phi % TWOPI
 
-def __find_fast_zero(R: float, sVector: Vector, gamma: float, zeta: float, sma: float, ecc: float, shadow: Shadow,
-                     enterOrExit: Eclipse, epsilon: float = 1e-5):
-    if enterOrExit is Eclipse.ENTER:
-        return __find_zero_newton(R, sVector, 3*pi/4 - gamma, zeta, sma, ecc, shadow, epsilon)
-    elif enterOrExit is Eclipse.EXIT:
-        return __find_zero_newton(R, sVector, 5*pi/4 - gamma, zeta, sma, ecc, shadow, epsilon)
-    else:
-        raise ValueError('enterOrExit parameter value must be ENTER or EXIT')
+    def _computeZeroFast(self, shadow: int, direction: int, epsilon: float = 1e-5) -> float:
+        """Compute the zero of the function g(φ) using Newton-Raphson method with initial guess being
+        (3 * pi / 4 - gamma) if direction is ENTER, and (5 * pi / 4 - gamma) if direction is EXIT. ValueError is
+        raised if direction is any other value."""
 
+        if direction is ENTER:
+            guess = 3 * pi / 4 - self._gamma
+        elif direction is EXIT:
+            guess = 5 * pi / 4 - self._gamma
+        else:
+            raise ValueError('direction parameter value must be ENTER or EXIT')
 
-def __find_certain_zeros(R: float, sVector: Vector, zeta: float, sma: float, ecc: float, shadow: Shadow,
-                         epsilon: float = 1e-5) -> float:
-    zeros = []
-    frac = 0.5
-    while len(zeros) < 4:
-        guesses = [i * pi * frac for i in range(int(2 / frac))]
-        computed = [__find_zero_newton(R, sVector, guess, zeta, sma, ecc, shadow, epsilon) for guess in guesses]
-        # round to the place of an epsilon value to compare for duplicate floating values
-        rounded = {round(c * 1e5) / 1e5 for c in computed}
-        zeros.clear()
-        for phi in computed:
-            roundedPhi = round(phi * 1e5) / 1e5
-            if roundedPhi in rounded:
-                zeros.append(phi)
-                rounded.remove(roundedPhi)
-        frac /= 2
-    return zeros
+        return self._computeZeroNewton(guess, shadow, epsilon)
 
+    @staticmethod
+    def checkZero(phi: float, sVector: 'Vector') -> bool:
+        """Check the root (zero) phi is on the shadow side of the Earth."""
+        return (sVector[0] * cos(phi) + sVector[1] * sin(phi)) > 0
 
-def __check_zero(phi: float, sVector: Vector):
-    return (sVector[0] * cos(phi) + sVector[1] * sin(phi)) > 0
+    @staticmethod
+    def checkAnomalyRange(psi: float, direction: int) -> bool:
+        """Check if a given anomaly corresponds to the correct direction. This is used to ensure a root
+        anomaly is indeed the entrance or exit anomaly as believed, and should catch any errors where the
+        root finding algorithm converges on an unintended root."""
 
+        return (direction == ENTER and pi / 2 <= psi < pi) or (direction == EXIT and pi <= psi <= 3 * pi / 2)
 
-def __check_range(psi: float, enterOrExit: Eclipse) -> bool:
-    cmp1 = (enterOrExit is Eclipse.ENTER and pi / 2 <= psi <= pi)
-    cmp2 = (enterOrExit is Eclipse.EXIT and pi <= psi <= 3 * pi / 2)
-    return cmp1 or cmp2
+    def _computeAllZeros(self, shadow: int, epsilon: float = 1e-5, iterationLimit: int = 4) -> list[float]:
+        """Attempts to compute all possible roots to the zero function g(φ) by continually doubling the
+        number of initial evenly spaced guesses. To avoid infinite loops on cases when shadow intersections
+        do not exist, only iterationLimit number of iterations are run before a SattrackException is raised.
+        Any zeros returned have already been validated by the _checkZero() method."""
+        # It is possible that a single root is found, but not its pair if they are very close together but rounding
+        # makes them look the same, and the pair is not added to the 'rounded' set. Decreasing the epsilon
+        # value should help this.
 
+        iterationCount = 1
+        fraction = 0.5
+        while True:
+            guesses = [i * pi * fraction for i in range(int(2 / fraction))]
+            values = [self._computeZeroNewton(guess, shadow, epsilon) for guess in guesses]
+            # round to the place of an epsilon value to compare for duplicate floating values ignoring rounding errors
+            invertedEpsilon = 1 / epsilon
+            rounded = {round(value * invertedEpsilon) / invertedEpsilon for value in values}
+            zeros = []
+            for phi in values:
+                roundedPhi = round(phi * invertedEpsilon) / invertedEpsilon
+                if roundedPhi in rounded:
+                    zeros.append(phi)
+                    rounded.remove(roundedPhi)
 
-def _get_zero(R: float, sVector: float, zeta: float, sma: float, ecc: float, shadow: Shadow, enterOrExit: Eclipse, *,
-              guess: float = None, epsilon: float = 1e-5) -> float:
-    # if guess is set use it first, then try __find_fast_zero, then use __find_certain_zeros
-    gamma = __compute_gamma(sVector)
-    if guess is not None:
-        phi = __find_zero_newton(R, sVector, guess, zeta, sma, ecc, shadow)
-        if __check_zero(phi, sVector):
+            validZeros = [phi for phi in zeros if self.checkZero(phi, self._sVector)]
+            if len(validZeros) == 2:
+                return validZeros
+            elif iterationCount >= iterationLimit:
+                raise SattrackException('satellite eclipse limit exceeded')
+
+            fraction /= 2
+            iterationCount += 1
+
+    def _computeShadowRoot(self, shadow: int, direction: int, guess: float = None, *, epsilon: float = 1e-5,
+                           iterationLimit: int = 4) -> float:
+        """Contains the logic for computing a shadow root from the zero function. The parameters
+        shadow and direction determine which root is considered valid. If guess is provided, it
+        is used as the initial guess to _computeZeroNewton. If that value does not converge correctly,
+        _computeZeroFast is used to compute the most efficient starting guess. If this also fails,
+        _computeAllZeros is used as a brute force method of finding all zeros, and then discerning
+        the correct root needed. The parameter iterationLimit is used in the brute force method, and
+        if more than n iterations are needed a NoFunctionRootFound exception is raised."""
+
+        # Initially either use the guess passed in, or use gamma as the initial guess.
+        sVector = self._sVector
+        gamma = self._gamma = self._computeGamma(sVector)
+        if guess is not None:
+            phi = self._computeZeroNewton(guess, shadow, epsilon=epsilon)
+            if self.checkZero(phi, sVector):
+                psi = (gamma + phi) % TWOPI
+                if self.checkAnomalyRange(psi, direction):
+                    return phi
+        # If the root found wasn't correct, use _computeZeroFast to make effective guesses for us.
+        phi = self._computeZeroFast(shadow, direction, epsilon)
+        if self.checkZero(phi, sVector):
             psi = (gamma + phi) % TWOPI
-            if __check_range(psi, enterOrExit):
-                return phi
-    phi = __find_fast_zero(R, sVector, gamma, zeta, sma, ecc, shadow, enterOrExit, epsilon)
-    if __check_zero(phi, sVector):
-        psi = (gamma + phi) % TWOPI
-        if __check_range(psi, enterOrExit):
-            return phi
-    zeros = __find_certain_zeros(R, sVector, zeta, sma, ecc, shadow, epsilon)
-    for phi in zeros:
-        if __check_zero(phi, sVector):
-            psi = (gamma + phi) % TWOPI
-            if __check_range(psi, enterOrExit):
+            if self.checkAnomalyRange(psi, direction):
                 return phi
 
-    raise NoFunctionRootFound('unable to find a valid zero')
+        # Finally, fall back on brute force attack.
+        try:
+            zeros = self._computeAllZeros(shadow, epsilon, iterationLimit)
+        except SattrackException as e:
+            if e.args[0].startswith('satellite eclipse limit exceeded'):
+                raise NoFunctionRootFound('unable to find a valid zero') from None
+            raise e
+        else:
+            for phi in zeros:
+                psi = (gamma + phi) % TWOPI
+                if self.checkAnomalyRange(psi, direction):
+                    return phi
 
+        raise NoFunctionRootFound('unable to find a valid zero')
 
-def __get_radius_z_comp(sVector: Vector, sma: float, ecc: float, inc: float, aop: float, phi: float) -> float:
-    cosPhi = cos(phi)
-    sinPhi = sin(phi)
-    sinInc = sin(inc)
-    term1 = (sma * (1 - ecc * ecc)) / (1 + ecc * cosPhi)
-    term2 = sin(aop) * sinInc * cosPhi
-    term3 = cos(aop) * sinInc * sinPhi
-    term4 = sVector[2] * (sVector[0] * cosPhi + sVector[1] * sinPhi)
-    return term1 * (term2 + term3 - term4)
+    def _computeApertureAngle(self, rs: float, shadow: int) -> float:
+        """Compute the aperture angle ξ from Ref[1] in correcting for umbra-penumbra. The shadow
+        parameter must be UMBRA or PENUMBRA."""
 
+        if shadow == UMBRA:
+            cosZeta = sqrt(rs * rs - (SUN_RADIUS - self._R) ** 2) / rs
+        elif shadow == PENUMBRA:
+            cosZeta = sqrt(rs * rs - (SUN_RADIUS + self._R) ** 2) / rs
+        else:
+            raise ValueError('Shadow parameter must be either UMBRA or PENUMBRA')
 
-def __get_latitude_term(Rz: float) -> float:
-    ae = EARTH_EQUITORIAL_RADIUS
-    fTerm = -0.006694317778266723
-    aeTerm = ae * ae * (1 + fTerm)
-    return (aeTerm - Rz * Rz) / (aeTerm + (Rz * Rz * fTerm))
+        return acos(cosZeta)
 
+    @staticmethod
+    def _computeRefractionAngle(altitudeAngle: float) -> float:
+        """Compute the refraction angle Δξ from Ref[1] to adjust the aperture angle."""
 
-def __get_radius_from_latitude(latitudeTerm: float) -> float:
-    ae = EARTH_EQUITORIAL_RADIUS
-    fTerm = 0.006694317778266723
-    return (ae * sqrt(1 - fTerm)) / sqrt(1 - fTerm * latitudeTerm)
+        numerator = 0.009928887226387075 + altitudeAngle * (0.06995 + altitudeAngle * 0.004087098938599872)
+        denominator = 1 + altitudeAngle * (28.934368654106574 + altitudeAngle * 277.39713657599236)
+        return numerator / denominator
 
+    def _computeCorrectedRefractionAngle(self, rs: float, shadow: int) -> float:
+        """Compute the aperture angle, corrected for atmospheric refraction from Ref[1].
+        The shadow parameter must be UMBRA or PENUMBRA."""
 
-def __get_aperture_angle(rs: float, Re: float, shadow: Shadow) -> float:
-    if shadow is Shadow.UMBRA:
-        cosZeta = sqrt(rs * rs - (SUN_RADIUS - Re) ** 2) / rs
-    elif shadow is Shadow.PENUMBRA:
-        cosZeta = sqrt(rs * rs - (SUN_RADIUS + Re) ** 2) / rs
-    else:
-        raise ValueError('shadow parameter must be either UMBRA or PENUMBRA')
-    return acos(cosZeta)
+        semiApertureAngle = self._computeApertureAngle(rs, shadow)
+        refractionAngle = self._computeRefractionAngle(semiApertureAngle)
+        if shadow == UMBRA:
+            correctedAngle = semiApertureAngle + refractionAngle
+        elif shadow == PENUMBRA:
+            correctedAngle = refractionAngle - semiApertureAngle
+        else:
+            raise ValueError('shadow parameter must be either UMBRA or PENUMBRA')
 
+        return correctedAngle
 
-def __get_refraction_angle(altitudeAngle: float) -> float:
-    numerator = 0.009928887226387075 + altitudeAngle * (0.06995 + altitudeAngle * 0.004087098938599872)
-    denominator = 1 + altitudeAngle * (28.934368654106574 + altitudeAngle * 277.39713657599236)
-    return numerator / denominator
+    def _computeApproximateAnomalies(self, time: 'JulianDate', shadow: int) -> (float, float):
+        """Compute the first iteration of finding the shadow anomalies. These anomalies
+        still need refining of the perspective Earth radius, but give us a close approximation
+        to determine how to compute the times to each anomaly (forward or backwards). The shadow
+        parameter must be UMBRA or PENUMBRA."""
 
-
-def __get_corrected_refraction_angle(rs: float, Re: float, shadow: Shadow) -> float:
-    semiApertureAngle = __get_aperture_angle(rs, Re, shadow)
-    refractionAngle = __get_refraction_angle(semiApertureAngle)
-    if shadow is Shadow.UMBRA:
-        correctedAngle = semiApertureAngle + refractionAngle
-    elif shadow is Shadow.PENUMBRA:
-        correctedAngle = refractionAngle - semiApertureAngle
-    else:
-        raise ValueError('shadow parameter must be either UMBRA or PENUMBRA')
-    return correctedAngle
-
-
-def _get_shadow_positions(jd: 'JulianDate', sat: 'Orbitable', shadow: Shadow, zeroEpsilon: float = 1e-5,
-                          radiusEpsilon: float = 1e-5) -> ((float, 'JulianDate'), (float, 'JulianDate')):
-    Re = 6371  # start with average radius of the earth
-    time = jd
-    sunPosition = Sun.computePosition(time)
-    elements = sat.getElements(time)
-    sVector = __compute_s_vector(sunPosition, elements.raan, elements.inc, elements.aop)
-    apertureAngle = __get_corrected_refraction_angle(sunPosition.mag(), Re, shadow)
-
-    # phi0 = sat.anomalyAt(jd, Orbitable.TRUE)
-    phi0 = sat.anomalyAtTime(jd, 'true')
-    approxPhi1 = _get_zero(Re, sVector, apertureAngle, elements.sma,
-                           elements.ecc, shadow, Eclipse.ENTER, epsilon=zeroEpsilon)
-    approxPhi2 = _get_zero(Re, sVector, apertureAngle, elements.sma, elements.ecc,
-                           shadow, Eclipse.EXIT, epsilon=zeroEpsilon)
-
-    # maximum difference between the rages of Re seems to be about 0.015, so take a very conservative value of 0.1 rad
-    errorBuffer = 0.1
-    # we're close enough to the exit anomaly that we don't know if the approximated anomaly is before or after it
-    if (abs(phi0 - approxPhi2) < errorBuffer) or (abs(phi0 + TWOPI - approxPhi2) < errorBuffer) \
-            or (abs(approxPhi2 + TWOPI - phi0) < errorBuffer):
-        # dt = (jd - sat.timeToAnomaly(approxPhi1, jd, Orbitable.PREVIOUS, Orbitable.TRUE))
-        dt = (jd - sat.timeToPreviousAnomaly(approxPhi1, jd, 'true'))
-        referenceTime = jd - dt
-    else:
-        # phi2Time = sat.timeToAnomaly(approxPhi2, jd, Orbitable.NEXT, Orbitable.TRUE)
-        # phi1Time = sat.timeToAnomaly(approxPhi1, phi2Time, Orbitable.PREVIOUS, Orbitable.TRUE)
-        phi2Time = sat.timeToNextAnomaly(approxPhi2, jd, 'true')
-        phi1Time = sat.timeToPreviousAnomaly(approxPhi1, phi2Time, 'true')
-        dt = (phi2Time - phi1Time) / 2
-        referenceTime = phi1Time + dt
-
-    enterPhi, enterTime = __compute_anomaly_loop(jd, referenceTime, sat, shadow,
-                                                 Eclipse.ENTER, zeroEpsilon, radiusEpsilon)
-    exitPhi, exitTime = __compute_anomaly_loop(jd, referenceTime, sat, shadow, Eclipse.EXIT, zeroEpsilon, radiusEpsilon)
-
-    # if our approxPhi2 ended up being
-    if enterTime < exitTime < jd:
-        gamma = __compute_gamma(sVector)
-        updatedJd = sat.timeToNextAnomaly(gamma, jd, 'true')
-        return _get_shadow_positions(updatedJd, sat, shadow, zeroEpsilon)
-
-    return (enterPhi, enterTime), (exitPhi, exitTime)
-
-
-def __compute_anomaly_loop(startTime: 'JulianDate', referenceTime: 'JulianDate', sat: 'Orbitable', shadow: Shadow,
-                           enterOrExit: Eclipse, zeroEpsilon: float = 1e-5,
-                           radiusEpsilon: float = 1e-5) -> (float, 'JulianDate'):
-    Re = 6371
-    time = startTime
-    sunPosition = Sun.computePosition(time)
-    elements = sat.getElements(time)
-    sVector = __compute_s_vector(sunPosition, elements.raan, elements.inc, elements.aop)
-
-    # imitating a do-while structure here
-    while True:
-        apertureAngle = __get_corrected_refraction_angle(sunPosition.mag(), Re, shadow)
-        phi = _get_zero(Re, sVector, apertureAngle, elements.sma, elements.ecc, shadow, enterOrExit,
-                        epsilon=zeroEpsilon)
-        if enterOrExit is Eclipse.ENTER:
-            # time = sat.timeToAnomaly(phi, referenceTime, Orbitable.PREVIOUS, Orbitable.TRUE)
-            time = sat.timeToPreviousAnomaly(phi, referenceTime, 'true')
-        elif enterOrExit is Eclipse.EXIT:
-            # time = sat.timeToAnomaly(phi, referenceTime, Orbitable.NEXT, Orbitable.TRUE)
-            time = sat.timeToNextAnomaly(phi, referenceTime, 'true')
-        elements = sat.getElements(time)
+        self._R = 6371
         sunPosition = Sun.computePosition(time)
-        sVector = __compute_s_vector(sunPosition, elements.raan, elements.inc, elements.aop)
-        previousRe = Re
-        Re = _get_perspective_radius(sVector, elements.sma, elements.ecc, elements.inc, elements.aop, phi)
-        if abs(Re - previousRe) > radiusEpsilon:
-            break
+        self._elements = self._satellite.getElements(time)
+        self._sVector = self._computeSVector(sunPosition)
+        self._zeta = self._computeCorrectedRefractionAngle(sunPosition.mag(), shadow)
 
-    return phi, time
+        approxPhi1 = self._computeShadowRoot(shadow, ENTER)
+        approxPhi2 = self._computeShadowRoot(shadow, EXIT)
+
+        return approxPhi1, approxPhi2
+
+    def _computePerspectiveRadius(self, phi: float) -> float:
+        """Execute an iteration of computing the perspective Earth radius of Escobal's method
+        found in Ref[1]."""
+
+        # Compute Z-component of radius
+        cosPhi = cos(phi)
+        sinPhi = sin(phi)
+        sinInc = sin(self._elements.inc)
+        sVector = self._sVector
+        ecc = self._elements.ecc
+        aop = self._elements.aop
+        term1 = (self._elements.sma * (1 - ecc * ecc)) / (1 + ecc * cosPhi)
+        term2 = sin(aop) * sinInc * cosPhi
+        term3 = cos(aop) * sinInc * sinPhi
+        term4 = sVector[2] * (sVector[0] * cosPhi + sVector[1] * sinPhi)
+        Rz = term1 * (term2 + term3 - term4)
+
+        # Compute latitude term
+        ae = EARTH_EQUITORIAL_RADIUS
+        fTerm = 0.006694317778266723
+        aeTerm = ae * ae * (1 - fTerm)
+        rzSquared = Rz * Rz
+        latitudeTerm = (aeTerm - rzSquared) / (aeTerm - (rzSquared * fTerm))
+
+        # Radius from latitude
+        return (ae * sqrt(1 - fTerm)) / sqrt(1 - fTerm * latitudeTerm)
+
+    def _computeAnomalyLoop(self, time: 'JulianDate', shadow: int, direction: int, *,
+                            zeroEpsilon: float = 1e-5, radiusEpsilon: float = 1e-5) -> (float, 'JulianDate'):
+        """Run the loop of iterating the algorithm until the radius value stops changing significantly.
+        The shadow parameter must be UMBRA or PENUMBRA, and the direction parameter must be ENTER or EXIT."""
+
+        self._R = 6371
+        sunPosition = Sun.computePosition(time)
+        self._elements = self._satellite.getElements(time)
+        self._sVector = self._computeSVector(sunPosition)
+
+        while True:
+            self._zeta = self._computeCorrectedRefractionAngle(sunPosition.mag(), shadow)
+            phi = self._computeShadowRoot(shadow, direction, epsilon=zeroEpsilon)
+            time = self._satellite.timeToNearestAnomaly(phi, time, 'true')
+            self._elements = self._satellite.getElements(time)
+            sunPosition = Sun.computePosition(time)
+            self._sVector = self._computeSVector(sunPosition)
+            previousRe = self._R
+            self._R = self._computePerspectiveRadius(phi)
+            if abs(self._R - previousRe) < radiusEpsilon:
+                break
+
+        return phi, time
+
+    def _eclipseIsValid(self, time: 'JulianDate'):
+        state = self._satellite.getState(time)
+        angularMomentum = cross(*state)
+        uz = norm(angularMomentum)
+        sunPosition = Sun.computePosition(time)
+        s = norm(sunPosition)
+        tmp = acos(dot(uz, s))
+        if tmp > pi / 2:
+            tmp = pi - tmp
+        delta = pi / 2 - tmp
+
+        elements = self._elements = self._satellite.getElements(time)
+        sVector = self._computeSVector(sunPosition)
+        gamma = self._computeGamma(sVector)
+        ecc = elements.ecc
+        numerator = EARTH_EQUITORIAL_RADIUS * (1 + ecc * cos(pi - gamma))
+        denominator = elements.sma * (1 - ecc * ecc)
+        deltaPrime = asin(numerator / denominator)
+
+        return delta < deltaPrime
+
+    def computeShadowPositions(self, time: 'JulianDate', shadow: int, *, zeroEpsilon: float = 1e-5,
+                               radiusEpsilon: float = 1e-5) -> ((float, 'JulianDate'), (float, 'JulianDate')):
+        """Compute the anomaly and time of the entrance and exit positions of the satellite. If the satellite
+        is eclipsed at time, the previous occurrence of the entrance time and the next occurrence of the exit
+        time is found. Otherwise, the next occurrence of each instant is found. Shadow must be UMBRA or PENUMBRA."""
+
+        if not self._eclipseIsValid(time):
+            raise NoSatelliteEclipseException(f'{self._satellite.name} is not eclipsed by Earth\'s shadow')
+
+        phi0 = self._satellite.anomalyAtTime(time, 'true')
+        try:
+            approxPhi1, approxPhi2 = self._computeApproximateAnomalies(time, shadow)
+        except NoFunctionRootFound:
+            raise NoSatelliteEclipseException(f'{self._satellite.name} is not eclipsed by Earth\'s shadow') from None
+
+        deltaAnomaly1 = computeAngleDifference(approxPhi1 - phi0)
+        deltaAnomaly2 = computeAngleDifference(approxPhi2 - phi0)
+        if deltaAnomaly1 < 0:
+            if deltaAnomaly2 < 0:
+                enterTime = self._satellite.timeToNextAnomaly(approxPhi1, time, 'true')
+                exitTime = self._satellite.timeToNextAnomaly(approxPhi2, time, 'true')
+            elif deltaAnomaly2 > 0:
+                enterTime = self._satellite.timeToPreviousAnomaly(approxPhi1, time, 'true')
+                exitTime = self._satellite.timeToNextAnomaly(approxPhi2, time, 'true')
+            else:  # deltaAnomaly2 == 0
+                enterTime = self._satellite.timeToPreviousAnomaly(approxPhi1, time, 'true')
+                exitTime = time
+        elif deltaAnomaly1 > 0:
+            enterTime = self._satellite.timeToNextAnomaly(approxPhi1, time, 'true')
+            exitTime = self._satellite.timeToNextAnomaly(approxPhi2, time, 'true')
+        else:
+            enterTime = time
+            exitTime = self._satellite.timeToNextAnomaly(approxPhi2, time, 'true')
+
+        try:
+            enterPhi, enterTime = self._computeAnomalyLoop(enterTime, shadow, ENTER, zeroEpsilon=zeroEpsilon,
+                                                           radiusEpsilon=radiusEpsilon)
+            exitPhi, exitTime = self._computeAnomalyLoop(exitTime, shadow, EXIT, zeroEpsilon=zeroEpsilon,
+                                                         radiusEpsilon=radiusEpsilon)
+        except NoFunctionRootFound:
+            raise NoSatelliteEclipseException(f'{self._satellite.name} is not eclipsed by Earth\'s shadow') from None
+
+        # Shadow times should not be before the calling time
+        if enterTime < exitTime < time:
+            gamma = self._computeGamma(self._sVector)
+            updatedTime = self._satellite.timeToNextAnomaly(gamma, time, 'true')
+            return self.computeShadowPositions(updatedTime, shadow, zeroEpsilon=zeroEpsilon,
+                                               radiusEpsilon=radiusEpsilon)
+
+        return (enterPhi, enterTime), (exitPhi, exitTime)
+
+    def computeShadowAnomalies(self, time: 'JulianDate', shadow: int, *, zeroEpsilon: float = 1e-5,
+                               radiusEpsilon: float = 1e-5) -> (float, float):
+        """Convenience function to only return the anomaly values of the eclipse positions. This is just a
+        simple wrapper around computeShadowPositions(). The shadow parameter must be UMBRA or PENUMBRA,
+        and a NoSatelliteEclipseException is raised if the satellite is not eclipsed by Earth's shadow."""
+
+        (enterPhi, _), (exitPhi, _) = self.computeShadowPositions(time, shadow, zeroEpsilon=zeroEpsilon,
+                                                                  radiusEpsilon=radiusEpsilon)
+
+        return enterPhi, exitPhi
+
+    def computeShadowTimes(self, time: 'JulianDate', shadow: int, *, zeroEpsilon: float = 1e-5,
+                           radiusEpsilon: float = 1e-5) -> ('JulianDate', 'JulianDate'):
+        """Convenience function to only return the anomaly times of the eclipse positions. This is just a
+        simple wrapper around computeShadowPositions(). The shadow parameter must be UMBRA or PENUMBRA,
+        and a NoSatelliteEclipseException is raised if the satellite is not eclipsed by Earth's shadow."""
+
+        (_, enterTime), (_, exitTime) = self.computeShadowPositions(time, shadow, zeroEpsilon=zeroEpsilon,
+                                                                    radiusEpsilon=radiusEpsilon)
+
+        return enterTime, exitTime
 
 
-def _get_perspective_radius(sVector: Vector, sma: float, ecc: float, inc: float, aop: float, phi: float) -> float:
-    Rz = __get_radius_z_comp(sVector, sma, ecc, inc, aop, phi)
-    latitudeTerm = __get_latitude_term(Rz)
-    return __get_radius_from_latitude(latitudeTerm)
+def isEclipsed(satellite: 'Orbitable', time: 'JulianDate', shadow: int = UMBRA, *, zeroEpsilon: float = 1e-5,
+               radiusEpsilon: float = 1e-5) -> bool:
+    """Returns if the satellite is eclipsed by Earth's shadow at time. If a NoSatelliteEclipseException
+    would ordinarily be raised, False is returned instead of propagating the exception. The shadow
+    parameter must be UMBRA or PENUMBRA."""
 
+    finder = EclipseFinder(satellite)
 
-def getShadowPositions(satellite: 'Orbitable', time: 'JulianDate',
-                       shadowType: Shadow) -> ((float, 'JulianDate'), (float, 'JulianDate')):
-    if checkEclipse(satellite, time) is False:
-        raise NoSatelliteEclipseException(f"{satellite.name} is not eclipsed by Earth's shadow")
-    return _get_shadow_positions(time, satellite, shadowType)
+    try:
+        enterTime, exitTime = finder.computeShadowTimes(time, shadow, zeroEpsilon=zeroEpsilon,
+                                                        radiusEpsilon=radiusEpsilon)
+    except NoSatelliteEclipseException:
+        return False
 
-
-def getShadowAnomalies(satellite: 'Orbitable', time: 'JulianDate', shadowType: Shadow) -> (float, float):
-    if checkEclipse(satellite, time) is False:
-        raise NoSatelliteEclipseException(f"{satellite.name} is not eclipsed by Earth's shadow")
-    (enterPhi, enterTime), (exitPhi, exitTime) = _get_shadow_positions(time, satellite, shadowType)
-    return enterPhi, exitPhi
-
-
-def getShadowTimes(satellite: 'Orbitable', time: 'JulianDate', shadowType: Shadow) -> ('JulianDate', 'JulianDate'):
-    if checkEclipse(satellite, time) is False:
-        raise NoSatelliteEclipseException(f"{satellite.name} is not eclipsed by Earth's shadow")
-    (enterPhi, enterTime), (exitPhi, exitTime) = _get_shadow_positions(time, satellite, shadowType)
-    return enterTime, exitTime
-
-
-def isEclipsed(satellite: 'Orbitable', time: 'JulianDate', shadowType: Shadow = Shadow.PENUMBRA) -> bool:
-
-    satPosition = satellite.getState(time)[0]
-    sunPosition = Sun.computePosition(time)
-    # convert vectors to relative to the satellite
-    earthPosition = -satPosition
-    relativeSunPosition = -satPosition + sunPosition
-
-    # get the perspective radius of the earth towards the sun
-    # elements = Elements.fromTle(satellite.getTle(), time)
-    elements = satellite.getElements(time)
-    sVector = __compute_s_vector(sunPosition, elements.raan, elements.inc, elements.aop)
-    # phi = elements.trueAnomalyAt(time)
-    # phi = satellite.anomalyAt(time, Orbitable.TRUE)
-    phi = satellite.anomalyAtTime(time, 'true')
-    earthRadius = _get_perspective_radius(sVector, elements.sma, elements.ecc, elements.inc, elements.aop, phi)
-
-    # semi-diameters of sun and earth relative to the satellite
-    thetaE = asin(earthRadius / earthPosition.mag())
-    thetaS = asin(SUN_RADIUS / relativeSunPosition.mag())
-    theta = vang(earthPosition, relativeSunPosition)
-
-    # logical eclipse values from Ref[2]
-    if shadowType is Shadow.UMBRA:
-        return (thetaE > thetaS) and (theta < (thetaE - thetaS))
-    elif shadowType is Shadow.PENUMBRA:
-        return abs(thetaE - thetaS) < theta < (thetaE + thetaS) or (thetaE > thetaS) and (theta < (thetaE - thetaS))
-    elif shadowType is Shadow.ANNULAR:
-        return (thetaS > thetaE) and (theta < (thetaS - thetaE))
-
-
-def checkEclipse(sat, time):
-    # compute delta
-    state = sat.getState(time)
-    h = cross(*state)
-    uz = norm(h)
-    sunPosition = Sun.computePosition(time)
-    s = norm(sunPosition)
-    tmp = acos(dot(uz, s))
-    if tmp > pi / 2:
-        tmp = pi - tmp
-    delta = pi / 2 - tmp
-
-    # compute delta'
-    elements = sat.getElements(time)
-    sVector = __compute_s_vector(sunPosition, elements.raan, elements.inc, elements.aop)
-    gamma = __compute_gamma(sVector)
-    rhs = EARTH_EQUITORIAL_RADIUS * (1 + elements.ecc * cos(pi - gamma))
-    lhs = elements.sma * (1 - elements.ecc * elements.ecc)
-    deltaP = asin(rhs / lhs)
-
-    return delta < deltaP
+    return enterTime <= time < exitTime

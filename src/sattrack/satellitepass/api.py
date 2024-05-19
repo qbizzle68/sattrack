@@ -1,11 +1,11 @@
 from .eclipse import (
-    Shadow,
-    Eclipse,
-    getShadowPositions,
-    getShadowAnomalies,
-    getShadowTimes,
+    EclipseFinder,
     isEclipsed,
-    checkEclipse,
+    UMBRA,
+    PENUMBRA,
+    ANNULAR,
+    ENTER,
+    EXIT,
 )
 
 from .exceptions import (
@@ -22,5 +22,4 @@ from .satpass import (
     PassTimeController,
     SatellitePass,
     PassFinder,
-    PassController,
 )
